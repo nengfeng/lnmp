@@ -442,7 +442,7 @@ checkDownload() {
   fi
 
   # PHP
-  if [[ "${php_option}" =~ ^[1-9]$|^1[0-4]$ ]] || [[ "${mphp_ver}" =~ ^5[3-6]$|^7[0-4]$|^8[0-4]$ ]]; then
+  if [[ "${php_option}" =~ ^[1-9]$|^1[0-5]$ ]] || [[ "${mphp_ver}" =~ ^5[3-6]$|^7[0-4]$|^8[0-5]$ ]]; then
     echo "PHP common..."
     src_url=${mirror_link}/src/libiconv-${libiconv_ver}.tar.gz && Download_src
     src_url=https://curl.haxx.se/download/curl-${curl_ver}.tar.gz && Download_src
@@ -505,6 +505,12 @@ checkDownload() {
     src_url=${mirror_link}/src/binutils-${binutils_ver}.tar.gz && Download_src
   elif [ "${php_option}" == '14' ] || [ "${mphp_ver}" == '84' ]; then
     src_url=https://secure.php.net/distributions/php-${php84_ver}.tar.gz && Download_src
+    src_url=${mirror_link}/src/argon2-${argon2_ver}.tar.gz && Download_src
+    src_url=${mirror_link}/src/libsodium-${libsodium_ver}.tar.gz && Download_src
+    src_url=${mirror_link}/src/libzip-${libzip_ver}.tar.gz && Download_src
+    src_url=${mirror_link}/src/binutils-${binutils_ver}.tar.gz && Download_src
+  elif [ "${php_option}" == '15' ] || [ "${mphp_ver}" == '85' ]; then
+    src_url=https://secure.php.net/distributions/php-${php85_ver}.tar.gz && Download_src
     src_url=${mirror_link}/src/argon2-${argon2_ver}.tar.gz && Download_src
     src_url=${mirror_link}/src/libsodium-${libsodium_ver}.tar.gz && Download_src
     src_url=${mirror_link}/src/libzip-${libzip_ver}.tar.gz && Download_src

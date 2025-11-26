@@ -42,8 +42,8 @@ Show_Help() {
   --apache                    Install Apache
   --apache_mode_option [1-2]  Apache2.4 mode, 1(default): php-fpm, 2: mod_php
   --apache_mpm_option [1-3]   Apache2.4 MPM, 1(default): event, 2: prefork, 3: worker
-  --php_option [1-14]         Install PHP version
-  --mphp_ver [53~84]          Install another PHP version (PATH: ${php_install_dir}\${mphp_ver})
+  --php_option [1-15]         Install PHP version
+  --mphp_ver [53~85]          Install another PHP version (PATH: ${php_install_dir}\${mphp_ver})
   --mphp_addons               Only install another PHP addons
   --phpcache_option [1-3]     Install PHP opcode cache, default: 1 opcache
   --php_extensions [ext name] Install PHP extensions, include zendguardloader,ioncube,
@@ -99,12 +99,12 @@ while :; do
       ;;
     --php_option)
       php_option=$2; shift 2
-      [[ ! ${php_option} =~ ^[1-9]$|^1[0-4]$ ]] && { echo "${CWARNING}php_option input error! Please only input number 1~14${CEND}"; exit 1; }
+      [[ ! ${php_option} =~ ^[1-9]$|^1[0-5]$ ]] && { echo "${CWARNING}php_option input error! Please only input number 1~15${CEND}"; exit 1; }
       [ -e "${php_install_dir}/bin/phpize" ] && { echo "${CWARNING}PHP already installed! ${CEND}"; unset php_option; }
       ;;
     --mphp_ver)
       mphp_ver=$2; mphp_flag=y; shift 2
-      [[ ! "${mphp_ver}" =~ ^5[3-6]$|^7[0-4]$|^8[0-3]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 53~83${CEND}"; exit 1; }
+      [[ ! "${mphp_ver}" =~ ^5[3-6]$|^7[0-5]$|^8[0-5]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 53~85${CEND}"; exit 1; }
       ;;
     --mphp_addons)
       mphp_addons_flag=y; shift 1
@@ -501,10 +501,11 @@ if [ ${ARG_NUM} == 0 ]; then
           echo -e "\t${CMSG}12${CEND}. Install php-8.2"
           echo -e "\t${CMSG}13${CEND}. Install php-8.3"
           echo -e "\t${CMSG}14${CEND}. Install php-8.4"
-          read -e -p "Please input a number:(Default 12 press Enter) " php_option
-          php_option=${php_option:-12}
-          if [[ ! ${php_option} =~ ^[1-9]$|^1[0-4]$ ]]; then
-            echo "${CWARNING}input error! Please only input number 1~14${CEND}"
+          echo -e "\t${CMSG}15${CEND}. Install php-8.4"
+          read -e -p "Please input a number:(Default 14 press Enter) " php_option
+          php_option=${php_option:-14}
+          if [[ ! ${php_option} =~ ^[1-9]$|^1[0-5]$ ]]; then
+            echo "${CWARNING}input error! Please only input number 1~15${CEND}"
           else
             break
           fi
@@ -683,7 +684,7 @@ if [ ${ARG_NUM} == 0 ]; then
   done
 
   # check phpMyAdmin
-  if [[ ${php_option} =~ ^[1-9]$|^1[0-4]$ ]] || [ -e "${php_install_dir}/bin/phpize" ]; then
+  if [[ ${php_option} =~ ^[1-9]$|^1[0-5]$ ]] || [ -e "${php_install_dir}/bin/phpize" ]; then
     while :; do echo
       read -e -p "Do you want to install phpMyAdmin? [y/n]: " phpmyadmin_flag
       if [[ ! ${phpmyadmin_flag} =~ ^[y,n]$ ]]; then
@@ -900,6 +901,10 @@ case "${php_option}" in
   14)
     . include/php-8.4.sh
     Install_PHP84 2>&1 | tee -a ${current_dir}/install.log
+    ;;
+  15)
+    . include/php-8.5.sh
+    Install_PHP85 2>&1 | tee -a ${current_dir}/install.log
     ;;
 esac
 
@@ -1173,7 +1178,7 @@ echo "Total Install Time: ${CQUESTION}${installTime}${CEND} minutes"
 [ "${db_option}" == '14' ] && echo "$(printf "%-32s" "MongoDB data dir:")${CMSG}${mongo_data_dir}${CEND}"
 [ "${db_option}" == '14' ] && echo "$(printf "%-32s" "MongoDB user:")${CMSG}root${CEND}"
 [ "${db_option}" == '14' ] && echo "$(printf "%-32s" "MongoDB password:")${CMSG}${dbmongopwd}${CEND}"
-[[ "${php_option}" =~ ^[1-9]$|^1[0-4]$ ]] && echo -e "\n$(printf "%-32s" "PHP install dir:")${CMSG}${php_install_dir}${CEND}"
+[[ "${php_option}" =~ ^[1-9]$|^1[0-5]$ ]] && echo -e "\n$(printf "%-32s" "PHP install dir:")${CMSG}${php_install_dir}${CEND}"
 [ "${phpcache_option}" == '1' ] && echo "$(printf "%-32s" "Opcache Control Panel URL:")${CMSG}http://${IPADDR}/ocp.php${CEND}"
 [ "${phpcache_option}" == '2' ] && echo "$(printf "%-32s" "APC Control Panel URL:")${CMSG}http://${IPADDR}/apc.php${CEND}"
 [ "${phpcache_option}" == '3' -a -e "${php_install_dir}/etc/php.d/02-eaccelerator.ini" ] && echo "$(printf "%-32s" "eAccelerator Control Panel URL:")${CMSG}http://${IPADDR}/control.php${CEND}"

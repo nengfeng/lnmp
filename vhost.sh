@@ -352,10 +352,11 @@ What Are You Doing?
         [ -e "/dev/shm/php82-cgi.sock" ] && echo -e "\t${CMSG}12${CEND}. PHP 8.2"
         [ -e "/dev/shm/php83-cgi.sock" ] && echo -e "\t${CMSG}13${CEND}. PHP 8.3"
         [ -e "/dev/shm/php84-cgi.sock" ] && echo -e "\t${CMSG}14${CEND}. PHP 8.4"
+        [ -e "/dev/shm/php85-cgi.sock" ] && echo -e "\t${CMSG}14${CEND}. PHP 8.5"
         read -e -p "Please input a number:(Default 0 press Enter) " php_option
         php_option=${php_option:-0}
-        if [[ ! ${php_option} =~ ^[0-9]$|^1[0-4]$ ]]; then
-          echo "${CWARNING}input error! Please only input number 1~14${CEND}"
+        if [[ ! ${php_option} =~ ^[0-9]$|^1[0-5]$ ]]; then
+          echo "${CWARNING}input error! Please only input number 1~15${CEND}"
         else
           break
         fi
@@ -375,6 +376,7 @@ What Are You Doing?
     [ "${php_option}" == '12' ] && mphp_ver=82
     [ "${php_option}" == '13' ] && mphp_ver=83
     [ "${php_option}" == '14' ] && mphp_ver=84
+    [ "${php_option}" == '15' ] && mphp_ver=85
     [ ! -e "/dev/shm/php${mphp_ver}-cgi.sock" ] && unset mphp_ver
   fi
 
