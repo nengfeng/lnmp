@@ -23,7 +23,9 @@ EOF
 sed -i 's@^"syntax on@syntax on@' /etc/vim/vimrc
 
 # history
-[ -z "$(grep history-timestamp ~/.bashrc)" ] && echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\`pwd\`/:\$msg ---- \$(who am i); } >> /tmp/\`hostname\`.\`whoami\`.history-timestamp'" >> ~/.bashrc
+[ -z "$(grep history-timestamp ~/.bashrc)" ] && echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\`pwd\`/:\$msg ---- \$(who am i); } >> ~/.history-timestamp'" >> ~/.bashrc
+# Set secure permissions for history file
+[ -e ~/.history-timestamp ] && chmod 600 ~/.history-timestamp
 
 # /etc/security/limits.conf
 [ -e /etc/security/limits.d/*nproc.conf ] && rename nproc.conf nproc.conf_bk /etc/security/limits.d/*nproc.conf
@@ -31,22 +33,23 @@ sed -i 's@^"syntax on@syntax on@' /etc/vim/vimrc
 sed -i '/^# End of file/,$d' /etc/security/limits.conf
 cat >> /etc/security/limits.conf <<EOF
 # End of file
-* soft nproc 1000000
-* hard nproc 1000000
-* soft nofile 1000000
-* hard nofile 1000000
-root soft nproc 1000000
-root hard nproc 1000000
-root soft nofile 1000000
-root hard nofile 1000000
+* soft nproc 65535
+* hard nproc 65535
+* soft nofile 65535
+* hard nofile 65535
+root soft nproc 65535
+root hard nproc 65535
+root soft nofile 65535
+root hard nofile 65535
 EOF
 
 # /etc/hosts
-[ "$(hostname -i | awk '{print $1}')" != "127.0.0.1" ] && sed -i "s@127.0.0.1.*localhost@&\n127.0.0.1 $(hostname)@g" /etc/hosts
+if [ "$(hostname -i | awk '{print $1}')" != "127.0.0.1" ]; then
+  [ -z "$(grep $(hostname) /etc/hosts)" ] && sed -i "s@127.0.0.1.*localhost@&\n127.0.0.1 $(hostname)@g" /etc/hosts
+fi
 
 # Set timezone
-rm -rf /etc/localtime
-ln -s /usr/share/zoneinfo/${timezone} /etc/localtime
+ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime
 
 # Set DNS
 #cat > /etc/resolv.conf << EOF
@@ -72,23 +75,26 @@ net.core.netdev_max_backlog = 32768
 net.ipv4.tcp_timestamps = 0
 net.ipv4.tcp_max_orphans = 32768
 EOF
-sysctl -p
+if ! sysctl -p > /dev/null 2>&1; then
+  echo "Warning: Failed to apply sysctl settings" >&2
+fi
 
 sed -i 's@^ACTIVE_CONSOLES.*@ACTIVE_CONSOLES="/dev/tty[1-2]"@' /etc/default/console-setup
 sed -i 's@^# en_US.UTF-8@en_US.UTF-8@' /etc/locale.gen
-init q
+[ -x /bin/systemctl ] && systemctl daemon-reload || init q
 
 # ufw
 if [ "${firewall_flag}" == 'y' ]; then
-  ufw allow 22/tcp
-  [ "${ssh_port}" != "22" ] && ufw allow ${ssh_port}/tcp
-  ufw allow 80/tcp
-  ufw allow 443/tcp
-  ufw --force enable
+  ufw allow 22/tcp || echo "Warning: Failed to configure ufw for port 22" >&2
+  [ "${ssh_port}" != "22" ] && ufw allow ${ssh_port}/tcp || echo "Warning: Failed to configure ufw for port ${ssh_port}" >&2
+  ufw allow 80/tcp || echo "Warning: Failed to configure ufw for port 80" >&2
+  ufw allow 443/tcp || echo "Warning: Failed to configure ufw for port 443" >&2
+  ufw --force enable || echo "Warning: Failed to enable ufw" >&2
 else
-  ufw --force disable
+  ufw --force disable || echo "Warning: Failed to disable ufw" >&2
 fi
-systemctl restart rsyslog ssh
+systemctl restart rsyslog || echo "Warning: Failed to restart rsyslog" >&2
+systemctl restart ssh || echo "Warning: Failed to restart ssh" >&2
 
 . /etc/profile
 . ~/.bashrc
