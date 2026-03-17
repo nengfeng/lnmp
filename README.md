@@ -255,6 +255,21 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 ./upgrade.sh --cacert            # 更新 CA 根证书 (建议每 3-6 个月)
 ```
 
+### 版本检测 (update_versions.sh)
+
+自动检测组件最新版本：
+
+```bash
+./update_versions.sh           # 检测版本更新（dry-run）
+./update_versions.sh --apply   # 自动应用小版本更新
+./update_versions.sh --json    # JSON 格式输出
+```
+
+功能特性：
+- 自动检测 Nginx、PHP、PostgreSQL、Redis 等组件的最新版本
+- 小版本更新（如 8.5.3 → 8.5.4）可自动应用
+- 大版本更新（如 PHP 8.4 → 8.5）仅提示，需手动确认
+
 ## 卸载
 
 ```bash
