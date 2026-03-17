@@ -1,0 +1,86 @@
+# newest software version
+# Web
+nginx_ver=1.28.2
+tengine_ver=3.1.0
+openresty_ver=1.29.2.1
+openssl_ver=3.5.5
+
+pcre_ver=8.45
+nghttp2_ver=1.59.0
+
+# DB
+mysql84_ver=8.4.8
+mysql80_ver=8.0.45
+
+mariadb118_ver=11.8.6
+mariadb114_ver=11.4.10
+mariadb1011_ver=10.11.15
+
+pgsql18_ver=18.3
+pgsql17_ver=17.9
+pgsql16_ver=16.13
+
+# PHP
+php83_ver=8.3.30
+php84_ver=8.4.19
+php85_ver=8.5.4
+
+# Nodejs
+nodejs_ver=20.20.1
+
+libiconv_ver=1.17
+curl_ver=8.18.0
+libmcrypt_ver=2.5.8
+mcrypt_ver=2.6.8
+mhash_ver=0.9.9.9
+freetype_ver=2.13.3
+icu4c_ver=63_1
+libsodium_ver=1.0.20
+libzip_ver=1.11.4
+argon2_ver=20190702
+binutils_ver=2.46.0
+imagemagick_ver=7.1.2-13
+imagick_ver=3.8.1
+graphicsmagick_ver=1.3.40
+gmagick_ver=2.0.6RC1
+zendopcache_ver=7.0.5
+apcu_ver=5.1.28
+phalcon_ver=5.10.0
+yaf_ver=3.3.6
+yar_ver=2.3.4
+swoole_ver=6.2.0
+xdebug_ver=3.5.1
+
+# Ftp
+pureftpd_ver=1.0.53
+
+# Redis
+redis_ver=8.6.1
+pecl_redis_ver=6.3.0
+
+# Memcached
+memcached_ver=1.6.41
+libmemcached_ver=1.0.18
+pecl_memcached_ver=3.4.0
+pecl_memcache_ver=8.2
+
+# MongoDB
+pecl_mongodb_ver=2.2.1
+
+# phpMyadmin
+phpmyadmin_ver=5.2.3
+
+# tcmalloc (gperftools)
+tcmalloc_ver=2.18
+
+# boost
+boost_ver=1.77.0
+boost_oldver=1.59.0
+
+# Others
+lua_nginx_module_ver=0.10.29
+luajit2_ver=2.1-20251030
+lua_resty_core_ver=0.1.32
+lua_resty_lrucache_ver=0.15
+lua_cjson_ver=2.1.0.15
+fail2ban_ver=master

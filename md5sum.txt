@@ -1,0 +1,2 @@
+# md5sum.txt will be generated at release time
+# Use GitHub releases for distribution

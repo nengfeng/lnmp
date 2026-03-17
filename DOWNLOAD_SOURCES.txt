@@ -1,0 +1,265 @@
+# LNMP 一键安装脚本 - 组件下载源列表
+# 更新时间: 2026-03-15
+#
+# 下载架构:
+#   镜像配置: options.conf (MIRROR_BASE_URL)
+#   镜像检测: common.sh (init_mirror + get_mirror_url)
+#   IP 检测:   ip_detect.sh (ip_state)
+#   下载函数:  download.sh (Download_src)
+#   批量下载:  check_download.sh (checkDownload)
+#
+# 说明:
+# - [官方+镜像] = 可从官方或国内镜像下载，自动检测 IP 切换
+# - [仅官方]    = 只能从官方下载，镜像站无此组件
+# - [校验码]    = 支持校验码验证 (SHA256/PGP/MD5)
+
+================================================================================
+一、镜像源系统
+================================================================================
+
+1.1 配置 (options.conf)
+
+  MIRROR_BASE_URL=https://mirrors.tuna.tsinghua.edu.cn   # 默认: 清华镜像
+  # MIRROR_BASE_URL=https://mirrors.ustc.edu.cn          # 中科大
+  # MIRROR_BASE_URL=https://mirrors.aliyun.com           # 阿里云
+  # MIRROR_BASE_URL=https://mirrors.xtom.com             # xtom (国际CDN)
+
+1.2 IP 自动检测 (ip_detect.sh → common.sh)
+
+  调用 init_mirror 自动检测 IP 所在国家:
+    - 中国大陆 (CN) → USE_CHINA_MIRROR=y → 使用 MIRROR_BASE_URL
+    - 其他地区      → USE_CHINA_MIRROR=n → 使用官方源
+
+  IP 检测 API 优先级 (ip_state):
+    1. Cloudflare trace   (~200ms, 无限流)
+    2. ip.sb/geoip        (~500ms, JSON)
+    3. ifconfig.co        (~600ms, 全名→代码映射)
+    4. ipinfo.io          (~800ms, 可能限流)
+
+1.3 镜像选择函数 (common.sh)
+
+  # 初始化镜像检测
+  init_mirror                    # 设置 USE_CHINA_MIRROR=y/n
+
+  # 获取镜像 URL
+  get_mirror_url "官方URL" "国内URL" "$USE_CHINA_MIRROR"
+
+  用法示例:
+    init_mirror
+    src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR") && Download_src
+
+================================================================================
+二、Web 服务器
+================================================================================
+
+组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+Nginx               | https://nginx.org/download/                    | 清华      | PGP
+Tengine             | https://tengine.taobao.org/download/           | 无        | 无
+OpenResty           | https://openresty.org/download/                | 清华      | PGP
+
+================================================================================
+三、Web 服务器依赖
+================================================================================
+
+组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+OpenSSL             | https://www.openssl.org/source/                | 清华      | SHA256
+PCRE                | https://sourceforge.net/projects/pcre/         | 清华      | 无
+tcmalloc            | https://github.com/gperftools/gperftools       | 清华      | 无
+
+================================================================================
+四、数据库
+================================================================================
+
+组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+MySQL 8.4           | https://cdn.mysql.com/Downloads/MySQL-8.4/     | 清华      | MD5
+MySQL 8.0           | https://cdn.mysql.com/Downloads/MySQL-8.0/     | 清华      | MD5
+MariaDB 11.8        | https://archive.mariadb.org/                   | 清华      | MD5
+MariaDB 11.4        | https://archive.mariadb.org/                   | 清华      | MD5
+MariaDB 10.11       | https://archive.mariadb.org/                   | 清华      | MD5
+PostgreSQL 16-18    | https://ftp.postgresql.org/pub/source/         | 清华      | MD5
+Boost               | https://sourceforge.net/projects/boost/        | 清华      | 无
+
+注: MySQL/MariaDB 支持二进制包或源码编译两种安装方式
+
+================================================================================
+五、PHP 核心
+================================================================================
+
+组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+PHP 8.3             | https://www.php.net/distributions/             | 清华      | SHA256
+PHP 8.4             | https://www.php.net/distributions/             | 清华      | SHA256
+PHP 8.5             | https://www.php.net/distributions/             | 清华      | SHA256
+
+================================================================================
+六、PHP 依赖库
+================================================================================
+
+组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+libiconv            | https://ftp.gnu.org/gnu/libiconv/              | 清华      | PGP
+curl                | https://curl.haxx.se/download/                 | 清华      | PGP
+freetype            | https://download.savannah.gnu.org/releases/    | 清华      | 无
+libsodium           | https://download.libsodium.org/releases/       | 清华      | PGP
+libzip              | https://libzip.org/download/                   | 清华      | 无
+binutils            | https://ftp.gnu.org/gnu/binutils/              | 清华      | PGP
+argon2              | https://github.com/P-H-C/phc-winner-argon2     | 清华      | 无
+ICU                 | https://github.com/unicode-org/icu/releases    | 清华      | 无
+
+================================================================================
+七、PECL 扩展
+================================================================================
+
+组件名称            | 下载地址                                        | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+pecl-redis          | https://pecl.php.net/get/redis-{ver}.tgz       | 清华      | 无
+pecl-memcached      | https://pecl.php.net/get/memcached-{ver}.tgz   | 清华      | 无
+pecl-memcache       | https://pecl.php.net/get/memcache-{ver}.tgz    | 清华      | 无
+pecl-mongodb        | https://pecl.php.net/get/mongodb-{ver}.tgz     | 清华      | 无
+pecl-imagick        | https://pecl.php.net/get/imagick-{ver}.tgz     | 清华      | 无
+pecl-gmagick        | https://pecl.php.net/get/gmagick-{ver}.tgz     | 清华      | 无
+pecl-apcu           | https://pecl.php.net/get/apcu-{ver}.tgz        | 清华      | 无
+pecl-phalcon        | https://pecl.php.net/get/phalcon-{ver}.tgz     | 清华      | 无
+pecl-yaf            | https://pecl.php.net/get/yaf-{ver}.tgz         | 清华      | 无
+pecl-swoole         | https://pecl.php.net/get/swoole-{ver}.tgz      | 清华      | 无
+pecl-xdebug         | https://pecl.php.net/get/xdebug-{ver}.tgz      | 清华      | 无
+ionCube             | https://downloads.ioncube.com/                 | 无        | 无
+ImageMagick         | https://github.com/ImageMagick/ImageMagick     | GitHub    | 无
+GraphicsMagick      | https://sourceforge.net/projects/graphicsmagick| 清华      | 无
+
+================================================================================
+八、缓存/NoSQL
+================================================================================
+
+组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+Redis               | http://download.redis.io/releases/             | 清华      | 无
+Memcached           | http://www.memcached.org/files/                | 清华      | 无
+libmemcached        | https://launchpad.net/libmemcached/            | 清华      | 无
+
+================================================================================
+九、Web 服务器/Lua 模块
+================================================================================
+
+组件名称            | 下载地址                                        | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+lua-nginx-module    | https://github.com/openresty/lua-nginx-module  | 清华      | 无
+ngx_devel_kit       | https://github.com/vision5/ngx_devel_kit       | 清华      | 无
+luajit2             | https://github.com/openresty/luajit2           | 清华      | 无
+lua-resty-core      | https://github.com/openresty/lua-resty-core    | 清华      | 无
+lua-resty-lrucache  | https://github.com/openresty/lua-resty-lrucache| 清华      | 无
+lua-cjson           | https://github.com/openresty/lua-cjson         | 清华      | 无
+ngx_lua_waf         | https://github.com/loveshell/ngx_lua_waf       | GitHub    | 无
+
+================================================================================
+十、安全/工具
+================================================================================
+
+组件名称            | 下载地址                                        | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+acme.sh             | https://github.com/acmesh-official/acme.sh     | 清华      | 无
+fail2ban            | https://github.com/fail2ban/fail2ban           | 清华      | 无
+webgrind            | https://github.com/jokkedk/webgrind            | GitHub    | 无
+dbxcli              | https://github.com/dropbox/dbxcli/releases     | GitHub    | 无
+
+================================================================================
+十一、其他组件
+================================================================================
+
+组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
+--------------------|------------------------------------------------|-----------|--------
+Node.js             | https://nodejs.org/dist/                       | 清华      | SHA256
+Pure-FTPd           | https://download.pureftpd.org/                 | 清华      | 无
+phpMyAdmin          | https://www.phpmyadmin.net/downloads/          | 清华      | SHA256
+CA Certificates     | https://curl.se/ca/cacert.pem                  | 无        | 无
+xprober             | ${MIRROR_BASE_URL}/src/                        | 清华      | 无
+ocp (OPcache面板)   | ${MIRROR_BASE_URL}/src/                        | 清华      | 无
+
+================================================================================
+十二、IP 检测功能 (ip_detect.sh)
+================================================================================
+
+纯 bash 实现，替代已移除的闭源 ois 二进制。
+
+功能:
+- ip_local       获取本机 IP (ip route → hostname -I → ifconfig)
+- ip_state       获取外网 IP 国家代码 (4级 API fallback)
+- conn_port      TCP 端口连通测试 (curl telnet → nc → /dev/tcp)
+
+用法:
+  . ./include/ip_detect.sh
+  IPADDR=$(ip_local)                  # 192.168.1.100
+  OUTIP_STATE=$(ip_state)             # CN / SG / US ...
+  result=$(conn_port -h 8.8.8.8 -p 53)  # true / false
+
+国家代码用途:
+  [ "${OUTIP_STATE}"x == "China"x ] && 使用国内镜像 || 使用官方源
+
+================================================================================
+十二、镜像站列表
+================================================================================
+
+国内镜像站:
+- 清华大学: https://mirrors.tuna.tsinghua.edu.cn  (默认)
+- 中科大:   https://mirrors.ustc.edu.cn
+- 阿里云:   https://mirrors.aliyun.com
+
+国际镜像站 (全球 CDN):
+- xtom:     https://mirrors.xtom.com
+
+⚠️ 重要说明:
+国内镜像站仅同步部分标准开源软件。GitHub 上的项目 (fail2ban, luajit2,
+lua-nginx-module, acme.sh 等) 不在国内镜像覆盖范围内，直接从 GitHub
+官方下载 (国内可正常访问，速度可能较慢)。
+
+已验证可用的镜像路径 (MIRROR_BASE_URL 下, 2026-03-15 实测):
+- openresty/       OpenResty ✅ (302 重定向)
+- mariadb/         MariaDB 二进制/源码 ✅
+- nodejs-release/  Node.js ✅
+- gnu/libiconv/    libiconv ✅
+- gnu/binutils/    binutils ✅
+
+不可用的路径:
+- github-release/  ❌ 不存在
+- nginx/           ❌ 不存在 (直接从 nginx.org 下载)
+- openssl/         ❌ 不存在
+- php/             ❌ 不存在
+- mysql/           ❌ 不存在
+- redis/           ❌ 不存在
+
+================================================================================
+十四、校验码验证
+================================================================================
+
+支持的校验码类型:
+- SHA256: OpenSSL, PHP, Node.js, phpMyAdmin
+- PGP 签名: Nginx, OpenResty, libiconv, curl, libsodium, binutils
+- MD5: MySQL, MariaDB, PostgreSQL
+
+默认启用校验码验证。跳过方式:
+  VERIFY_CHECKSUM=no ./download_sources.sh nginx
+
+================================================================================
+十五、使用示例
+================================================================================
+
+# 下载常用组件 (自动检测镜像)
+./download_sources.sh --common
+
+# 强制使用国内镜像
+MIRROR_MODE=china ./download_sources.sh nginx
+
+# 强制使用官方源
+MIRROR_MODE=official ./download_sources.sh nginx
+
+# 在脚本中使用
+init_mirror
+official_url="https://github.com/fail2ban/fail2ban/archive/refs/tags/1.0.0.tar.gz"
+china_url="${MIRROR_BASE_URL}/github-release/fail2ban/fail2ban/fail2ban-1.0.0.tar.gz"
+src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
+Download_src
+
+================================================================================
