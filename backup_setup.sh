@@ -229,7 +229,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 3)" ]; then
   [[ "${1}" == 25 ]] && Host=oss-eu-central-1-internal.aliyuncs.com
   [[ "${1}" == 26 ]] && Host=oss-eu-west-1-internal.aliyuncs.com
   [[ "${1}" == 27 ]] && Host=oss-me-east-1-internal.aliyuncs.com
-  [["$(conn_port --host ${Host} --port 80)" == "false"]] && Host=$(echo ${Host} | sed 's@-internal@@g')
+  [[ "$(conn_port --host ${Host} --port 80)" == "false" ]] && Host=$(echo ${Host} | sed 's@-internal@@g')
   [ -e "/root/.ossutilconfig" ] && rm -f /root/.ossutilconfig
   while :; do echo
     read -e -p "Please enter the aliyun oss Access Key ID: " KeyID

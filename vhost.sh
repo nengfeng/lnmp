@@ -149,7 +149,7 @@ If you enter '.', the field will be left blank.
         echo "${CMSG}Enter one of ec-256, ec-384, ec-521 will issue a ECC cert.${CEND}"
         echo
         read -e -p "Please enter your cert key length (default ec-256): " CERT_KEYLENGTH
-        if [[[ "${CERT_KEYLENGTH}" == "" ]]]; then
+        if [[ "${CERT_KEYLENGTH}" == "" ]]; then
           CERT_KEYLENGTH="ec-256"
           break
         elif [[ "${CERT_KEYLENGTH}" =~ ^2048$|^3072$|^4096$|^8192$|^ec-256$|^ec-384$|^ec-521$ ]]; then

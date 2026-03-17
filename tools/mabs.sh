@@ -4,6 +4,7 @@
 # Load required modules
 . ../include/color.sh
 . ../include/check_os.sh
+. ../include/ip_detect.sh
 
 ######################  proc defination  ########################
 # ignore rule
@@ -115,7 +116,7 @@ do
   # while read Line
   do
     #[ -z "$(echo $IP | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|CNS')" ] && continue
-    if [[ "$(../include/ois.${ARCH} conn_port --host ${IP} --port ${PORT})" == "false" ]]; then
+    if [[ "$(conn_port --host ${IP} --port ${PORT})" == "false" ]]; then
       [ ! -e ipnologin.txt ] && > ipnologin.txt
       [ -z "$(grep $IP ipnologin.txt | grep $(date +%F))" ] && echo "$(date +%F_%H%M) $IP" >> ipnologin.txt
       continue

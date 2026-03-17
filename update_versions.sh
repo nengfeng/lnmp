@@ -18,8 +18,8 @@ cd "${current_dir}"
 
 apply_changes="n"
 output_json="n"
-[ "$1" == "--apply" ] && apply_changes="y"
-[ "$1" == "--json" ] && output_json="y"
+[[ "$1" == "--apply" ]] && apply_changes="y"
+[[ "$1" == "--json" ]] && output_json="y"
 
 . ./include/color.sh 2>/dev/null || true
 . ./versions.txt
@@ -49,7 +49,7 @@ major_minor() {
 # Returns: "same" "minor" "major" "older"
 classify_update() {
   local current="$1" latest="$2"
-  [ "$current" == "$latest" ] && echo "same" && return
+  [[ "$current" == "$latest" ]] && echo "same" && return
   
   local cur_major=$(echo "$current" | cut -d. -f1)
   local lat_major=$(echo "$latest" | cut -d. -f1)
@@ -82,7 +82,7 @@ check_latest() {
   latest="${latest#v}"
   current="${current#v}"
 
-  if [ "$current" == "$latest" ]; then
+  if [[ "$current" == "$latest" ]]; then
     results="${results}✅ ${name}: ${current} (最新)\n"
     up_to_date=$((up_to_date + 1))
     return
@@ -95,7 +95,7 @@ check_latest() {
       # Minor/patch update
       results="${results}🔄 ${name}: ${current} → ${latest} (小版本更新)\n"
       minor_updated=$((minor_updated + 1))
-      if [ "$apply_changes" == "y" ]; then
+      if [[ "$apply_changes" == "y" ]]; then
         local varname=$(grep "_ver=" versions.txt | grep "$current" | head -1 | cut -d= -f1)
         if [ -n "$varname" ]; then
           sed -i "s/^${varname}=.*/${varname}=${latest}/" versions.txt
@@ -127,13 +127,13 @@ nginx_stable=$(curl -sL --connect-timeout 5 --max-time 10 \
   grep -oP 'Stable version.*?nginx-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 if [ -n "$nginx_stable" ]; then
   total=$((total + 1))
-  if [ "$nginx_ver" == "$nginx_stable" ]; then
+  if [[ "$nginx_ver" == "$nginx_stable" ]]; then
     results="${results}✅ Nginx (stable): ${nginx_ver} (最新)\n"
     up_to_date=$((up_to_date + 1))
   elif version_lt "$nginx_ver" "$nginx_stable"; then
     results="${results}🔄 Nginx (stable): ${nginx_ver} → ${nginx_stable} (小版本更新)\n"
     minor_updated=$((minor_updated + 1))
-    if [ "$apply_changes" == "y" ]; then
+    if [[ "$apply_changes" == "y" ]]; then
       sed -i "s/^nginx_ver=.*/nginx_ver=${nginx_stable}/" versions.txt
       results="${results}   ✏️  已更新 nginx_ver=${nginx_stable}\n"
     fi
@@ -177,13 +177,13 @@ for v in json.load(sys.stdin):
     if v['major']=='${pg_major}': print(v['major']+'.'+v.get('latestMinor','0'))" 2>/dev/null)
     eval "pg_current=\$pgsql${pg_major}_ver"
     if [ -n "$pg_latest" ]; then
-      if [ "$pg_current" == "$pg_latest" ]; then
+      if [[ "$pg_current" == "$pg_latest" ]]; then
         results="${results}✅ PostgreSQL ${pg_major}: ${pg_current} (最新)\n"
         up_to_date=$((up_to_date + 1))
       elif version_lt "$pg_current" "$pg_latest"; then
         results="${results}🔄 PostgreSQL ${pg_major}: ${pg_current} → ${pg_latest} (小版本更新)\n"
         minor_updated=$((minor_updated + 1))
-        [ "$apply_changes" == "y" ] && sed -i "s/^pgsql${pg_major}_ver=.*/pgsql${pg_major}_ver=${pg_latest}/" versions.txt
+        [[ "$apply_changes" == "y" ]] && sed -i "s/^pgsql${pg_major}_ver=.*/pgsql${pg_major}_ver=${pg_latest}/" versions.txt
       else
         results="${results}✅ PostgreSQL ${pg_major}: ${pg_current} (最新: ${pg_latest})\n"
         up_to_date=$((up_to_date + 1))
@@ -214,13 +214,13 @@ for t in tags:
         print(v); break" 2>/dev/null)
     eval "php_current=\$php${php_major/./}_ver"
     if [ -n "$php_latest" ]; then
-      if [ "$php_current" == "$php_latest" ]; then
+      if [[ "$php_current" == "$php_latest" ]]; then
         results="${results}✅ PHP ${php_major}: ${php_current} (最新)\n"
         up_to_date=$((up_to_date + 1))
       elif version_lt "$php_current" "$php_latest"; then
         results="${results}🔄 PHP ${php_major}: ${php_current} → ${php_latest} (小版本更新)\n"
         minor_updated=$((minor_updated + 1))
-        [ "$apply_changes" == "y" ] && sed -i "s/^php${php_major/./}_ver=.*/php${php_major/./}_ver=${php_latest}/" versions.txt
+        [[ "$apply_changes" == "y" ]] && sed -i "s/^php${php_major/./}_ver=.*/php${php_major/./}_ver=${php_latest}/" versions.txt
       else
         results="${results}✅ PHP ${php_major}: ${php_current} (最新: ${php_latest})\n"
         up_to_date=$((up_to_date + 1))
@@ -273,7 +273,7 @@ for item in "${pecl_repos[@]}"; do
   if [ -z "$latest" ]; then
     results="${results}⚠️  ${name}: 无法获取 (当前: ${current})\n"
     check_failed=$((check_failed + 1))
-  elif [ "$current" == "$latest" ]; then
+  elif [[ "$current" == "$latest" ]]; then
     results="${results}✅ ${name}: ${current} (最新)\n"
     up_to_date=$((up_to_date + 1))
   elif [ "$(classify_update "$current" "$latest")" == "major" ]; then
@@ -282,7 +282,7 @@ for item in "${pecl_repos[@]}"; do
   elif version_lt "$current" "$latest"; then
     results="${results}🔄 ${name}: ${current} → ${latest} (小版本更新)\n"
     minor_updated=$((minor_updated + 1))
-    if [ "$apply_changes" == "y" ]; then
+    if [[ "$apply_changes" == "y" ]]; then
       varname=$(grep "_ver=" versions.txt | grep "$current" | head -1 | cut -d= -f1)
       [ -n "$varname" ] && sed -i "s/^${varname}=.*/${varname}=${latest}/" versions.txt
     fi
@@ -319,7 +319,7 @@ echo "${CCYAN}========================================${CEND}"
 echo "${CCYAN} 检查结果${CEND}"
 echo "${CCYAN}========================================${CEND}"
 echo ""
-echo -e "$results"
+printf "%b\n" "$results"
 
 echo "${CCYAN}========================================${CEND}"
 echo "总计: ${total} 个组件"
@@ -329,7 +329,7 @@ echo "  🆕 大版本可用: ${major_available}"
 echo "  ⚠️  检查失败: ${check_failed}"
 echo ""
 
-if [ "$apply_changes" == "n" ] && [ "$minor_updated" -gt 0 ]; then
+if [[ "$apply_changes" == "n" ]] && [ "$minor_updated" -gt 0 ]; then
   echo "${CYELLOW}提示: 使用 --apply 参数应用小版本更新${CEND}"
   echo "  ./update_versions.sh --apply"
 fi
