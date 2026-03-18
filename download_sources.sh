@@ -559,19 +559,42 @@ download_component() {
         local ver_underscore=$(echo "$ver" | sed 's/\./_/g')
         fallback_url=$(echo "$fallback_url" | sed "s/{ver_underscore}/$ver_underscore/g")
         
-        # 从备用源下载，不验证校验码（GitHub archive 没有校验码）
+        # 从备用源下载到 src 目录
+        cd "${SRC_DIR}"
         if wget -q "$fallback_url" -O "$filename" 2>/dev/null; then
-          log INFO "Downloaded from fallback: $fallback_url"
           # 验证文件大小（确保不是空文件或错误页）
-          local file_size=$(stat -c%s "$filename" 2>/dev/null || echo "0")
+          local file_size=$(stat -c%s "$filename" 2>/dev/null || stat -f%z "$filename" 2>/dev/null || echo "0")
           if [ "$file_size" -gt 1000 ]; then
             log INFO "Fallback download successful: $filename"
+            
+            # 如果需要重命名解压目录
+            if [ -n "$rename_dir_template" ]; then
+              local expected_dir=$(echo "$rename_dir_template" | sed "s/{ver}/$ver/g")
+              expected_dir=$(echo "$expected_dir" | sed "s/{ver_dash}/$ver_dash/g")
+              expected_dir=$(echo "$expected_dir" | sed "s/{ver_underscore}/$ver_underscore/g")
+              
+              # 解压并重命名
+              local archive_name=$(tar -tzf "$filename" 2>/dev/null | head -1 | cut -d'/' -f1)
+              if [ -n "$archive_name" ] && [ "$archive_name" != "$expected_dir" ]; then
+                tar -xzf "$filename" 2>/dev/null
+                if [ -d "$archive_name" ]; then
+                  mv "$archive_name" "$expected_dir"
+                  # 重新打包为期望的文件名格式
+                  tar -czf "$filename" "$expected_dir"
+                  rm -rf "$expected_dir"
+                  log INFO "Renamed archive directory: $archive_name -> $expected_dir"
+                fi
+              fi
+            fi
+            
+            cd - > /dev/null
             return 0
           else
             log WARN "Fallback download appears corrupted, removing..."
             rm -f "$filename"
           fi
         fi
+        cd - > /dev/null
       fi
       
       return 1
