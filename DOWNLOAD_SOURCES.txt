@@ -101,7 +101,7 @@ PHP 8.5             | https://www.php.net/distributions/             | 清华   
 组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
 --------------------|------------------------------------------------|-----------|--------
 libiconv            | https://ftp.gnu.org/gnu/libiconv/              | 清华      | PGP
-curl                | https://curl.haxx.se/download/                 | 清华      | PGP
+curl                | https://curl.se/download/                       | 清华      | PGP
 freetype            | https://download.savannah.gnu.org/releases/    | 清华      | 无
 libsodium           | https://download.libsodium.org/releases/       | 清华      | PGP
 libzip              | https://libzip.org/download/                   | 清华      | 无
