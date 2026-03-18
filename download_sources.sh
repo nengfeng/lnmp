@@ -487,13 +487,15 @@ download_component() {
     [[ -z "$line" ]] && continue
     [[ ! "$line" =~ \| ]] && continue
     
-    # 新格式: 组件名|官方源|国内镜像|文件名|校验码URL|校验码类型
+    # 新格式: 组件名|官方源|国内镜像|文件名|校验码URL|校验码类型|备用源|重命名目录
     local name=$(echo "$line" | cut -d'|' -f1)
     local official_url=$(echo "$line" | cut -d'|' -f2 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
     local china_url=$(echo "$line" | cut -d'|' -f3 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
     local filename_template=$(echo "$line" | cut -d'|' -f4)
     local checksum_url_template=$(echo "$line" | cut -d'|' -f5 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
     local checksum_type=$(echo "$line" | cut -d'|' -f6)
+    local fallback_url_template=$(echo "$line" | cut -d'|' -f7)
+    local rename_dir_template=$(echo "$line" | cut -d'|' -f8)
     
     # 替换架构变量
     official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g")
@@ -543,8 +545,33 @@ download_component() {
         log WARN "China mirror failed, trying official source..."
         download_info=$(build_download_url "$official_url" "$filename_template" "$ver")
         url=$(echo "$download_info" | cut -d'|' -f1)
-        download_file "$url" "$filename" "$checksum_url" "$checksum_type"
-        return $?
+        if download_file "$url" "$filename" "$checksum_url" "$checksum_type"; then
+          return 0
+        fi
+      fi
+      
+      # 尝试备用源 (如 GitHub)
+      if [ -n "$fallback_url_template" ]; then
+        log WARN "Primary sources failed, trying fallback (GitHub)..."
+        local fallback_url=$(echo "$fallback_url_template" | sed "s/{ver}/$ver/g")
+        local ver_dash="${ver//./-}"
+        fallback_url=$(echo "$fallback_url" | sed "s/{ver_dash}/$ver_dash/g")
+        local ver_underscore=$(echo "$ver" | sed 's/\./_/g')
+        fallback_url=$(echo "$fallback_url" | sed "s/{ver_underscore}/$ver_underscore/g")
+        
+        # 从备用源下载，不验证校验码（GitHub archive 没有校验码）
+        if wget -q "$fallback_url" -O "$filename" 2>/dev/null; then
+          log INFO "Downloaded from fallback: $fallback_url"
+          # 验证文件大小（确保不是空文件或错误页）
+          local file_size=$(stat -c%s "$filename" 2>/dev/null || echo "0")
+          if [ "$file_size" -gt 1000 ]; then
+            log INFO "Fallback download successful: $filename"
+            return 0
+          else
+            log WARN "Fallback download appears corrupted, removing..."
+            rm -f "$filename"
+          fi
+        fi
       fi
       
       return 1
