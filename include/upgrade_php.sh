@@ -8,6 +8,7 @@ VERIFY_CHECKSUM="${VERIFY_CHECKSUM:-yes}"
 Upgrade_PHP() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${php_install_dir}" ] && echo "${CWARNING}PHP is not installed on your system! ${CEND}" && exit 1
+  
   OLD_php_ver=$(${php_install_dir}/bin/php-config --version)
   pythonCtl=python
   command -v python3 > /dev/null 2>&1 && pythonCtl=python3
@@ -15,6 +16,28 @@ Upgrade_PHP() {
   Latest_php_ver=${Latest_php_ver:-8.3.20}
   echo
   echo "Current PHP Version: ${CMSG}$OLD_php_ver${CEND}"
+  
+  # ========== 【新增】升级前备份 ==========
+  BACKUP_DIR="/data/backup/php_backup_$(date +%Y%m%d_%H%M%S)"
+  mkdir -p "${BACKUP_DIR}"
+  echo "${CCYAN}Backing up PHP ${OLD_php_ver} to ${BACKUP_DIR}...${CEND}"
+  cp -a "${php_install_dir}" "${BACKUP_DIR}/"
+  
+  # 创建回滚脚本
+  cat > "${BACKUP_DIR}/rollback.sh" << EOF
+#!/bin/bash
+BACKUP_DIR="${BACKUP_DIR}"
+php_install_dir="${php_install_dir}"
+echo "Rolling back PHP..."
+svc_stop php-fpm
+rm -rf "\${php_install_dir}"
+cp -a "\${BACKUP_DIR}/php" "\${php_install_dir}"
+svc_start php-fpm
+echo "PHP rolled back successfully"
+EOF
+  chmod +x "${BACKUP_DIR}/rollback.sh"
+  # ======================================
+  
   while :; do echo
     [ "${php_flag}" != 'y' ] && read -e -p "Please input upgrade PHP Version(Default: $Latest_php_ver): " NEW_php_ver
     NEW_php_ver=${NEW_php_ver:-${Latest_php_ver}}
@@ -22,18 +45,14 @@ Upgrade_PHP() {
       local file_name="php-${NEW_php_ver}.tar.gz"
       if [ ! -e "${file_name}" ]; then
         echo "Downloading PHP ${NEW_php_ver}..."
-        # 尝试官方源
         src_url="https://www.php.net/distributions/${file_name}"
         Download_src
-        # 验证 SHA256 校验码
         if [ -e "${file_name}" ]; then
           verify_sha256 "${file_name}" "https://www.php.net/distributions/${file_name}.sha256" || {
-            # 校验失败，尝试 GitHub 备用源
             echo "${CYELLOW}Checksum verification failed, trying GitHub fallback...${CEND}"
             rm -f "${file_name}"
             src_url="https://github.com/php/php-src/archive/refs/tags/php-${NEW_php_ver}.tar.gz"
             Download_src
-            # GitHub 下载需要重命名目录
             if [ -e "${file_name}" ]; then
               local archive_dir=$(tar -tzf "${file_name}" 2>/dev/null | head -1 | cut -d'/' -f1)
               if [ -n "${archive_dir}" ] && [ "${archive_dir}" != "php-${NEW_php_ver}" ]; then
@@ -74,13 +93,50 @@ Upgrade_PHP() {
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
     ${php_install_dir}/bin/php -i |grep 'Configure Command' | awk -F'=>' '{print $2}' | bash
     make ZEND_EXTRA_LIBS='-liconv' -j ${THREAD}
+    
+    # ========== 【新增】编译后验证 ==========
+    echo "Verifying compiled PHP binary..."
+    if ! "objs/php" -v > /dev/null 2>&1; then
+      echo "${CFAILURE}Compilation verification failed! Rolling back...${CEND}"
+      svc_start php-fpm
+      popd > /dev/null
+      rm -rf php-${NEW_php_ver}
+      echo "${CYELLOW}To rollback, run: ${BACKUP_DIR}/rollback.sh${CEND}"
+      exit 1
+    fi
+    # ========================================
+    
     echo "Stoping php-fpm..."
     svc_stop php-fpm
     make install
+    
+    # ========== 【新增】安装后验证 ==========
+    echo "Verifying installed PHP..."
+    if ! "${php_install_dir}/bin/php" -v > /dev/null 2>&1; then
+      echo "${CFAILURE}Installation verification failed! Rolling back...${CEND}"
+      rm -rf "${php_install_dir}"
+      cp -a "${BACKUP_DIR}/php" "${php_install_dir}"
+      svc_start php-fpm
+      exit 1
+    fi
+    
+    # 验证服务是否正常
     echo "Starting php-fpm..."
     svc_start php-fpm
+    sleep 2
+    if ! svc_is_active php-fpm; then
+      echo "${CWARNING}php-fpm failed to start! Rolling back...${CEND}"
+      rm -rf "${php_install_dir}"
+      cp -a "${BACKUP_DIR}/php" "${php_install_dir}"
+      svc_start php-fpm
+      exit 1
+    fi
+    # ========================================
+    
     popd > /dev/null
-    echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}$OLD_php_ver${CEND} to ${CWARNING}${NEW_php_ver}${CEND}"
+    echo "You have ${CMSG}successfully${CEND} upgraded from ${CWARNING}$OLD_php_ver${CEND} to ${CWARNING}${NEW_php_ver}${CEND}"
+    echo "${CYELLOW}Backup location: ${BACKUP_DIR}${CEND}"
+    echo "${CYELLOW}To rollback, run: ${BACKUP_DIR}/rollback.sh${CEND}"
     rm -rf php-${NEW_php_ver}
   fi
   popd > /dev/null
