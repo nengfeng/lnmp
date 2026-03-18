@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
+# Default checksum verification setting
+VERIFY_CHECKSUM="${VERIFY_CHECKSUM:-yes}"
+
 Upgrade_PHP() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${php_install_dir}" ] && echo "${CWARNING}PHP is not installed on your system! ${CEND}" && exit 1
@@ -16,11 +19,37 @@ Upgrade_PHP() {
     [ "${php_flag}" != 'y' ] && read -e -p "Please input upgrade PHP Version(Default: $Latest_php_ver): " NEW_php_ver
     NEW_php_ver=${NEW_php_ver:-${Latest_php_ver}}
     if [[ "${NEW_php_ver%.*}" == "${OLD_php_ver%.*}" ]]; then
-      [ ! -e "php-${NEW_php_ver}.tar.gz" ] && wget -c https://secure.php.net/distributions/php-${NEW_php_ver}.tar.gz > /dev/null 2>&1
-      if [ -e "php-${NEW_php_ver}.tar.gz" ]; then
-        echo "Download [${CMSG}php-${NEW_php_ver}.tar.gz${CEND}] successfully! "
+      local file_name="php-${NEW_php_ver}.tar.gz"
+      if [ ! -e "${file_name}" ]; then
+        echo "Downloading PHP ${NEW_php_ver}..."
+        # 尝试官方源
+        src_url="https://www.php.net/distributions/${file_name}"
+        Download_src
+        # 验证 SHA256 校验码
+        if [ -e "${file_name}" ]; then
+          verify_sha256 "${file_name}" "https://www.php.net/distributions/${file_name}.sha256" || {
+            # 校验失败，尝试 GitHub 备用源
+            echo "${CYELLOW}Checksum verification failed, trying GitHub fallback...${CEND}"
+            rm -f "${file_name}"
+            src_url="https://github.com/php/php-src/archive/refs/tags/php-${NEW_php_ver}.tar.gz"
+            Download_src
+            # GitHub 下载需要重命名目录
+            if [ -e "${file_name}" ]; then
+              local archive_dir=$(tar -tzf "${file_name}" 2>/dev/null | head -1 | cut -d'/' -f1)
+              if [ -n "${archive_dir}" ] && [ "${archive_dir}" != "php-${NEW_php_ver}" ]; then
+                tar -xzf "${file_name}"
+                mv "${archive_dir}" "php-${NEW_php_ver}"
+                tar -czf "${file_name}" "php-${NEW_php_ver}"
+                rm -rf "php-${NEW_php_ver}"
+              fi
+            fi
+          }
+        fi
+      fi
+      if [ -e "${file_name}" ]; then
+        echo "Download [${CMSG}${file_name}${CEND}] successfully! "
       else
-        echo "${CWARNING}PHP version does not exist! ${CEND}"
+        echo "${CWARNING}PHP version does not exist or download failed! ${CEND}"
       fi
       break
     else

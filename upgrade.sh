@@ -22,6 +22,7 @@ pushd "${current_dir}" > /dev/null
 . ./include/check_os.sh
 . ./include/check_dir.sh
 . ./include/download.sh
+. ./include/check_download.sh
 . ./include/get_char.sh
 . ./include/upgrade_web.sh
 . ./include/upgrade_db.sh
