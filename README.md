@@ -281,7 +281,7 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 
 ## 系统要求
 
-- **操作系统**: Debian 11/12, Ubuntu 20.04/22.04/24.04
+- **操作系统**: Debian 11/12/13, Ubuntu 20.04/22.04/24.04
 - **内存**: 最低 512MB，推荐 1GB+
 - **磁盘**: 最低 5GB，推荐 10GB+
 - **架构**: x86_64, aarch64
