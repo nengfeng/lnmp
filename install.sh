@@ -204,13 +204,13 @@ parse_args() {
 
 parse_args "$@"
 
-# Check md5sum
-if [[ ${ARG_NUM} == 0 ]] && [ ! -e ~/.lnmp ]; then
+# Check md5sum (only for tarball installations)
+[ -e "${current_dir}.tar.gz" ] && tool_file=${current_dir}.tar.gz
+[ -e "${current_dir}-full.tar.gz" ] && tool_file=${current_dir}-full.tar.gz
+if [[ ${ARG_NUM} == 0 ]] && [ ! -e ~/.lnmp ] && [ -n "${tool_file}" ]; then
   confirm "Do you want to check md5sum?" md5sum_flag n
 fi
-if [[ "${md5sum_flag}" == y ]]; then
-  [ -e "${current_dir}.tar.gz" ] && tool_file=${current_dir}.tar.gz
-  [ -e "${current_dir}-full.tar.gz" ] && tool_file=${current_dir}-full.tar.gz
+if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
   script_md5=${tool_file##*/}
   if [ -e "${tool_file}" ]; then
     now_script_md5=$(md5sum ${tool_file} | awk '{print $1}')
