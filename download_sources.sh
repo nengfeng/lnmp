@@ -330,17 +330,20 @@ verify_checksum() {
   case $checksum_type in
     sha256)
       # 先尝试匹配包含文件名的行，再尝试纯校验码
-      expected_checksum=$(grep "  ${filename}$" "$checksum_file" | awk '{print $1}')
+      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)
+      expected_checksum=$(grep -E "  ${filename}$|\*${filename}$" "$checksum_file" | awk '{print $1}')
       [ -z "$expected_checksum" ] && expected_checksum=$(grep -E "^[a-fA-F0-9]{64}$" "$checksum_file" | head -1)
       actual_checksum=$(sha256sum "$file" | awk '{print $1}')
       ;;
     sha1)
-      expected_checksum=$(grep "  ${filename}$" "$checksum_file" | awk '{print $1}')
+      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)
+      expected_checksum=$(grep -E "  ${filename}$|\*${filename}$" "$checksum_file" | awk '{print $1}')
       [ -z "$expected_checksum" ] && expected_checksum=$(grep -E "^[a-fA-F0-9]{40}$" "$checksum_file" | head -1)
       actual_checksum=$(sha1sum "$file" | awk '{print $1}')
       ;;
     md5)
-      expected_checksum=$(grep "  ${filename}$" "$checksum_file" | awk '{print $1}')
+      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)
+      expected_checksum=$(grep -E "  ${filename}$|\*${filename}$" "$checksum_file" | awk '{print $1}')
       [ -z "$expected_checksum" ] && expected_checksum=$(grep -E "^[a-fA-F0-9]{32}$" "$checksum_file" | head -1)
       actual_checksum=$(md5sum "$file" | awk '{print $1}')
       ;;
