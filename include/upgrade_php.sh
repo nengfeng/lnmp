@@ -60,7 +60,7 @@ ROLLBACK_EOF
         src_url="https://www.php.net/distributions/${file_name}"
         Download_src
         if [ -e "${file_name}" ]; then
-          verify_sha256 "${file_name}" "https://www.php.net/distributions/${file_name}.sha256" || {
+          verify_php_sha256 "${file_name}" "${NEW_php_ver}" || {
             echo "${CYELLOW}Checksum verification failed, trying GitHub fallback...${CEND}"
             rm -f "${file_name}"
             src_url="https://github.com/php/php-src/archive/refs/tags/php-${NEW_php_ver}.tar.gz"

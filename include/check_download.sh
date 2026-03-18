@@ -33,7 +33,8 @@ verify_sha256() {
   echo "Verifying SHA256 checksum for ${file_name}..."
   
   if wget -q "$checksum_url" -O "${file_name}.sha256" 2>/dev/null; then
-    local expected=$(cat "${file_name}.sha256" | tr -d '[:space:]')
+    # 校验和文件可能是 "sha256" 或 "sha256  filename" 格式，只取第一个字段
+    local expected=$(awk '{print $1}' "${file_name}.sha256" | tr -d '[:space:]')
     local actual=$(compute_sha256 "$file_name")
     
     if [[ "$expected" == "$actual" ]]; then
@@ -48,6 +49,51 @@ verify_sha256() {
   else
     echo "${CYELLOW}Could not download checksum file, skipping verification${CEND}"
     return 0
+  fi
+}
+
+# 验证 PHP SHA256 校验码（使用 PHP releases API）
+# 参数: 文件名 PHP版本号
+# PHP.net 不提供独立的 .sha256 文件，需要通过 API 获取
+verify_php_sha256() {
+  local file_name=$1
+  local php_ver=$2
+  
+  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
+  
+  echo "Verifying SHA256 checksum for ${file_name}..."
+  
+  # 从 PHP releases API 获取校验和
+  local api_url="https://www.php.net/releases/index.php?serialize=1&version=${php_ver}&max=1"
+  local api_response
+  
+  api_response=$(curl -s --connect-timeout 10 --max-time 30 "$api_url" 2>/dev/null)
+  
+  if [ -z "$api_response" ]; then
+    echo "${CYELLOW}Could not fetch PHP releases API, skipping verification${CEND}"
+    return 0
+  fi
+  
+  # 从序列化数据中提取 sha256（格式: s:6:"sha256";s:64:"...";）
+  local expected
+  expected=$(echo "$api_response" | grep -oP 's:6:"sha256";s:64:"\K[a-f0-9]{64}' | head -1)
+  
+  if [ -z "$expected" ]; then
+    echo "${CYELLOW}Could not parse SHA256 from API response, skipping verification${CEND}"
+    return 0
+  fi
+  
+  local actual
+  actual=$(compute_sha256 "$file_name")
+  
+  if [[ "$expected" == "$actual" ]]; then
+    echo "${CGREEN}Checksum verified: ${actual}${CEND}"
+    return 0
+  else
+    echo "${CFAILURE}Checksum mismatch!${CEND}"
+    echo "Expected: $expected"
+    echo "Actual:   $actual"
+    return 1
   fi
 }
 
@@ -317,7 +363,7 @@ checkDownload() {
     local file_name="php-${php_ver_to_use}.tar.gz"
     src_url="https://www.php.net/distributions/php-${php_ver_to_use}.tar.gz"
     Download_src
-    verify_sha256 "$file_name" "https://www.php.net/distributions/php-${php_ver_to_use}.tar.gz.sha256"
+    verify_php_sha256 "$file_name" "$php_ver_to_use"
   fi
 
   # APCU (PECL - official only)
@@ -428,9 +474,9 @@ checkDownload() {
   if [[ "${phpmyadmin_flag}" == y ]]; then
     echo "Download phpMyAdmin..."
     local file_name="phpMyAdmin-${phpmyadmin_ver}-all-languages.tar.gz"
-    src_url="https://www.phpmyadmin.net/downloads/${file_name}"
+    src_url="https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/${file_name}"
     Download_src
-    verify_sha256 "$file_name" "https://www.phpmyadmin.net/downloads/${file_name}.sha256"
+    verify_sha256 "$file_name" "https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/${file_name}.sha256"
   fi
 
   popd > /dev/null
