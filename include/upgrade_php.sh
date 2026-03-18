@@ -21,20 +21,32 @@ Upgrade_PHP() {
   BACKUP_DIR="/data/backup/php_backup_$(date +%Y%m%d_%H%M%S)"
   mkdir -p "${BACKUP_DIR}"
   echo "${CCYAN}Backing up PHP ${OLD_php_ver} to ${BACKUP_DIR}...${CEND}"
-  cp -a "${php_install_dir}" "${BACKUP_DIR}/"
-  
-  # 创建回滚脚本
-  cat > "${BACKUP_DIR}/rollback.sh" << EOF
+
+  # 备份并验证
+  if ! cp -a "${php_install_dir}" "${BACKUP_DIR}/"; then
+    echo "${CFAILURE}Backup failed! Aborting upgrade.${CEND}"
+    rm -rf "${BACKUP_DIR}"
+    exit 1
+  fi
+
+  # 验证备份完整性
+  if [ ! -f "${BACKUP_DIR}/php/bin/php" ]; then
+    echo "${CFAILURE}Backup verification failed! Aborting upgrade.${CEND}"
+    rm -rf "${BACKUP_DIR}"
+    exit 1
+  fi
+  echo "${CSUCCESS}Backup completed successfully.${CEND}"
+
+  # 创建回滚脚本（使用硬编码路径）
+  cat > "${BACKUP_DIR}/rollback.sh" << ROLLBACK_EOF
 #!/bin/bash
-BACKUP_DIR="${BACKUP_DIR}"
-php_install_dir="${php_install_dir}"
 echo "Rolling back PHP..."
 svc_stop php-fpm
-rm -rf "\${php_install_dir}"
-cp -a "\${BACKUP_DIR}/php" "\${php_install_dir}"
+rm -rf "${php_install_dir}"
+cp -a "${BACKUP_DIR}/php" "${php_install_dir}"
 svc_start php-fpm
 echo "PHP rolled back successfully"
-EOF
+ROLLBACK_EOF
   chmod +x "${BACKUP_DIR}/rollback.sh"
   # ======================================
   
@@ -98,7 +110,7 @@ EOF
     echo "Verifying compiled PHP binary..."
     if ! "objs/php" -v > /dev/null 2>&1; then
       echo "${CFAILURE}Compilation verification failed! Rolling back...${CEND}"
-      svc_start php-fpm
+      # 注意：此时 php-fpm 还在运行，不需要启动
       popd > /dev/null
       rm -rf php-${NEW_php_ver}
       echo "${CYELLOW}To rollback, run: ${BACKUP_DIR}/rollback.sh${CEND}"
