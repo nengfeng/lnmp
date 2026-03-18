@@ -63,8 +63,8 @@ verify_php_sha256() {
   
   echo "Verifying SHA256 checksum for ${file_name}..."
   
-  # 从 PHP releases API 获取校验和
-  local api_url="https://www.php.net/releases/index.php?serialize=1&version=${php_ver}&max=1"
+  # 从 PHP releases API 获取校验和（使用 JSON 格式，比序列化格式更可靠）
+  local api_url="https://www.php.net/releases/index.php?json&version=${php_ver}&max=1"
   local api_response
   
   api_response=$(curl -s --connect-timeout 10 --max-time 30 "$api_url" 2>/dev/null)
@@ -74,9 +74,10 @@ verify_php_sha256() {
     return 0
   fi
   
-  # 从序列化数据中提取 sha256（格式: s:6:"sha256";s:64:"...";）
+  # 从 JSON 中提取对应文件的 sha256
+  # JSON 格式: {"8.3.20":{"source":[{"filename":"php-8.3.20.tar.gz","sha256":"..."}]}}
   local expected
-  expected=$(echo "$api_response" | grep -oP 's:6:"sha256";s:64:"\K[a-f0-9]{64}' | head -1)
+  expected=$(echo "$api_response" | grep -oP "\"${file_name}\"[^}]*\"sha256\"\s*:\s*\"\K[a-f0-9]{64}" | head -1)
   
   if [ -z "$expected" ]; then
     echo "${CYELLOW}Could not parse SHA256 from API response, skipping verification${CEND}"
