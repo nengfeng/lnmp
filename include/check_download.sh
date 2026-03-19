@@ -338,8 +338,8 @@ checkDownload() {
     src_url="https://download.savannah.gnu.org/releases/freetype/freetype-${freetype_ver}.tar.gz"
     Download_src
 
-    # argon2 (GitHub)
-    src_url="https://github.com/P-H-C/phc-winner-argon2/archive/argon2-${argon2_ver}.tar.gz"
+    # argon2 (GitHub) - tag 名称就是版本号，如 20190702
+    src_url="https://github.com/P-H-C/phc-winner-argon2/archive/refs/tags/${argon2_ver}.tar.gz"
     Download_src
 
     # libsodium (official only)
