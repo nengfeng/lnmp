@@ -99,11 +99,11 @@ setup_nginx_service() {
   service_action enable nginx
 }
 
-# Extract common build dependencies (PCRE, OpenSSL)
+# Extract common build dependencies (PCRE2, OpenSSL)
 # Usage: extract_web_deps
 extract_web_deps() {
   pushd ${current_dir}/src > /dev/null
-  tar xzf pcre-${pcre_ver}.tar.gz
+  tar xzf pcre2-${pcre_ver}.tar.gz
   tar xzf openssl-${openssl_ver}.tar.gz
   popd > /dev/null
 }
@@ -112,7 +112,7 @@ extract_web_deps() {
 # Usage: cleanup_web_deps
 cleanup_web_deps() {
   pushd ${current_dir}/src > /dev/null
-  rm -rf pcre-${pcre_ver} openssl-${openssl_ver}
+  rm -rf pcre2-${pcre_ver} openssl-${openssl_ver}
   popd > /dev/null
 }
 
@@ -140,7 +140,7 @@ install_web_server() {
     conf_dir=${install_dir}/nginx
   fi
   
-  tar xzf pcre-${pcre_ver}.tar.gz
+  tar xzf pcre2-${pcre_ver}.tar.gz
   tar xzf ${src_name}.tar.gz
   tar xzf openssl-${openssl_ver}.tar.gz
   pushd ${src_name} > /dev/null
@@ -160,14 +160,14 @@ install_web_server() {
     --with-http_gzip_static_module --with-http_realip_module \
     --with-http_flv_module --with-http_mp4_module \
     --with-openssl=../openssl-${openssl_ver} \
-    --with-pcre=../pcre-${pcre_ver} --with-pcre-jit \
+    --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit \
     --with-ld-opt="-ltcmalloc ${extra_ld_opt}" ${nginx_modules_options}
   
   compile_and_install
   
   if [ -e "${conf_dir}/conf/nginx.conf" ]; then
     popd > /dev/null
-    cleanup_src pcre-${pcre_ver} openssl-${openssl_ver} ${src_name}
+    cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name}
     success_msg "${server_type}"
   else
     rm -rf ${install_dir}

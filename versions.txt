@@ -5,7 +5,7 @@ tengine_ver=3.1.0
 openresty_ver=1.29.2.1
 openssl_ver=3.5.5
 
-pcre_ver=8.45
+pcre_ver=10.45
 nghttp2_ver=1.59.0
 
 # DB

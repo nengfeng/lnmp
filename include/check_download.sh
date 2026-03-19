@@ -241,10 +241,10 @@ checkDownload() {
       ;;
   esac
 
-  # PCRE (official only - mirror path invalid)
+  # PCRE2 (GitHub releases)
   if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
-    echo "Download pcre..."
-    src_url="https://downloads.sourceforge.net/project/pcre/pcre/${pcre_ver}/pcre-${pcre_ver}.tar.gz"
+    echo "Download pcre2..."
+    src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz"
     Download_src
   fi
 
