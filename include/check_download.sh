@@ -166,11 +166,14 @@ verify_pgp_signature() {
 
 download_openssl() {
   echo "Download openSSL..."
-  src_url="https://www.openssl.org/source/openssl-${openssl_ver}.tar.gz"
   local file_name="openssl-${openssl_ver}.tar.gz"
-  local checksum_url="https://www.openssl.org/source/openssl-${openssl_ver}.tar.gz.sha256"
+  local official_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/${file_name}"
+  local china_url="${MIRROR_BASE_URL}/openssl/source/${file_name}"
+  src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
   Download_src
-  verify_sha256 "$file_name" "$checksum_url"
+  # OpenSSL GitHub releases 提供 SHA1 校验
+  local checksum_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/${file_name}.sha1"
+  verify_sha256 "$file_name" "$checksum_url" || verify_sha1 "$file_name" "$checksum_url"
 }
 
 checkDownload() {

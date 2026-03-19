@@ -46,7 +46,7 @@ Nginx_lua_waf() {
   nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre-\w.\w\+ @--with-pcre=../pcre-${pcre_ver} @")
   if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
     src_url=https://nginx.org/download/nginx-${nginx_ver}.tar.gz && Download_src
-    src_url="https://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" && Download_src
+    src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
     src_url="https://downloads.sourceforge.net/project/pcre/pcre/${pcre_ver}/pcre-${pcre_ver}.tar.gz" && Download_src
     src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/0.3.3.tar.gz" && Download_src
     src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/${lua_nginx_module_ver}.tar.gz" && Download_src
@@ -108,10 +108,10 @@ Tengine_lua_waf() {
   tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre-\w.\w\+ @--with-pcre=../pcre-${pcre_ver} @")
   if [ -z "$(echo ${tengine_configure_args} | grep lua)" ]; then
     src_url=https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz && Download_src
-    src_url="https://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" && Download_src
+    src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
     src_url="https://downloads.sourceforge.net/project/pcre/pcre/${pcre_ver}/pcre-${pcre_ver}.tar.gz" && Download_src
     src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/0.3.3.tar.gz" && Download_src
-    src_url="https://github.com/openresty/lua-nginx-module/archive/master.tar.gz" && Download_src
+    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/${lua_nginx_module_ver}.tar.gz" && Download_src
     tar xzf tengine-${tengine_ver}.tar.gz
     tar xzf openssl-${openssl_ver}.tar.gz
     tar xzf pcre-${pcre_ver}.tar.gz
