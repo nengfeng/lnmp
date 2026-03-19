@@ -305,6 +305,18 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 - PCRE2 性能更好、功能更完整
 - 现代 Nginx 版本已全面支持 PCRE2
 
+**PHP 与 PCRE2:**
+
+PHP 从 8.0 开始完全内置 PCRE2，不再依赖系统 PCRE 库：
+
+| PHP 版本 | PCRE 支持 |
+|---------|----------|
+| PHP 7.3 | 开始支持 PCRE2（可选） |
+| PHP 7.4 | 默认使用 PCRE2 |
+| PHP 8.0+ | 完全内置 PCRE2 |
+
+本项目 PHP 8.3/8.4/8.5 已内置 PCRE2，**不依赖系统 PCRE**。
+
 ## 常用命令
 
 ```bash
