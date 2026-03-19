@@ -286,6 +286,25 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 - **磁盘**: 最低 5GB，推荐 10GB+
 - **架构**: x86_64, aarch64
 
+## 依赖说明
+
+### PCRE2
+
+本项目使用 **PCRE2** (Perl Compatible Regular Expressions) 作为 Nginx/Tengine/OpenResty 的正则表达式库。
+
+| 组件 | PCRE2 要求 |
+|------|-----------|
+| Nginx | ≥ 1.21.5 |
+| Tengine | ≥ 2.3.0 |
+| OpenResty | ≥ 1.21.4.1 |
+
+**注意**: 旧版 Nginx (< 1.21.5) 使用 PCRE1，如需兼容旧版本请手动修改 `versions.txt` 和下载源配置。
+
+**为什么切换到 PCRE2?**
+- PCRE1 (8.x) 已于 2021 年停止维护
+- PCRE2 性能更好、功能更完整
+- 现代 Nginx 版本已全面支持 PCRE2
+
 ## 常用命令
 
 ```bash
