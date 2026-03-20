@@ -3,6 +3,8 @@
 # BLOG:  https://github.com/nengfeng/lnmp
 # Description: Unified MySQL installation function
 
+. include/db-common.sh
+
 # Install MySQL (unified for all versions)
 # Usage: Install_MySQL <mysql_ver> <cnf_func> <reset_master>
 #   mysql_ver:  e.g. mysql84_ver or mysql80_ver

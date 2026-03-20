@@ -3,6 +3,8 @@
 # BLOG:  https://github.com/nengfeng/lnmp
 # Description: Unified MariaDB installation function
 
+. include/db-common.sh
+
 # Install MariaDB (unified for all versions)
 # Usage: Install_MariaDB <mariadb_ver> <root_cmd>
 #   mariadb_ver: e.g. mariadb118_ver, mariadb114_ver, mariadb1011_ver
