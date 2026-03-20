@@ -103,7 +103,11 @@ ROLLBACK_EOF
     fi
     make clean
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
-    ${php_install_dir}/bin/php -i |grep 'Configure Command' | awk -F'=>' '{print $2}' | bash
+    # Get original configure command and fix iconv settings
+    local configure_cmd=$(${php_install_dir}/bin/php -i | grep 'Configure Command' | awk -F'=>' '{print $2}')
+    # Fix iconv: remove any path after --with-iconv= and add ICONV_PLUG=1
+    configure_cmd=$(echo "${configure_cmd}" | sed 's|--with-iconv=[^ ]*|--with-iconv|g')
+    ICONV_PLUG=1 bash -c "${configure_cmd}"
     make -j ${THREAD}
     
     # ========== 【新增】编译后验证 ==========

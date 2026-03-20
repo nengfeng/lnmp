@@ -8,16 +8,6 @@
 install_php_deps() {
   pushd ${current_dir}/src > /dev/null
   
-  # libiconv
-  if [ ! -e "/usr/local/lib/libiconv.la" ]; then
-    tar xzf libiconv-${libiconv_ver}.tar.gz
-    pushd libiconv-${libiconv_ver} > /dev/null
-    ./configure
-    compile_and_install
-    popd > /dev/null
-    cleanup_src libiconv-${libiconv_ver}
-  fi
-
   # curl
   if [ ! -e "${curl_install_dir}/lib/libcurl.la" ]; then
     tar xzf curl-${curl_ver}.tar.gz
@@ -325,7 +315,7 @@ install_php_source() {
     local phpcache_arg=''
   fi
   
-  ./configure --prefix=${install_dir} --with-config-file-path=${install_dir}/etc \
+  ICONV_PLUG=1 ./configure --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) --prefix=${install_dir} --with-config-file-path=${install_dir}/etc \
     --with-config-file-scan-dir=${install_dir}/etc/php.d \
     --with-fpm-user=${run_user} --with-fpm-group=${run_group} --enable-fpm ${phpcache_arg} --disable-fileinfo \
     --enable-mysqlnd --with-mysqli=mysqlnd --with-pdo-mysql=mysqlnd \
