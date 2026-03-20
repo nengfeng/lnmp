@@ -104,7 +104,7 @@ ROLLBACK_EOF
     make clean
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
     ${php_install_dir}/bin/php -i |grep 'Configure Command' | awk -F'=>' '{print $2}' | bash
-    make ZEND_EXTRA_LIBS='-liconv' -j ${THREAD}
+    make -j ${THREAD}
     
     # ========== 【新增】编译后验证 ==========
     echo "Verifying compiled PHP binary..."
