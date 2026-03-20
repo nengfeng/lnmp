@@ -177,6 +177,9 @@ get_version() {
     mariadb-src)    ver=${VERSIONS[mariadb118_ver]} ;;
     postgresql)     ver=${VERSIONS[pgsql18_ver]} ;;
     php)            ver=${VERSIONS[php84_ver]} ;;
+    php83)          ver=${VERSIONS[php83_ver]} ;;
+    php84)          ver=${VERSIONS[php84_ver]} ;;
+    php85)          ver=${VERSIONS[php85_ver]} ;;
     libiconv)       ver=${VERSIONS[libiconv_ver]} ;;
     curl)           ver=${VERSIONS[curl_ver]} ;;
     freetype)       ver=${VERSIONS[freetype_ver]} ;;
