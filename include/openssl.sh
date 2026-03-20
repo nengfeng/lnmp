@@ -72,7 +72,8 @@ Install_openSSL() {
       make depend
       compile_and_install
       popd > /dev/null
-      if [ -f "${openssl_install_dir}/lib/libcrypto.a" ]; then
+      # OpenSSL 3.x 默认构建共享库，检查 libcrypto.so 或 libcrypto.a
+      if [ -f "${openssl_install_dir}/lib/libcrypto.a" ] || [ -f "${openssl_install_dir}/lib/libcrypto.so" ] || [ -f "${openssl_install_dir}/lib64/libcrypto.so" ]; then
         success_msg "openSSL"
         /bin/cp cacert.pem ${openssl_install_dir}/cert.pem
         cleanup_src openssl-${openssl_ver}
