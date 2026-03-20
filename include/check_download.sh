@@ -52,6 +52,36 @@ verify_sha256() {
   fi
 }
 
+# 验证 SHA1 校验码
+# 参数: 文件名 校验码URL
+verify_sha1() {
+  local file_name=$1
+  local checksum_url=$2
+  
+  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
+  [ -z "$checksum_url" ] && return 0
+  
+  echo "Verifying SHA1 checksum for ${file_name}..."
+  
+  if wget -q "$checksum_url" -O "${file_name}.sha1" 2>/dev/null; then
+    local expected=$(awk '{print $1}' "${file_name}.sha1" | tr -d '[:space:]')
+    local actual=$(sha1sum "$file_name" 2>/dev/null | awk '{print $1}')
+    
+    if [[ "$expected" == "$actual" ]]; then
+      echo "${CGREEN}SHA1 checksum verified: ${actual}${CEND}"
+      return 0
+    else
+      echo "${CFAILURE}SHA1 checksum mismatch!${CEND}"
+      echo "Expected: $expected"
+      echo "Actual:   $actual"
+      return 1
+    fi
+  else
+    echo "${CYELLOW}Could not download SHA1 checksum file, skipping verification${CEND}"
+    return 0
+  fi
+}
+
 # 验证 PHP SHA256 校验码（使用 PHP releases API）
 # 参数: 文件名 PHP版本号
 # PHP.net 不提供独立的 .sha256 文件，需要通过 API 获取
@@ -171,9 +201,9 @@ download_openssl() {
   local china_url="${MIRROR_BASE_URL}/openssl/source/${file_name}"
   src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
   Download_src
-  # OpenSSL GitHub releases 提供 SHA1 校验
-  local checksum_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/${file_name}.sha1"
-  verify_sha256 "$file_name" "$checksum_url" || verify_sha1 "$file_name" "$checksum_url"
+  # OpenSSL GitHub releases 提供 SHA256 校验
+  local checksum_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/${file_name}.sha256"
+  verify_sha256 "$file_name" "$checksum_url"
 }
 
 checkDownload() {
