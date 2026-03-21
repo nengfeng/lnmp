@@ -199,7 +199,9 @@ Uninstall_MySQL() {
   # uninstall mysql,mariadb
   if [ -d "${db_install_dir}/support-files" ]; then
     svc_stop mysqld > /dev/null 2>&1
-    rm -rf ${db_install_dir} /etc/init.d/mysqld /etc/my.cnf /etc/logrotate.d/mysql* /etc/ld.so.conf.d/*{mysql,mariadb}*.conf
+    rm -rf ${db_install_dir} /etc/init.d/mysqld /etc/my.cnf /etc/logrotate.d/mysql*
+    # Remove ld.so.conf.d entries for mysql/mariadb
+    rm -f /etc/ld.so.conf.d/*mysql*.conf /etc/ld.so.conf.d/*mariadb*.conf
     id -u mysql >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mysql
     [ -e "${db_data_dir}" ] && /bin/mv ${db_data_dir}{,$(date +%Y%m%d%H)}
     sed -i 's@^dbrootpwd=.*@dbrootpwd=@' ./options.conf
