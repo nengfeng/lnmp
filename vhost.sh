@@ -390,8 +390,9 @@ What Are You Doing?
     init_mirror
     # acme.sh 仅在 GitHub 官方源，无国内镜像
     local acme_url="https://github.com/acmesh-official/acme.sh/archive/refs/heads/master.tar.gz"
-    src_url="${acme_url}"
-    [ ! -e acme.sh-master.tar.gz ] && Download_src
+    if [ ! -e acme.sh-master.tar.gz ]; then
+      wget --tries=6 -c -O acme.sh-master.tar.gz "${acme_url}"
+    fi
     tar xzf acme.sh-master.tar.gz
     pushd acme.sh-master > /dev/null
     ./acme.sh --install > /dev/null 2>&1
