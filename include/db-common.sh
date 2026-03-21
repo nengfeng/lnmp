@@ -27,8 +27,9 @@ wait_for_db_ready() {
   while [ ${elapsed} -lt ${timeout} ]; do
     # Check if socket exists
     if [ -S "${socket}" ]; then
-      # Try to connect
-      if ${mysql_cmd} -uroot -e "SELECT 1" >/dev/null 2>&1; then
+      # Try to connect and verify user table is accessible
+      # This ensures the database is fully initialized
+      if ${mysql_cmd} -uroot -e "SELECT User,Host FROM mysql.user WHERE User='root' LIMIT 1" >/dev/null 2>&1; then
         echo "${CSUCCESS}Database is ready!${CEND}"
         return 0
       fi
@@ -119,14 +120,31 @@ setup_mysql_root() {
   # Wait for database to be ready
   wait_for_db_ready ${install_dir} || return 1
   
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "create user root@'127.0.0.1' identified by \"${root_pwd}\";"
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "grant all privileges on *.* to root@'127.0.0.1' with grant option;"
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "grant all privileges on *.* to root@'localhost' with grant option;"
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "alter user root@'localhost' identified by \"${root_pwd}\";"
+  # MySQL 8.0 uses --initialize-insecure which creates root@localhost with empty password
+  
+  # 1. Create root@'127.0.0.1'
+  ${install_dir}/bin/mysql -uroot -hlocalhost -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";" || {
+    echo "${CFAILURE}Failed to create root@'127.0.0.1' user${CEND}"
+    return 1
+  }
+  
+  # 2. Grant privileges to root@'127.0.0.1'
+  ${install_dir}/bin/mysql -uroot -hlocalhost -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
+  
+  # 3. Set password for root@'localhost'
+  ${install_dir}/bin/mysql -uroot -hlocalhost -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
+    echo "${CFAILURE}Failed to set root@localhost password${CEND}"
+    return 1
+  }
+  
+  # 4. Grant privileges to root@'localhost'
+  ${install_dir}/bin/mysql -uroot -p"${root_pwd}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'localhost' WITH GRANT OPTION;"
   
   if [[ "${reset_master}" == "yes" ]]; then
-    ${install_dir}/bin/mysql -uroot -p${root_pwd} -e "reset master;"
+    ${install_dir}/bin/mysql -uroot -p"${root_pwd}" -e "RESET MASTER;"
   fi
+  
+  echo "${CSUCCESS}MySQL root user setup completed${CEND}"
 }
 
 # ============================================
@@ -213,24 +231,41 @@ setup_mariadb_root() {
   wait_for_db_ready ${install_dir} || return 1
 
   # Use ALTER USER syntax (compatible with MariaDB 10.11+ and 11.x)
-  # Order matters: set localhost password first, then create 127.0.0.1 user
+  # Note: MariaDB 10.4+ uses unix_socket auth by default, so root can connect without password
   
   # 1. Set password for root@'localhost' (this user already exists after mysql_install_db)
-  ${install_dir}/bin/${cmd} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
-    echo "${CWARNING}Failed to set root@localhost password, trying SET PASSWORD...${CEND}"
-    ${install_dir}/bin/${cmd} -e "SET PASSWORD FOR root@'localhost' = PASSWORD(\"${root_pwd}\");"
-  }
+  local password_set=0
   
-  # 2. Create root@'127.0.0.1' with same password
-  ${install_dir}/bin/${cmd} -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
+  # Try ALTER USER first
+  if ${install_dir}/bin/${cmd} -uroot -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" 2>/dev/null; then
+    password_set=1
+    echo "${CMSG}root@localhost password set via ALTER USER${CEND}"
+  else
+    # Fallback to SET PASSWORD
+    if ${install_dir}/bin/${cmd} -uroot -e "SET PASSWORD FOR root@'localhost' = PASSWORD(\"${root_pwd}\");" 2>/dev/null; then
+      password_set=1
+      echo "${CMSG}root@localhost password set via SET PASSWORD${CEND}"
+    fi
+  fi
+  
+  if [ ${password_set} -eq 0 ]; then
+    echo "${CFAILURE}Failed to set root@localhost password!${CEND}"
+    echo "${CWARNING}This may indicate database initialization issues.${CEND}"
+    return 1
+  fi
+  
+  # 2. Create root@'127.0.0.1' with same password (using password now)
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";"
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
   
   # 3. Cleanup
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.user WHERE Password='' AND User NOT LIKE 'mariadb.%';"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.db WHERE User='';"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.proxies_priv WHERE Host!='localhost';"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DROP DATABASE IF EXISTS test;"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "RESET MASTER;"
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.user WHERE Password='' AND User NOT LIKE 'mariadb.%';"
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.db WHERE User='';"
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.proxies_priv WHERE Host!='localhost';"
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DROP DATABASE IF EXISTS test;"
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "RESET MASTER;"
+  
+  echo "${CSUCCESS}MariaDB root user setup completed${CEND}"
 }
 
 # ============================================
