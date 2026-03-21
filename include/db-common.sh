@@ -4,6 +4,50 @@
 # Description: Common functions for MySQL/MariaDB installation
 
 # ============================================
+# Database Ready Check Functions
+# ============================================
+
+# Wait for MySQL/MariaDB to be ready to accept connections
+# Usage: wait_for_db_ready install_dir [timeout_seconds] [socket_path]
+# Returns: 0 on success, 1 on timeout
+wait_for_db_ready() {
+  local install_dir=$1
+  local timeout=${2:-600}
+  local socket=${3:-/tmp/mysql.sock}
+  local mysql_cmd="${install_dir}/bin/mysql"
+  
+  # Detect mariadb command for MariaDB 11.x+
+  [ -x "${install_dir}/bin/mariadb" ] && mysql_cmd="${install_dir}/bin/mariadb"
+  
+  local start_time=$(date +%s)
+  local elapsed=0
+  
+  echo "${CMSG}Waiting for database to be ready...${CEND}"
+  
+  while [ ${elapsed} -lt ${timeout} ]; do
+    # Check if socket exists
+    if [ -S "${socket}" ]; then
+      # Try to connect
+      if ${mysql_cmd} -uroot -e "SELECT 1" >/dev/null 2>&1; then
+        echo "${CSUCCESS}Database is ready!${CEND}"
+        return 0
+      fi
+    fi
+    
+    sleep 2
+    elapsed=$(($(date +%s) - start_time))
+    
+    # Progress indicator every 30 seconds
+    if [ $((elapsed % 30)) -eq 0 ] && [ ${elapsed} -gt 0 ]; then
+      echo "${CMSG}Still waiting... (${elapsed}s elapsed, timeout at ${timeout}s)${CEND}"
+    fi
+  done
+  
+  echo "${CFAILURE}Database failed to become ready within ${timeout} seconds${CEND}"
+  return 1
+}
+
+# ============================================
 # Common MySQL Installation Functions
 # ============================================
 
@@ -71,6 +115,9 @@ setup_mysql_root() {
   local install_dir=$1
   local root_pwd=$2
   local reset_master=${3:-no}
+  
+  # Wait for database to be ready
+  wait_for_db_ready ${install_dir} || return 1
   
   ${install_dir}/bin/mysql -uroot -hlocalhost -e "create user root@'127.0.0.1' identified by \"${root_pwd}\";"
   ${install_dir}/bin/mysql -uroot -hlocalhost -e "grant all privileges on *.* to root@'127.0.0.1' with grant option;"
@@ -161,6 +208,9 @@ setup_mariadb_root() {
   local install_dir=$1
   local root_pwd=$2
   local cmd=${3:-mariadb}
+
+  # Wait for database to be ready
+  wait_for_db_ready ${install_dir} || return 1
 
   # Use ALTER USER syntax (compatible with MariaDB 10.11+ and 11.x)
   # Order matters: set localhost password first, then create 127.0.0.1 user

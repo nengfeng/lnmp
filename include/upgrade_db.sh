@@ -93,6 +93,7 @@ Upgrade_DB() {
       ${mariadb_install_dir}/scripts/mysql_install_db --user=mysql --basedir=${mariadb_install_dir} --datadir=${mariadb_data_dir}
       chown mysql:mysql -R ${mariadb_data_dir}
       svc_start mysqld
+      wait_for_db_ready ${mariadb_install_dir} || { echo "${CFAILURE}Database failed to start${CEND}"; return 1; }
       ${mariadb_install_dir}/bin/mysql < DB_all_backup_$(date +"%Y%m%d").sql
       svc_restart mysqld
       ${mariadb_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
@@ -119,6 +120,7 @@ Upgrade_DB() {
       [ -e "${mysql_install_dir}/my.cnf" ] && rm -rf ${mysql_install_dir}/my.cnf
       sed -i '/myisam_repair_threads/d' /etc/my.cnf
       svc_start mysqld
+      wait_for_db_ready ${mysql_install_dir} || { echo "${CFAILURE}Database failed to start${CEND}"; return 1; }
       ${mysql_install_dir}/bin/mysql < DB_all_backup_$(date +"%Y%m%d").sql
       svc_restart mysqld
       ${mysql_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
