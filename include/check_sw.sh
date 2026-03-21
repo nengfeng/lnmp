@@ -35,6 +35,17 @@ installDepsDebian() {
   for Package in ${pkgList}; do
     apt-get --no-install-recommends -y install ${Package}
   done
+  
+  # Debian 13+ libaio time64 transition fix (same as Ubuntu 24.04+)
+  if [[ "${Debian_ver}" =~ ^1[3-9]$ ]]; then
+    if [ ! -e /usr/lib/x86_64-linux-gnu/libaio.so.1 ]; then
+      libaio_src=$(find /usr/lib -name 'libaio.so.1t64*' 2>/dev/null | head -1)
+      if [ -n "${libaio_src}" ]; then
+        ln -sf "${libaio_src}" /usr/lib/x86_64-linux-gnu/libaio.so.1
+        echo "${CMSG}Created libaio.so.1 symlink for Debian 13+ compatibility${CEND}"
+      fi
+    fi
+  fi
 }
 
 installDepsUbuntu() {
@@ -66,7 +77,19 @@ installDepsUbuntu() {
   for Package in ${pkgList}; do
     apt-get --no-install-recommends -y install ${Package}
   done
-  [[ "${Ubuntu_ver}" =~ ^24$ ]] && ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64.0.2 /usr/lib/x86_64-linux-gnu/libaio.so.1 
+  
+  # Ubuntu 24.04+ libaio time64 transition fix
+  # The package installs libaio.so.1t64 but MySQL expects libaio.so.1
+  if [[ "${Ubuntu_ver}" =~ ^2[4-9]$ ]]; then
+    if [ ! -e /usr/lib/x86_64-linux-gnu/libaio.so.1 ]; then
+      # Find the actual libaio library file
+      libaio_src=$(find /usr/lib -name 'libaio.so.1t64*' 2>/dev/null | head -1)
+      if [ -n "${libaio_src}" ]; then
+        ln -sf "${libaio_src}" /usr/lib/x86_64-linux-gnu/libaio.so.1
+        echo "${CMSG}Created libaio.so.1 symlink for Ubuntu 24.04+ compatibility${CEND}"
+      fi
+    fi
+  fi
 }
 
 installDepsBySrc() {
