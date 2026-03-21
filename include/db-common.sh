@@ -790,6 +790,8 @@ setup_db_service() {
 
   if has_systemd; then
     # Use systemd service unit
+    # Note: Type=notify would be ideal but mysqld_safe doesn't support it
+    # We use Type=forking with ExecStartPost to wait for the socket
     cat > /lib/systemd/system/mysqld.service << EOF
 [Unit]
 Description=MySQL/MariaDB Server
@@ -799,10 +801,11 @@ After=network.target
 Type=forking
 PIDFile=${data_dir}/mysql.pid
 ExecStart=${install_dir}/bin/${safe_cmd} --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid
+ExecStartPost=/bin/bash -c 'for i in {1..300}; do [ -S /tmp/mysql.sock ] && break; sleep 1; done'
 ExecStop=/bin/kill -TERM \$MAINPID
 Restart=on-failure
 RestartSec=5
-TimeoutStartSec=300
+TimeoutStartSec=600
 TimeoutStopSec=100
 LimitNOFILE=65535
 
