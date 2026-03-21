@@ -723,6 +723,7 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOF
     svc_daemon_reload
+    svc_enable mysqld
   else
     # Fallback to SysV init
     /bin/cp ${install_dir}/support-files/mysql.server /etc/init.d/mysqld
