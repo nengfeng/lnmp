@@ -717,6 +717,8 @@ ExecStart=${install_dir}/bin/${safe_cmd} --basedir=${install_dir} --datadir=${da
 ExecStop=/bin/kill -TERM \$MAINPID
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=300
+TimeoutStopSec=100
 LimitNOFILE=65535
 
 [Install]
