@@ -54,37 +54,40 @@ config_nginx_scenario() {
   
   if [[ "${scenario}" == "dedicated" ]]; then
     # Dedicated server settings - higher performance
-    sed -i 's@^worker_rlimit_nofile.*@worker_rlimit_nofile 102400@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  worker_connections.*@  worker_connections 102400@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  keepalive_timeout.*@  keepalive_timeout 300@' ${install_dir}/conf/nginx.conf
-    
+    sed -i 's@^worker_rlimit_nofile.*@worker_rlimit_nofile 102400;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  worker_connections.*@  worker_connections 102400;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  keepalive_timeout.*@  keepalive_timeout 300;@' ${install_dir}/conf/nginx.conf
+
     # Larger buffers for high traffic
-    sed -i 's@^  client_header_buffer_size.*@  client_header_buffer_size 64k@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  large_client_header_buffers.*@  large_client_header_buffers 8 64k@' ${install_dir}/conf/nginx.conf
-    
+    sed -i 's@^  client_header_buffer_size.*@  client_header_buffer_size 64k;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  large_client_header_buffers.*@  large_client_header_buffers 8 64k;@' ${install_dir}/conf/nginx.conf
+
     # FastCGI buffers
-    sed -i 's@^  fastcgi_buffer_size.*@  fastcgi_buffer_size 128k@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  fastcgi_buffers.*@  fastcgi_buffers 8 128k@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  fastcgi_busy_buffers_size.*@  fastcgi_busy_buffers_size 256k@' ${install_dir}/conf/nginx.conf
-    
+    sed -i 's@^  fastcgi_buffer_size.*@  fastcgi_buffer_size 128k;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  fastcgi_buffers.*@  fastcgi_buffers 8 128k;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  fastcgi_busy_buffers_size.*@  fastcgi_busy_buffers_size 256k;@' ${install_dir}/conf/nginx.conf
+
     # Enable open file cache for better static file performance
-    sed -i 's@^  ##If you have a lot of static files.*@  ##Open file cache for static files\n  open_file_cache max=10000 inactive=30s;\n  open_file_cache_valid 60s;\n  open_file_cache_min_uses 2;\n  open_file_cache_errors on;@' ${install_dir}/conf/nginx.conf
-    
+    # Use printf and append approach for multi-line config
+    if ! grep -q "^  open_file_cache" ${install_dir}/conf/nginx.conf; then
+      sed -i '/^  ##If you have a lot of static files/a\  ##Open file cache for static files\n  open_file_cache max=10000 inactive=30s;\n  open_file_cache_valid 60s;\n  open_file_cache_min_uses 2;\n  open_file_cache_errors on;' ${install_dir}/conf/nginx.conf
+    fi
+
   else
     # VPS settings - resource conservative
-    sed -i 's@^worker_rlimit_nofile.*@worker_rlimit_nofile 51200@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  worker_connections.*@  worker_connections 51200@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  keepalive_timeout.*@  keepalive_timeout 60@' ${install_dir}/conf/nginx.conf
-    
+    sed -i 's@^worker_rlimit_nofile.*@worker_rlimit_nofile 51200;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  worker_connections.*@  worker_connections 51200;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  keepalive_timeout.*@  keepalive_timeout 60;@' ${install_dir}/conf/nginx.conf
+
     # Smaller buffers to save memory
-    sed -i 's@^  client_header_buffer_size.*@  client_header_buffer_size 32k@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  large_client_header_buffers.*@  large_client_header_buffers 4 32k@' ${install_dir}/conf/nginx.conf
-    
+    sed -i 's@^  client_header_buffer_size.*@  client_header_buffer_size 32k;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  large_client_header_buffers.*@  large_client_header_buffers 4 32k;@' ${install_dir}/conf/nginx.conf
+
     # FastCGI buffers
-    sed -i 's@^  fastcgi_buffer_size.*@  fastcgi_buffer_size 64k@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  fastcgi_buffers.*@  fastcgi_buffers 4 64k@' ${install_dir}/conf/nginx.conf
-    sed -i 's@^  fastcgi_busy_buffers_size.*@  fastcgi_busy_buffers_size 128k@' ${install_dir}/conf/nginx.conf
-    
+    sed -i 's@^  fastcgi_buffer_size.*@  fastcgi_buffer_size 64k;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  fastcgi_buffers.*@  fastcgi_buffers 4 64k;@' ${install_dir}/conf/nginx.conf
+    sed -i 's@^  fastcgi_busy_buffers_size.*@  fastcgi_busy_buffers_size 128k;@' ${install_dir}/conf/nginx.conf
+
     # Keep open_file_cache disabled for VPS (saves memory)
   fi
 }
