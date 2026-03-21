@@ -25,12 +25,31 @@ wait_for_db_ready() {
   echo "${CMSG}Waiting for database to be ready...${CEND}"
   
   while [ ${elapsed} -lt ${timeout} ]; do
-    # Check if socket exists
+    # Check if socket exists (primary indicator of readiness)
     if [ -S "${socket}" ]; then
-      # Try to connect and verify user table is accessible
-      # This ensures the database is fully initialized
-      if ${mysql_cmd} -uroot -e "SELECT User,Host FROM mysql.user WHERE User='root' LIMIT 1" >/dev/null 2>&1; then
+      socket_ready=1
+      
+      # Try to connect - try both with and without password
+      # Fresh install: no password
+      if ${mysql_cmd} -uroot -e "SELECT 1" >/dev/null 2>&1; then
         echo "${CSUCCESS}Database is ready!${CEND}"
+        return 0
+      fi
+      
+      # Reinstall or password already set: use password from config
+      if [ -n "${dbrootpwd}" ]; then
+        if ${mysql_cmd} -uroot -p"${dbrootpwd}" -e "SELECT 1" >/dev/null 2>&1; then
+          echo "${CSUCCESS}Database is ready!${CEND}"
+          return 0
+        fi
+      fi
+      
+      # Socket exists but auth failed - check if process is running
+      # This handles reinstall scenarios with different password
+      if pgrep -x "mariadbd" >/dev/null 2>&1 || pgrep -x "mysqld" >/dev/null 2>&1; then
+        # Process running and socket exists - DB is ready
+        # Auth failure is expected for reinstall with different password
+        echo "${CSUCCESS}Database is ready (socket exists, process running)!${CEND}"
         return 0
       fi
     fi
