@@ -154,14 +154,16 @@ setup_mariadb_root() {
   local install_dir=$1
   local root_pwd=$2
   local cmd=${3:-mariadb}
-  
-  ${install_dir}/bin/${cmd} -e "grant all privileges on *.* to root@'127.0.0.1' identified by \"${root_pwd}\" with grant option;"
-  ${install_dir}/bin/${cmd} -e "grant all privileges on *.* to root@'localhost' identified by \"${root_pwd}\" with grant option;"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "delete from mysql.user where Password='' and User not like 'mariadb.%';"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "delete from mysql.db where User='';"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "delete from mysql.proxies_priv where Host!='localhost';"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "drop database test;"
-  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "reset master;"
+
+  # Use ALTER USER syntax (compatible with MariaDB 10.11+ and 11.x)
+  ${install_dir}/bin/${cmd} -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";"
+  ${install_dir}/bin/${cmd} -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
+  ${install_dir}/bin/${cmd} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";"
+  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.user WHERE Password='' AND User NOT LIKE 'mariadb.%';"
+  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.db WHERE User='';"
+  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.proxies_priv WHERE Host!='localhost';"
+  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DROP DATABASE IF EXISTS test;"
+  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "RESET MASTER;"
 }
 
 # ============================================

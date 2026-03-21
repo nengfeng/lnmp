@@ -101,10 +101,16 @@ Reset_force_dbrootpwd() {
   local escaped_pwd="${New_dbrootpwd}"
   if ${db_install_dir}/bin/mysql -V | grep -qi MariaDB; then
     # MariaDB (10.11, 11.4, 11.8)
-    ${db_install_dir}/bin/mysql -uroot -hlocalhost << EOF
+    # Detect MariaDB version to use correct command (mysql or mariadb)
+    local mdb_cmd="mysql"
+    local mdb_ver=$(${db_install_dir}/bin/mysql -V | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    if [[ $(echo "$mdb_ver" | cut -d. -f1) -ge 11 ]]; then
+      mdb_cmd="mariadb"
+    fi
+    ${db_install_dir}/bin/${mdb_cmd} -uroot -hlocalhost << EOF
 FLUSH PRIVILEGES;
-SET PASSWORD FOR 'root'@'localhost' = PASSWORD('${escaped_pwd}');
-SET PASSWORD FOR 'root'@'127.0.0.1' = PASSWORD('${escaped_pwd}');
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${escaped_pwd}';
+ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '${escaped_pwd}';
 FLUSH PRIVILEGES;
 EOF
   else
