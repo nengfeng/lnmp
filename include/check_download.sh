@@ -492,7 +492,7 @@ checkDownload() {
       wget -q "https://nodejs.org/dist/v${nodejs_ver}/SHASUMS256.txt" -O "SHASUMS256.txt" 2>/dev/null && {
         expected_sha256=$(grep "${file_name}" SHASUMS256.txt | awk '{print $1}')
         actual_sha256=$(sha256sum "$file_name" | awk '{print $1}')
-        [["$expected_sha256" == "$actual_sha256"]] && echo "${CGREEN}Node.js checksum verified${CEND}" || echo "${CFAILURE}Node.js checksum mismatch!${CEND}"
+        [[ "$expected_sha256" == "$actual_sha256" ]] && echo "${CGREEN}Node.js checksum verified${CEND}" || echo "${CFAILURE}Node.js checksum mismatch!${CEND}"
       } || echo "${CYELLOW}Could not verify Node.js checksum${CEND}"
     fi
   fi
