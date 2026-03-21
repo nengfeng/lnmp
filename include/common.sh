@@ -475,7 +475,23 @@ service_action() {
 # Start a service
 # Usage: svc_start <service_name> [quiet]
 svc_start() {
-  _svc start "$1" "${2:-no}"
+  local service="$1"
+  local quiet="${2:-no}"
+  
+  _svc start "${service}" "${quiet}"
+  local result=$?
+  
+  # If systemctl start failed (e.g., timeout), check if process is actually running
+  # This handles slow-starting services like MySQL/MariaDB on low-resource VPS
+  if [ ${result} -ne 0 ]; then
+    sleep 2
+    if svc_is_active "${service}"; then
+      [[ "${quiet}" != "yes" ]] && echo "${CMSG}${service} is running despite startup timeout${CEND}"
+      return 0
+    fi
+  fi
+  
+  return ${result}
 }
 
 # Stop a service
@@ -540,14 +556,57 @@ disable_service() {
   svc_disable "${service}"
 }
 
-# Check if a service is running
+# Check if a service is active/running
 # Usage: svc_is_active <service_name>
 # Returns: 0 if running, 1 if not
 svc_is_active() {
+  local service="$1"
+  
   if has_systemd; then
-    systemctl is-active --quiet "$1" 2>/dev/null
+    # First check systemd status
+    if systemctl is-active --quiet "${service}" 2>/dev/null; then
+      return 0
+    fi
+    
+    # Fallback: check if process is actually running
+    # This handles cases where systemd timed out but process started
+    case "${service}" in
+      mysqld|mariadb)
+        pgrep -x "mariadbd" >/dev/null 2>&1 || pgrep -x "mysqld" >/dev/null 2>&1
+        return $?
+        ;;
+      php-fpm|php*-fpm)
+        pgrep -x "php-fpm" >/dev/null 2>&1
+        return $?
+        ;;
+      nginx)
+        pgrep -x "nginx" >/dev/null 2>&1
+        return $?
+        ;;
+      redis-server|redis)
+        pgrep -x "redis-server" >/dev/null 2>&1
+        return $?
+        ;;
+      memcached)
+        pgrep -x "memcached" >/dev/null 2>&1
+        return $?
+        ;;
+      postgresql)
+        pgrep -x "postgres" >/dev/null 2>&1
+        return $?
+        ;;
+      pureftpd|pure-ftpd)
+        pgrep -x "pure-ftpd" >/dev/null 2>&1
+        return $?
+        ;;
+      *)
+        # Generic fallback
+        pgrep -x "${service}" >/dev/null 2>&1 || pgrep -f "${service}" >/dev/null 2>&1
+        return $?
+        ;;
+    esac
   else
-    pgrep -x "$1" >/dev/null 2>&1 || pgrep -f "$1" >/dev/null 2>&1
+    pgrep -x "${service}" >/dev/null 2>&1 || pgrep -f "${service}" >/dev/null 2>&1
   fi
 }
 
