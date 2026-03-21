@@ -37,7 +37,9 @@ install_php_deps() {
     pushd phc-winner-argon2-${argon2_ver} > /dev/null
     compile_and_install
     [ ! -d /usr/local/lib/pkgconfig ] && mkdir -p /usr/local/lib/pkgconfig
-    /bin/cp libargon2.pc /usr/local/lib/pkgconfig/
+    # Generate proper libargon2.pc with correct paths (fix template placeholders)
+    local arch=$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo "x86_64-linux-gnu")
+    sed -e "s/@HOST_MULTIARCH@/${arch}/g" -e "s/@UPSTREAM_VER@/${argon2_ver}/g" libargon2.pc > /usr/local/lib/pkgconfig/libargon2.pc
     popd > /dev/null
     cleanup_src phc-winner-argon2-${argon2_ver}
   fi
