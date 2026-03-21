@@ -13,6 +13,9 @@ Install_MariaDB() {
   local mariadb_ver=$1
   local root_cmd=${2:-mariadb}
 
+  # Fix libaio symlink for Debian 13+ / Ubuntu 24.04+
+  fix_libaio_symlink
+
   pushd ${current_dir}/src > /dev/null
   create_mysql_user
 

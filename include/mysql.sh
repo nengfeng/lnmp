@@ -15,6 +15,9 @@ Install_MySQL() {
   local cnf_func=$2
   local reset_master=${3:-no}
 
+  # Fix libaio symlink for Debian 13+ / Ubuntu 24.04+
+  fix_libaio_symlink
+
   pushd ${current_dir}/src > /dev/null
   create_mysql_user
 

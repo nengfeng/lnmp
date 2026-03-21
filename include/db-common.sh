@@ -4,6 +4,45 @@
 # Description: Common functions for MySQL/MariaDB installation
 
 # ============================================
+# Library Compatibility Functions
+# ============================================
+
+# Fix libaio.so.1 symlink for Debian 13+ / Ubuntu 24.04+ (time64 transition)
+# MySQL/MariaDB expects libaio.so.1 but newer distros install libaio.so.1t64
+# Usage: fix_libaio_symlink
+fix_libaio_symlink() {
+  local libaio_target="/usr/lib/x86_64-linux-gnu/libaio.so.1"
+  
+  # Check if libaio.so.1 already exists
+  if [ -e "${libaio_target}" ]; then
+    return 0
+  fi
+  
+  # Find the actual libaio library (libaio.so.1t64 or libaio.so.1t64.x.x)
+  local libaio_src=$(find /usr/lib -name 'libaio.so.1t64*' -type f 2>/dev/null | head -1)
+  
+  if [ -n "${libaio_src}" ]; then
+    ln -sf "${libaio_src}" "${libaio_target}"
+    ldconfig
+    echo "${CMSG}Created libaio.so.1 symlink -> ${libaio_src}${CEND}"
+    return 0
+  fi
+  
+  # If no libaio at all, try to install it
+  echo "${CWARNING}libaio library not found, attempting to install...${CEND}"
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get -y install libaio1t64 2>/dev/null || apt-get -y install libaio1 2>/dev/null
+    # Try again after install
+    libaio_src=$(find /usr/lib -name 'libaio.so.1t64*' -type f 2>/dev/null | head -1)
+    if [ -n "${libaio_src}" ]; then
+      ln -sf "${libaio_src}" "${libaio_target}"
+      ldconfig
+      echo "${CMSG}Created libaio.so.1 symlink -> ${libaio_src}${CEND}"
+    fi
+  fi
+}
+
+# ============================================
 # Database Ready Check Functions
 # ============================================
 
