@@ -16,7 +16,9 @@
 
 ### PHP
 - PHP 8.3 / 8.4 / 8.5 (支持多版本共存)
-- 14 种 PECL 扩展 (Redis, Memcached, MongoDB, Swoole, Xdebug 等)
+- 13 种 PECL 扩展 (Redis, Memcached, MongoDB, Swoole, Xdebug 等)
+
+> **注意**: gmagick (GraphicsMagick PHP 扩展) 已于 v1.4.12 移除。该扩展自 2018 年起停止维护，所有版本均为 RC 候选版，从未发布稳定版。建议使用 imagick (ImageMagick PHP 扩展) 替代，imagick 仍在积极维护中。
 
 ### 其他服务
 - Redis / Memcached / Pure-FTPd / phpMyAdmin / Node.js

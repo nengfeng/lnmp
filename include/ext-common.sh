@@ -6,13 +6,12 @@
 # Extension registry - maps extension names to their script files and install functions.
 # Format: ext_script|install_func|uninstall_func [extra_install_func]
 #
-# Some extensions (imagick, gmagick) require installing a base library first,
+# Some extensions (imagick) require installing a base library first,
 # then the PECL extension. The extra_install_func handles that.
 
 declare -A EXT_SCRIPTS=(
   [ioncube]="ioncube.sh|Install_ionCube|Uninstall_ionCube"
   [imagick]="ImageMagick.sh|Install_ImageMagick|Install_pecl_imagick|Uninstall_ImageMagick|Uninstall_pecl_imagick"
-  [gmagick]="GraphicsMagick.sh|Install_GraphicsMagick|Install_pecl_gmagick|Uninstall_GraphicsMagick|Uninstall_pecl_gmagick"
   [fileinfo]="pecl_fileinfo.sh|Install_pecl_fileinfo|Uninstall_pecl_fileinfo"
   [imap]="pecl_imap.sh|Install_pecl_imap|Uninstall_pecl_imap"
   [ldap]="pecl_ldap.sh|Install_pecl_ldap|Uninstall_pecl_ldap"
@@ -30,7 +29,6 @@ declare -A EXT_SCRIPTS=(
 declare -A EXT_FLAGS=(
   [ioncube]=pecl_ioncube
   [imagick]=pecl_imagick
-  [gmagick]=pecl_gmagick
   [fileinfo]=pecl_fileinfo
   [imap]=pecl_imap
   [ldap]=pecl_ldap

@@ -424,16 +424,6 @@ checkDownload() {
     Download_src
   fi
 
-  # GraphicsMagick + gmagick
-  if [[ "${pecl_gmagick}" == 1 ]]; then
-    echo "Download GraphicsMagick..."
-    src_url="https://downloads.sourceforge.net/project/graphicsmagick/graphicsmagick/${graphicsmagick_ver}/GraphicsMagick-${graphicsmagick_ver}.tar.xz"
-    Download_src
-    echo "Download gmagick..."
-    src_url="https://pecl.php.net/get/gmagick-${gmagick_ver}.tgz"
-    Download_src
-  fi
-
   # Redis server
   if [[ "${redis_flag}" == y ]]; then
     echo "Download redis-server..."

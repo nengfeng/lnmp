@@ -46,7 +46,7 @@ Show_Help() {
   --mphp_addons               Only install another PHP addons
   --phpcache_option [1-2]     Install PHP opcode cache, default: 1 opcache
   --php_extensions [ext name] Install PHP extensions, include ioncube,
-                              imagick,gmagick,fileinfo,imap,ldap,phalcon,
+                              imagick,fileinfo,imap,ldap,phalcon,
                               yaf,redis,memcached,memcache,mongodb,swoole,xdebug
   --nodejs                    Install Nodejs
   --db_option [1-6]           Install DB version
@@ -70,7 +70,7 @@ parse_php_extensions() {
   local exts=$1
   [ -n "$(echo ${exts} | grep -w ioncube)" ] && pecl_ioncube=1
   [ -n "$(echo ${exts} | grep -w imagick)" ] && pecl_imagick=1
-  [ -n "$(echo ${exts} | grep -w gmagick)" ] && pecl_gmagick=1
+
   [ -n "$(echo ${exts} | grep -w fileinfo)" ] && pecl_fileinfo=1
   [ -n "$(echo ${exts} | grep -w imap)" ] && pecl_imap=1
   [ -n "$(echo ${exts} | grep -w ldap)" ] && pecl_ldap=1
@@ -85,23 +85,22 @@ parse_php_extensions() {
 }
 
 # Set PHP extension flags from number list
-# Usage: set_php_ext_from_numbers "2 9 10"
+# Usage: set_php_ext_from_numbers "2 8 9"
 set_php_ext_from_numbers() {
   local nums=$1
   [ -n "$(echo ${nums} | grep -w 1)" ]  && pecl_ioncube=1
   [ -n "$(echo ${nums} | grep -w 2)" ]  && pecl_imagick=1
-  [ -n "$(echo ${nums} | grep -w 3)" ]  && pecl_gmagick=1
-  [ -n "$(echo ${nums} | grep -w 4)" ]  && pecl_fileinfo=1
-  [ -n "$(echo ${nums} | grep -w 5)" ]  && pecl_imap=1
-  [ -n "$(echo ${nums} | grep -w 6)" ]  && pecl_ldap=1
-  [ -n "$(echo ${nums} | grep -w 7)" ]  && pecl_phalcon=1
-  [ -n "$(echo ${nums} | grep -w 8)" ]  && pecl_yaf=1
-  [ -n "$(echo ${nums} | grep -w 9)" ]  && pecl_redis=1
-  [ -n "$(echo ${nums} | grep -w 10)" ] && pecl_memcached=1
-  [ -n "$(echo ${nums} | grep -w 11)" ] && pecl_memcache=1
-  [ -n "$(echo ${nums} | grep -w 12)" ] && pecl_mongodb=1
-  [ -n "$(echo ${nums} | grep -w 13)" ] && pecl_swoole=1
-  [ -n "$(echo ${nums} | grep -w 14)" ] && pecl_xdebug=1
+  [ -n "$(echo ${nums} | grep -w 3)" ]  && pecl_fileinfo=1
+  [ -n "$(echo ${nums} | grep -w 4)" ]  && pecl_imap=1
+  [ -n "$(echo ${nums} | grep -w 5)" ]  && pecl_ldap=1
+  [ -n "$(echo ${nums} | grep -w 6)" ]  && pecl_phalcon=1
+  [ -n "$(echo ${nums} | grep -w 7)" ]  && pecl_yaf=1
+  [ -n "$(echo ${nums} | grep -w 8)" ]  && pecl_redis=1
+  [ -n "$(echo ${nums} | grep -w 9)" ]  && pecl_memcached=1
+  [ -n "$(echo ${nums} | grep -w 10)" ] && pecl_memcache=1
+  [ -n "$(echo ${nums} | grep -w 11)" ] && pecl_mongodb=1
+  [ -n "$(echo ${nums} | grep -w 12)" ] && pecl_swoole=1
+  [ -n "$(echo ${nums} | grep -w 13)" ] && pecl_xdebug=1
 }
 
 # Parse command-line arguments (pure bash, no eval)
@@ -364,20 +363,19 @@ if [[ ${ARG_NUM} == 0 ]]; then
     printf "%b" "	${CMSG} 0${CEND}. Do not install\n"
     printf "%b" "	${CMSG} 1${CEND}. Install ioncube\n"
     printf "%b" "	${CMSG} 2${CEND}. Install imagick\n"
-    printf "%b" "	${CMSG} 3${CEND}. Install gmagick\n"
-    printf "%b" "	${CMSG} 4${CEND}. Install fileinfo\n"
-    printf "%b" "	${CMSG} 5${CEND}. Install imap\n"
-    printf "%b" "	${CMSG} 6${CEND}. Install ldap\n"
-    printf "%b" "	${CMSG} 7${CEND}. Install phalcon\n"
-    printf "%b" "	${CMSG} 8${CEND}. Install yaf\n"
-    printf "%b" "	${CMSG} 9${CEND}. Install redis\n"
-    printf "%b" "	${CMSG}10${CEND}. Install memcached\n"
-    printf "%b" "	${CMSG}11${CEND}. Install memcache\n"
-    printf "%b" "	${CMSG}12${CEND}. Install mongodb\n"
-    printf "%b" "	${CMSG}13${CEND}. Install swoole\n"
-    printf "%b" "	${CMSG}14${CEND}. Install xdebug\n"
-    read -e -p "Please input numbers (Default '2 9 10', space-separated): " phpext_option
-    phpext_option=${phpext_option:-'2 9 10'}
+    printf "%b" "	${CMSG} 3${CEND}. Install fileinfo\n"
+    printf "%b" "	${CMSG} 4${CEND}. Install imap\n"
+    printf "%b" "	${CMSG} 5${CEND}. Install ldap\n"
+    printf "%b" "	${CMSG} 6${CEND}. Install phalcon\n"
+    printf "%b" "	${CMSG} 7${CEND}. Install yaf\n"
+    printf "%b" "	${CMSG} 8${CEND}. Install redis\n"
+    printf "%b" "	${CMSG} 9${CEND}. Install memcached\n"
+    printf "%b" "	${CMSG}10${CEND}. Install memcache\n"
+    printf "%b" "	${CMSG}11${CEND}. Install mongodb\n"
+    printf "%b" "	${CMSG}12${CEND}. Install swoole\n"
+    printf "%b" "	${CMSG}13${CEND}. Install xdebug\n"
+    read -e -p "Please input numbers (Default '2 8 9', space-separated): " phpext_option
+    phpext_option=${phpext_option:-'2 8 9'}
     if [ "${phpext_option}" != '0' ]; then
       set_php_ext_from_numbers "${phpext_option}"
     fi

@@ -37,7 +37,7 @@ Show_Help() {
   --allphp                      Uninstall all PHP
   --phpcache                    Uninstall PHP opcode cache
   --php_extensions [ext name]   Uninstall PHP extensions, include ioncube,
-                                imagick,gmagick,fileinfo,imap,ldap,phalcon,
+                                imagick,fileinfo,imap,ldap,phalcon,
                                 yaf,redis,memcached,memcache,mongodb,swoole,xdebug
   --pureftpd                    Uninstall PureFtpd
   --redis                       Uninstall Redis-server
@@ -101,7 +101,7 @@ while [ $# -gt 0 ]; do
       php_extensions=$2; shift 2
       [ -n "$(echo ${php_extensions} | grep -w ioncube)" ] && pecl_ioncube=1
       [ -n "$(echo ${php_extensions} | grep -w imagick)" ] && pecl_imagick=1
-      [ -n "$(echo ${php_extensions} | grep -w gmagick)" ] && pecl_gmagick=1
+  
       [ -n "$(echo ${php_extensions} | grep -w fileinfo)" ] && pecl_fileinfo=1
       [ -n "$(echo ${php_extensions} | grep -w imap)" ] && pecl_imap=1
       [ -n "$(echo ${php_extensions} | grep -w ldap)" ] && pecl_ldap=1
@@ -263,7 +263,6 @@ Print_ALLPHP() {
     [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && echo /lib/systemd/system/php${php_ver}-fpm.service
   done
   [ -e "${imagick_install_dir}" ] && echo ${imagick_install_dir}
-  [ -e "${gmagick_install_dir}" ] && echo ${gmagick_install_dir}
   [ -e "${curl_install_dir}" ] && echo ${curl_install_dir}
   [ -e "${freetype_install_dir}" ] && echo ${freetype_install_dir}
 }
@@ -292,7 +291,6 @@ Uninstall_ALLPHP() {
     [ -e "${php_install_dir}${php_ver}" ] && { rm -rf ${php_install_dir}${php_ver}; echo "${CMSG}PHP${php_ver} uninstall completed! ${CEND}"; }
   done
   [ -e "${imagick_install_dir}" ] && rm -rf ${imagick_install_dir}
-  [ -e "${gmagick_install_dir}" ] && rm -rf ${gmagick_install_dir}
   [ -e "${curl_install_dir}" ] && rm -rf ${curl_install_dir}
   [ -e "${freetype_install_dir}" ] && rm -rf ${freetype_install_dir}
 }
@@ -318,11 +316,11 @@ Menu_PHPext() {
     printf "%b" "\t${CMSG} 0${CEND}. Do not uninstall\n"
     printf "%b" "\t${CMSG} 1${CEND}. Uninstall ioncube\n"
     printf "%b" "\t${CMSG} 2${CEND}. Uninstall imagick\n"
-    printf "%b" "\t${CMSG} 3${CEND}. Uninstall gmagick\n"
-    printf "%b" "\t${CMSG} 4${CEND}. Uninstall fileinfo\n"
-    printf "%b" "\t${CMSG} 5${CEND}. Uninstall imap\n"
-    printf "%b" "\t${CMSG} 6${CEND}. Uninstall ldap\n"
-    printf "%b" "\t${CMSG} 7${CEND}. Uninstall phalcon\n"
+    printf "%b" "\t${CMSG} 3${CEND}. Uninstall fileinfo\n"
+    printf "%b" "\t${CMSG} 4${CEND}. Uninstall imap\n"
+    printf "%b" "\t${CMSG} 5${CEND}. Uninstall ldap\n"
+    printf "%b" "\t${CMSG} 6${CEND}. Uninstall phalcon\n"
+    printf "%b" "\t${CMSG} 7${CEND}. Uninstall yaf\n"
     printf "%b" "\t${CMSG} 8${CEND}. Uninstall redis\n"
     printf "%b" "\t${CMSG} 9${CEND}. Uninstall memcached\n"
     printf "%b" "\t${CMSG}10${CEND}. Uninstall memcache\n"
@@ -345,11 +343,11 @@ Menu_PHPext() {
     else
       [ -n "$(echo ${array_phpext[@]} | grep -w 1)" ] && pecl_ioncube=1
       [ -n "$(echo ${array_phpext[@]} | grep -w 2)" ] && pecl_imagick=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 3)" ] && pecl_gmagick=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 4)" ] && pecl_fileinfo=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 5)" ] && pecl_imap=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 6)" ] && pecl_ldap=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 7)" ] && pecl_phalcon=1
+      [ -n "$(echo ${array_phpext[@]} | grep -w 3)" ] && pecl_fileinfo=1
+      [ -n "$(echo ${array_phpext[@]} | grep -w 4)" ] && pecl_imap=1
+      [ -n "$(echo ${array_phpext[@]} | grep -w 5)" ] && pecl_ldap=1
+      [ -n "$(echo ${array_phpext[@]} | grep -w 6)" ] && pecl_phalcon=1
+      [ -n "$(echo ${array_phpext[@]} | grep -w 7)" ] && pecl_yaf=1
       [ -n "$(echo ${array_phpext[@]} | grep -w 8)" ] && pecl_redis=1
       [ -n "$(echo ${array_phpext[@]} | grep -w 9)" ] && pecl_memcached=1
       [ -n "$(echo ${array_phpext[@]} | grep -w 10)" ] && pecl_memcache=1

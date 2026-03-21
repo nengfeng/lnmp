@@ -190,7 +190,6 @@ get_version() {
     argon2)         ver=${VERSIONS[argon2_ver]} ;;
     icu)            ver=${VERSIONS[icu4c_ver]} ;;
     imagemagick)    ver=${VERSIONS[imagemagick_ver]} ;;
-    graphicsmagick) ver=${VERSIONS[graphicsmagick_ver]} ;;
     redis)          ver=${VERSIONS[redis_ver]} ;;
     memcached)      ver=${VERSIONS[memcached_ver]} ;;
     libmemcached)   ver=${VERSIONS[libmemcached_ver]} ;;
@@ -210,7 +209,6 @@ get_version() {
     pecl-memcache)  ver=${VERSIONS[pecl_memcache_ver]} ;;
     pecl-mongodb)   ver=${VERSIONS[pecl_mongodb_ver]} ;;
     pecl-imagick)   ver=${VERSIONS[imagick_ver]} ;;
-    pecl-gmagick)   ver=${VERSIONS[gmagick_ver]} ;;
     pecl-apcu)      ver=${VERSIONS[apcu_ver]} ;;
     pecl-phalcon)   ver=${VERSIONS[phalcon_ver]} ;;
     pecl-yaf)       ver=${VERSIONS[yaf_ver]} ;;
