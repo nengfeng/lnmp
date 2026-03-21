@@ -688,10 +688,11 @@ After=network.target
 [Service]
 Type=forking
 PIDFile=${data_dir}/mysql.pid
-ExecStart=${install_dir}/bin/mysqld_safe --defaults-file=/etc/my.cnf &
-ExecStop=${install_dir}/bin/mysqladmin -uroot shutdown
+ExecStart=${install_dir}/bin/mysqld_safe --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid
+ExecStop=/bin/kill -TERM \$MAINPID
 Restart=on-failure
 RestartSec=5
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
