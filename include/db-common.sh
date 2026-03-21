@@ -94,8 +94,15 @@ install_mariadb_binary() {
   
   tar zxf mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz
   mv mariadb-${mariadb_ver}-linux-systemd-x86_64/* ${install_dir}
-  sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${install_dir}/bin/mysqld_safe
-  sed -i "s@/usr/local/mysql@${install_dir}@g" ${install_dir}/bin/mysqld_safe
+  
+  # Inject tcmalloc for better memory performance
+  # Use mariadbd-safe for MariaDB 11.x+, mysqld_safe for older versions
+  local safe_script="${install_dir}/bin/mariadbd-safe"
+  [ ! -f "${safe_script}" ] && safe_script="${install_dir}/bin/mysqld_safe"
+  if [ -f "${safe_script}" ]; then
+    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${safe_script}
+    sed -i "s@/usr/local/mysql@${install_dir}@g" ${safe_script}
+  fi
 }
 
 # Install MariaDB from source
@@ -680,6 +687,12 @@ setup_db_service() {
   local install_dir=$1
   local data_dir=$2
 
+  # Use mariadbd-safe for MariaDB 11.x+, mysqld_safe for MySQL and older MariaDB
+  local safe_cmd="mysqld_safe"
+  if [ -x "${install_dir}/bin/mariadbd-safe" ]; then
+    safe_cmd="mariadbd-safe"
+  fi
+
   if has_systemd; then
     # Use systemd service unit
     cat > /lib/systemd/system/mysqld.service << EOF
@@ -690,7 +703,7 @@ After=network.target
 [Service]
 Type=forking
 PIDFile=${data_dir}/mysql.pid
-ExecStart=${install_dir}/bin/mysqld_safe --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid
+ExecStart=${install_dir}/bin/${safe_cmd} --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid
 ExecStop=/bin/kill -TERM \$MAINPID
 Restart=on-failure
 RestartSec=5
