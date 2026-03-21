@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
+. include/db-common.sh
+
 Upgrade_DB() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${db_install_dir}/bin/mysql" ] && echo "${CWARNING}MySQL/MariaDB is not installed on your system! ${CEND}" && exit 1
@@ -96,6 +98,10 @@ Upgrade_DB() {
       ${mariadb_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
       ${mariadb_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "reset master;" >/dev/null 2>&1
       ${mariadb_install_dir}/bin/mysql_upgrade -uroot -p${dbrootpwd} >/dev/null 2>&1
+      # Reset root user permissions (including root@'127.0.0.1')
+      local root_cmd="mysql"
+      [ -x "${mariadb_install_dir}/bin/mariadb" ] && root_cmd="mariadb"
+      setup_mariadb_root ${mariadb_install_dir} ${dbrootpwd} ${root_cmd}
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
     elif [[ "${DB}" == MySQL ]]; then
       tar xJf ${DB_filename}.tar.xz
@@ -118,6 +124,8 @@ Upgrade_DB() {
       ${mysql_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
       ${mysql_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "reset master;" >/dev/null 2>&1
       ${mysql_install_dir}/bin/mysql_upgrade -uroot -p${dbrootpwd} >/dev/null 2>&1
+      # Reset root user permissions (including root@'127.0.0.1')
+      setup_mysql_root ${mysql_install_dir} ${dbrootpwd}
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
     fi
   fi
