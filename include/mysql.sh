@@ -55,5 +55,5 @@ Install_MySQL() {
   setup_mysql_root ${mysql_install_dir} ${dbrootpwd} ${reset_master}
 
   post_install_db ${mysql_install_dir} mysql ${mysql_data_dir}
-  svc_stop mysqld
+  # Keep service running - install.sh will handle final service check
 }

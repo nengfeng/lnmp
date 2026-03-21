@@ -163,9 +163,19 @@ setup_mariadb_root() {
   local cmd=${3:-mariadb}
 
   # Use ALTER USER syntax (compatible with MariaDB 10.11+ and 11.x)
+  # Order matters: set localhost password first, then create 127.0.0.1 user
+  
+  # 1. Set password for root@'localhost' (this user already exists after mysql_install_db)
+  ${install_dir}/bin/${cmd} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
+    echo "${CWARNING}Failed to set root@localhost password, trying SET PASSWORD...${CEND}"
+    ${install_dir}/bin/${cmd} -e "SET PASSWORD FOR root@'localhost' = PASSWORD(\"${root_pwd}\");"
+  }
+  
+  # 2. Create root@'127.0.0.1' with same password
   ${install_dir}/bin/${cmd} -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";"
-  ${install_dir}/bin/${cmd} -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
-  ${install_dir}/bin/${cmd} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";"
+  ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
+  
+  # 3. Cleanup
   ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.user WHERE Password='' AND User NOT LIKE 'mariadb.%';"
   ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.db WHERE User='';"
   ${install_dir}/bin/${cmd} -uroot -p${root_pwd} -e "DELETE FROM mysql.proxies_priv WHERE Host!='localhost';"

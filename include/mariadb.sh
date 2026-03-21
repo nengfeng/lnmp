@@ -52,5 +52,5 @@ Install_MariaDB() {
   setup_mariadb_root ${mariadb_install_dir} ${dbrootpwd} ${root_cmd}
 
   post_install_db ${mariadb_install_dir} mariadb ${mariadb_data_dir}
-  svc_stop mysqld
+  # Keep service running - install.sh will handle final service check
 }
