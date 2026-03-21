@@ -19,7 +19,7 @@ Upgrade_DB() {
       if [ $? -eq 0 ]; then
         dbrootpwd=${NEW_dbrootpwd}
         sed -i "s+^dbrootpwd.*+dbrootpwd='$dbrootpwd'+" ../options.conf
-  chmod 600 ../options.conf
+        chmod 600 ../options.conf
         break
       else
         echo "${CFAILURE}${DB} root password incorrect,Please enter again! ${CEND}"
@@ -28,7 +28,7 @@ Upgrade_DB() {
   done
 
   OLD_db_ver_tmp=$(${db_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e 'select version()\G;' | grep version | awk '{print $2}')
-  if [[ -n "$(${db_install_dir}/bin/mysql -V | grep || MariaDB)" ]]; then
+  if [[ -n "$(${db_install_dir}/bin/mysql -V | grep -i MariaDB)" ]]; then
     [[ "${OUTIP_STATE}"x == "China"x ]] && DOWN_ADDR=https://mirrors.tuna.tsinghua.edu.cn/mariadb || DOWN_ADDR=https://archive.mariadb.org
     DB=MariaDB
     OLD_db_ver=$(echo ${OLD_db_ver_tmp} | awk -F'-' '{print $1}')
