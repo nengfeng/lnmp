@@ -290,6 +290,7 @@ setup_php_fpm_service() {
   sed -i "s@/usr/local/php@${php_dir}@g" /lib/systemd/system/php-fpm.service
   svc_daemon_reload
   svc_enable php-fpm
+  svc_start php-fpm
 }
 
 # ============================================
