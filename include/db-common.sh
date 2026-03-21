@@ -782,26 +782,27 @@ setup_db_service() {
   local install_dir=$1
   local data_dir=$2
 
-  # Use mariadbd-safe for MariaDB 11.x+, mysqld_safe for MySQL and older MariaDB
-  local safe_cmd="mysqld_safe"
-  if [ -x "${install_dir}/bin/mariadbd-safe" ]; then
-    safe_cmd="mariadbd-safe"
+  # Determine the actual daemon binary (not the safe wrapper)
+  # mysqld_safe/mariadbd-safe are shell scripts that don't work well with systemd
+  local daemon_cmd="mysqld"
+  if [ -x "${install_dir}/bin/mariadbd" ]; then
+    daemon_cmd="mariadbd"
   fi
 
   if has_systemd; then
     # Use systemd service unit
-    # Note: Type=notify would be ideal but mysqld_safe doesn't support it
-    # We use Type=forking with ExecStartPost to wait for the socket
+    # Use Type=simple with direct daemon binary (not *_safe wrapper)
+    # Type=simple: systemd considers service started when process is forked
+    # The daemon drops privileges to mysql user via --user=mysql in my.cnf
+    # Our wait_for_db_ready() function handles checking actual readiness
     cat > /lib/systemd/system/mysqld.service << EOF
 [Unit]
 Description=MySQL/MariaDB Server
 After=network.target
 
 [Service]
-Type=forking
-PIDFile=${data_dir}/mysql.pid
-ExecStart=${install_dir}/bin/${safe_cmd} --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid
-ExecStartPost=/bin/bash -c 'for i in {1..300}; do [ -S /tmp/mysql.sock ] && break; sleep 1; done'
+Type=simple
+ExecStart=${install_dir}/bin/${daemon_cmd} --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid --user=mysql
 ExecStop=/bin/kill -TERM \$MAINPID
 Restart=on-failure
 RestartSec=5
@@ -815,7 +816,7 @@ EOF
     svc_daemon_reload
     svc_enable mysqld
   else
-    # Fallback to SysV init
+    # Fallback to SysV init (use mysql.server which includes safe wrapper)
     /bin/cp ${install_dir}/support-files/mysql.server /etc/init.d/mysqld
     sed -i "s@^basedir=.*@basedir=${install_dir}@" /etc/init.d/mysqld
     sed -i "s@^datadir=.*@datadir=${data_dir}@" /etc/init.d/mysqld
