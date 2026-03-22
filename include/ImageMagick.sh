@@ -7,17 +7,33 @@ Install_ImageMagick() {
     echo "${CWARNING}ImageMagick already installed! ${CEND}"
   else
     pushd ${current_dir}/src > /dev/null
-    tar xzf ImageMagick-${imagemagick_ver}.tar.gz
+    local imagemagick_filename="ImageMagick-${imagemagick_ver}.tar.gz"
+    # GitHub tag download: archive directory is ImageMagick-${ver}, not ImageMagick-ver
+    local src_dir="ImageMagick-${imagemagick_ver}"
+    
+    if [ ! -f "${imagemagick_filename}" ]; then
+      echo "${CFAILURE}${imagemagick_filename} not found!${CEND}"
+      popd > /dev/null
+      return 1
+    fi
+    
+    tar xzf ${imagemagick_filename}
     #if [[ "${PM}" == 'yum' ]]; then
     #  yum -y install libwebp-devel
     #elif [[ "${PM}" == 'apt-get' ]]; then
     #  yum -y install libwebp-dev
     #fi
-    pushd ImageMagick-${imagemagick_ver} > /dev/null
+    pushd ${src_dir} > /dev/null
     ./configure --prefix=${imagick_install_dir} --enable-shared --enable-static
     compile_and_install
+    
+    # Create symlink for MagickWand-config if needed
+    if [ -x "${imagick_install_dir}/bin/MagickWand-config" ]; then
+      ln -sf ${imagick_install_dir}/bin/MagickWand-config /usr/local/bin/MagickWand-config 2>/dev/null
+    fi
+    
     popd > /dev/null
-    cleanup_src ImageMagick-${imagemagick_ver}
+    cleanup_src ${src_dir}
     popd > /dev/null
   fi
 }
@@ -31,13 +47,23 @@ Uninstall_ImageMagick() {
 
 Install_pecl_imagick() {
   if [ -e "${php_install_dir}/bin/phpize" ]; then
+    # Check if ImageMagick is installed
+    if [ ! -d "${imagick_install_dir}" ]; then
+      echo "${CFAILURE}ImageMagick not installed! Please install ImageMagick first.${CEND}"
+      return 1
+    fi
+    
     pushd ${current_dir}/src > /dev/null
     phpExtensionDir=$(${php_install_dir}/bin/php-config --extension-dir)
 
     src_url=https://pecl.php.net/get/imagick-${imagick_ver}.tgz && Download_src
     tar xzf imagick-${imagick_ver}.tgz
     pushd imagick-${imagick_ver} > /dev/null
-    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+    
+    # Set environment to find MagickWand-config
+    export PKG_CONFIG_PATH=${imagick_install_dir}/lib/pkgconfig:/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+    export PATH=${imagick_install_dir}/bin:$PATH
+    
     ${php_install_dir}/bin/phpize
     ./configure --with-php-config=${php_install_dir}/bin/php-config --with-imagick=${imagick_install_dir}
     compile_and_install

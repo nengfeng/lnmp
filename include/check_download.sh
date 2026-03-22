@@ -417,8 +417,8 @@ checkDownload() {
   # ImageMagick + imagick (GitHub + PECL)
   if [[ "${pecl_imagick}" == 1 ]]; then
     echo "Download ImageMagick..."
-    src_url="https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${imagemagick_ver}.tar.gz"
-    Download_src
+    local imagemagick_filename="ImageMagick-${imagemagick_ver}.tar.gz"
+    wget --tries=6 -c -O "${imagemagick_filename}" "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${imagemagick_ver}.tar.gz"
     echo "Download imagick..."
     src_url="https://pecl.php.net/get/imagick-${imagick_ver}.tgz"
     Download_src
