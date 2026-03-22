@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=forking
-PIDFile=/var/run/redis/redis.pid
+PIDFile=/run/redis/redis.pid
 User=redis
 Group=redis
 
-Environment=statedir=/var/run/redis
+Environment=statedir=/run/redis
 PermissionsStartOnly=true
 ExecStartPre=/bin/mkdir -p ${statedir}
 ExecStartPre=/bin/chown -R redis:redis ${statedir}
