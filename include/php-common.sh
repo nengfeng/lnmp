@@ -376,9 +376,9 @@ opcache.consistency_checks=0
 EOF
   fi
   
-  setup_php_fpm_service ${install_dir}
   generate_php_fpm_conf ${install_dir}
   config_php_fpm_pool ${install_dir} ${mem} ${scenario}
+  setup_php_fpm_service ${install_dir}
 
   # Setup logrotate
   setup_php_fpm_logrotate ${install_dir}
