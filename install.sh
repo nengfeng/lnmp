@@ -424,6 +424,13 @@ OUTIP_STATE=$(ip_state)
 # Check download source packages
 . ./include/check_download.sh
 
+# Set PHP version for download
+case "${php_option}" in
+  1) php_ver_to_use="${php83_ver}" ;;
+  2) php_ver_to_use="${php84_ver}" ;;
+  3) php_ver_to_use="${php85_ver}" ;;
+esac
+
 [[ "${armplatform}" == "y" ]] && dbinstallmethod=2
 checkDownload 2>&1 | tee -a ${current_dir}/install.log
 
