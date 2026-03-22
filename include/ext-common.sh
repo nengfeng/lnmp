@@ -55,7 +55,8 @@ install_php_ext() {
 
   . include/${script}
   ${func1} 2>&1 | tee -a ${current_dir}/install.log
-  [[ -n "$func2" ]] && ${func2} 2>&1 | tee && ${current_dir}/install.log
+  # Only call func2 if it's an install function (starts with Install_)
+  [[ -n "$func2" && "$func2" == Install_* ]] && ${func2} 2>&1 | tee -a ${current_dir}/install.log
 }
 
 # Uninstall a single PHP extension
