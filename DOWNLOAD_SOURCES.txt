@@ -120,7 +120,6 @@ pecl-memcached      | https://pecl.php.net/get/memcached-{ver}.tgz   | 清华   
 pecl-memcache       | https://pecl.php.net/get/memcache-{ver}.tgz    | 清华      | 无
 pecl-mongodb        | https://pecl.php.net/get/mongodb-{ver}.tgz     | 清华      | 无
 pecl-imagick        | https://pecl.php.net/get/imagick-{ver}.tgz     | 清华      | 无
-pecl-gmagick        | https://pecl.php.net/get/gmagick-{ver}.tgz     | 清华      | 无
 pecl-apcu           | https://pecl.php.net/get/apcu-{ver}.tgz        | 清华      | 无
 pecl-phalcon        | https://pecl.php.net/get/phalcon-{ver}.tgz     | 清华      | 无
 pecl-yaf            | https://pecl.php.net/get/yaf-{ver}.tgz         | 清华      | 无
@@ -128,7 +127,6 @@ pecl-swoole         | https://pecl.php.net/get/swoole-{ver}.tgz      | 清华   
 pecl-xdebug         | https://pecl.php.net/get/xdebug-{ver}.tgz      | 清华      | 无
 ionCube             | https://downloads.ioncube.com/                 | 无        | 无
 ImageMagick         | https://github.com/ImageMagick/ImageMagick     | GitHub    | 无
-GraphicsMagick      | https://sourceforge.net/projects/graphicsmagick| 清华      | 无
 
 ================================================================================
 八、缓存/NoSQL
