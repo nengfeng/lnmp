@@ -8,6 +8,27 @@
 # All other components use official sources directly.
 
 # ============================================
+# OpenSSL version check (for Argon2 support)
+# OpenSSL 3.2+ has built-in Argon2 support
+openssl_ver_ge_32() {
+  local ver
+  ver=$(openssl version 2>/dev/null | awk '{print $2}')
+  if [ -z "$ver" ]; then
+    return 1
+  fi
+  local major=$(echo "$ver" | cut -d. -f1)
+  local minor=$(echo "$ver" | cut -d. -f2)
+  if [[ "$major" -ge 4 ]]; then
+    return 0
+  elif [[ "$major" -eq 3 ]]; then
+    if [[ "$minor" -ge 2 ]]; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# ============================================
 
 # 计算 SHA256
 compute_sha256() {
@@ -371,10 +392,20 @@ checkDownload() {
     src_url="https://download.savannah.gnu.org/releases/freetype/freetype-${freetype_ver}.tar.gz"
     Download_src
 
-    # argon2 (GitHub) - only needed for PHP < 8.4 (PHP 8.4+ uses OpenSSL built-in Argon2)
+    # argon2 (GitHub) - only needed when can't use OpenSSL built-in Argon2
+    # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip
     # php_option: 1=8.3, 2=8.4, 3=8.5 | mphp_ver: 83, 84, 85
+    local need_argon2=false
     if [[ "${php_option}" == "1" ]] || [[ "${mphp_ver}" == "83" ]]; then
-      echo "Download argon2..."
+      need_argon2=true
+    elif [[ "${php_option}" =~ ^[23]$ ]] || [[ "${mphp_ver}" =~ ^8[45]$ ]]; then
+      # PHP 8.4/8.5 - check OpenSSL version
+      if ! openssl_ver_ge_32; then
+        need_argon2=true
+      fi
+    fi
+    if [[ "${need_argon2}" == "true" ]]; then
+      echo "Download argon2 (OpenSSL < 3.2 or PHP < 8.4)..."
       src_url="https://github.com/P-H-C/phc-winner-argon2/archive/refs/tags/${argon2_ver}.tar.gz"
       Download_src
     fi

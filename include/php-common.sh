@@ -12,6 +12,35 @@ php_ver_ge_84() {
   [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]
 }
 
+# Check if OpenSSL version is 3.2 or later
+# OpenSSL 3.2+ has built-in Argon2 support
+openssl_ver_ge_32() {
+  local ver
+  ver=$(openssl version 2>/dev/null | awk '{print $2}')
+  if [ -z "$ver" ]; then
+    return 1
+  fi
+  local major=$(echo "$ver" | cut -d. -f1)
+  local minor=$(echo "$ver" | cut -d. -f2)
+  local patch=$(echo "$ver" | cut -d. -f3)
+  # OpenSSL 3.2+ (version format: 3.2.0, 3.2.1, etc.)
+  if [[ "$major" -ge 4 ]]; then
+    return 0
+  elif [[ "$major" -eq 3 ]]; then
+    if [[ "$minor" -ge 2 ]]; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# Check if we can use OpenSSL built-in Argon2
+# Requires: PHP 8.4+ AND OpenSSL 3.2+
+can_use_openssl_argon2() {
+  local php_ver=$1
+  php_ver_ge_84 "${php_ver}" && openssl_ver_ge_32
+}
+
 # Install PHP dependency libraries
 # Usage: install_php_deps [php_ver]
 #   php_ver: PHP version string (e.g., "8.3.20", "8.4.10")
@@ -43,8 +72,9 @@ install_php_deps() {
     cleanup_src freetype-${freetype_ver}
   fi
 
-  # argon2 - only needed for PHP < 8.4 (PHP 8.4+ uses OpenSSL built-in Argon2)
-  if ! php_ver_ge_84 "${php_ver}"; then
+  # argon2 - only needed when can't use OpenSSL built-in Argon2
+  # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip libargon2
+  if ! can_use_openssl_argon2 "${php_ver}"; then
     if [ ! -e "/usr/local/lib/pkgconfig/libargon2.pc" ]; then
       tar xzf phc-winner-argon2-${argon2_ver}.tar.gz
       pushd phc-winner-argon2-${argon2_ver} > /dev/null
@@ -342,8 +372,8 @@ install_php_source() {
     local phpcache_arg=''
   fi
   
-  # Build argon2 argument (PHP 8.4+ uses OpenSSL built-in Argon2)
-  if php_ver_ge_84 "${php_ver}"; then
+  # Build argon2 argument (PHP 8.4+ with OpenSSL 3.2+ uses built-in Argon2)
+  if can_use_openssl_argon2 "${php_ver}"; then
     local argon2_arg='--with-openssl-argon2'
   else
     local argon2_arg='--with-password-argon2'
