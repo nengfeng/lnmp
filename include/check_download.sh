@@ -389,6 +389,10 @@ checkDownload() {
     local china_url="${MIRROR_BASE_URL}/gnu/binutils/binutils-${binutils_ver}.tar.gz"
     src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
     Download_src
+
+    # mhash (SourceForge)
+    src_url="https://downloads.sourceforge.net/project/mhash/mhash/${mhash_ver}/mhash-${mhash_ver}.tar.gz"
+    Download_src
   fi
 
   # PHP source
