@@ -20,7 +20,7 @@ Install_PHP() {
   php_with_curl='--with-curl'
 
   create_run_user
-  install_php_deps
+  install_php_deps ${php_ver}
   install_php_source ${php_ver} ${php_install_dir} ${THREAD}
   post_install_php ${php_ver} ${php_install_dir} ${Mem} ${server_scenario}
 

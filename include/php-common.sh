@@ -3,11 +3,23 @@
 # BLOG:  https://github.com/nengfeng/lnmp
 # Description: Common functions for PHP installation
 
+# Check if PHP version is 8.4 or later
+# PHP 8.4+ can use OpenSSL's built-in Argon2 via --with-openssl-argon2
+php_ver_ge_84() {
+  local ver=$1
+  local major=$(echo "$ver" | cut -d. -f1)
+  local minor=$(echo "$ver" | cut -d. -f2)
+  [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]
+}
+
 # Install PHP dependency libraries
-# These libraries are shared across all PHP versions
+# Usage: install_php_deps [php_ver]
+#   php_ver: PHP version string (e.g., "8.3.20", "8.4.10")
+#   PHP 8.4+ uses OpenSSL built-in Argon2, no libargon2 needed
 install_php_deps() {
+  local php_ver=${1:-}
   pushd ${current_dir}/src > /dev/null
-  
+
   # curl
   if [ ! -e "${curl_install_dir}/lib/libcurl.la" ]; then
     tar xzf curl-${curl_ver}.tar.gz
@@ -31,16 +43,17 @@ install_php_deps() {
     cleanup_src freetype-${freetype_ver}
   fi
 
-  # argon2
-  if [ ! -e "/usr/local/lib/pkgconfig/libargon2.pc" ]; then
-    tar xzf phc-winner-argon2-${argon2_ver}.tar.gz
-    pushd phc-winner-argon2-${argon2_ver} > /dev/null
-    compile_and_install
-    popd > /dev/null
-    cleanup_src phc-winner-argon2-${argon2_ver}
-    # Create pkg-config file (argon2 source doesn't include one)
-    [ ! -d /usr/local/lib/pkgconfig ] && mkdir -p /usr/local/lib/pkgconfig
-    cat > /usr/local/lib/pkgconfig/libargon2.pc << 'EOF'
+  # argon2 - only needed for PHP < 8.4 (PHP 8.4+ uses OpenSSL built-in Argon2)
+  if ! php_ver_ge_84 "${php_ver}"; then
+    if [ ! -e "/usr/local/lib/pkgconfig/libargon2.pc" ]; then
+      tar xzf phc-winner-argon2-${argon2_ver}.tar.gz
+      pushd phc-winner-argon2-${argon2_ver} > /dev/null
+      compile_and_install
+      popd > /dev/null
+      cleanup_src phc-winner-argon2-${argon2_ver}
+      # Create pkg-config file (argon2 source doesn't include one)
+      [ ! -d /usr/local/lib/pkgconfig ] && mkdir -p /usr/local/lib/pkgconfig
+      cat > /usr/local/lib/pkgconfig/libargon2.pc << 'EOF'
 prefix=/usr/local
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
@@ -52,6 +65,7 @@ Version: 20190702
 Libs: -L${libdir} -largon2
 Cflags: -I${includedir}
 EOF
+    fi
   fi
 
   # libsodium
@@ -328,6 +342,13 @@ install_php_source() {
     local phpcache_arg=''
   fi
   
+  # Build argon2 argument (PHP 8.4+ uses OpenSSL built-in Argon2)
+  if php_ver_ge_84 "${php_ver}"; then
+    local argon2_arg='--with-openssl-argon2'
+  else
+    local argon2_arg='--with-password-argon2'
+  fi
+  
   ICONV_PLUG=1 ./configure --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) --prefix=${install_dir} --with-config-file-path=${install_dir}/etc \
     --with-config-file-scan-dir=${install_dir}/etc/php.d \
     --with-fpm-user=${run_user} --with-fpm-group=${run_group} --enable-fpm ${phpcache_arg} --disable-fileinfo \
@@ -335,7 +356,7 @@ install_php_source() {
     --with-iconv --with-freetype --with-jpeg --with-zlib \
     --enable-xml --disable-rpath --enable-bcmath --enable-shmop --enable-exif \
     --enable-sysvsem ${php_with_curl} --enable-mbregex \
-    --enable-mbstring --with-password-argon2 --with-sodium=/usr/local --enable-gd ${php_with_openssl} \
+    --enable-mbstring ${argon2_arg} --with-sodium=/usr/local --enable-gd ${php_with_openssl} \
     --with-mhash --enable-pcntl --enable-sockets --enable-ftp --enable-intl --with-xsl \
     --with-gettext --with-zip=/usr/local --enable-soap --disable-debug ${php_modules_options}
   make -j ${threads}

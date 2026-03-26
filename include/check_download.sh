@@ -371,9 +371,13 @@ checkDownload() {
     src_url="https://download.savannah.gnu.org/releases/freetype/freetype-${freetype_ver}.tar.gz"
     Download_src
 
-    # argon2 (GitHub) - tag 名称就是版本号，如 20190702
-    src_url="https://github.com/P-H-C/phc-winner-argon2/archive/refs/tags/${argon2_ver}.tar.gz"
-    Download_src
+    # argon2 (GitHub) - only needed for PHP < 8.4 (PHP 8.4+ uses OpenSSL built-in Argon2)
+    # php_option: 1=8.3, 2=8.4, 3=8.5 | mphp_ver: 83, 84, 85
+    if [[ "${php_option}" == "1" ]] || [[ "${mphp_ver}" == "83" ]]; then
+      echo "Download argon2..."
+      src_url="https://github.com/P-H-C/phc-winner-argon2/archive/refs/tags/${argon2_ver}.tar.gz"
+      Download_src
+    fi
 
     # libsodium (official only)
     src_url="https://download.libsodium.org/libsodium/releases/libsodium-${libsodium_ver}.tar.gz"
