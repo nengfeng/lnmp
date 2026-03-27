@@ -288,6 +288,59 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 - **磁盘**: 最低 5GB，推荐 10GB+
 - **架构**: x86_64, aarch64
 
+## 数据库与 CPU 兼容性
+
+### 二进制安装 vs 源码编译
+
+安装时可选择两种方式（`dbinstallmethod` 参数）：
+- `1` - 二进制安装（快速，但可能存在 CPU 兼容性问题）
+- `2` - 源码编译（较慢，但完全兼容当前 CPU）
+
+### MariaDB 二进制包
+
+MariaDB 官方仅提供 `bintar-linux-systemd-x86_64` 二进制包，该包针对较新的 CPU 优化编译。
+
+**可能遇到的问题：**
+- 运行时出现 `Illegal instruction` 错误
+- 表示二进制文件使用了当前 CPU 不支持的指令集
+
+**推荐配置：**
+| CPU | SSE4.2 | AVX | AVX2 | 建议 |
+|-----|--------|-----|------|------|
+| 较新 (2013年后) | ✓ | ✓ | ✓ | 二进制安装可用 |
+| 较旧 (2013年前) | ✗ | - | - | 使用源码编译 |
+
+**常见兼容 CPU：**
+- Intel: Sandy Bridge (2代) 及以后
+- AMD: Bulldozer 及以后
+
+### MySQL 二进制包
+
+MySQL 官方二进制包兼容性更好，对旧 CPU 支持更完善。
+
+**推荐配置：**
+| CPU | 兼容性 | 建议 |
+|-----|--------|------|
+| 任意 x86_64 | ✓ | 二进制安装可用 |
+
+### 解决方案
+
+如果 MariaDB 二进制安装出现 `Illegal instruction`：
+
+```bash
+# 方案1: 使用 MySQL 替代
+./install.sh --db_option 1  # MySQL 8.4
+
+# 方案2: 源码编译 MariaDB
+./install.sh --dbinstallmethod 2 --db_option 3  # MariaDB 10.11
+```
+
+**检查 CPU 支持的指令集：**
+```bash
+cat /proc/cpuinfo | grep -o 'flags.*' | head -1
+# 检查是否包含 sse4_2, avx, avx2 等
+```
+
 ## 依赖说明
 
 ### PCRE2
