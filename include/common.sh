@@ -671,3 +671,39 @@ cleanup_versions() {
     rm -rf ${prefix}-${ver}
   done
 }
+
+# Improve web directory permissions for enhanced security
+# Usage: setup_web_directory_permissions
+setup_web_directory_permissions() {
+  # Set /data to 755 (keep existing behavior for compatibility)
+  [ -d /data ] && chmod 755 /data
+  
+  # Set more restrictive permissions for web directories
+  if [ -d "${wwwroot_dir}" ]; then
+    # Web root: 750 (owner: rwx, group: r-x, others: none)
+    # This prevents other users from accessing web files
+    chmod 750 ${wwwroot_dir}
+    chown ${run_user}:${run_group} ${wwwroot_dir}
+    
+    # Ensure subdirectories have appropriate permissions
+    find ${wwwroot_dir} -type d -exec chmod 750 {} \; 2>/dev/null
+    find ${wwwroot_dir} -type f -exec chmod 640 {} \; 2>/dev/null
+    
+    # Special case for default directory (may need 755 for nginx access)
+    if [ -d "${wwwroot_dir}/default" ]; then
+      chmod 755 ${wwwroot_dir}/default
+      chown ${run_user}:${run_group} ${wwwroot_dir}/default
+    fi
+  fi
+  
+  if [ -d "${wwwlogs_dir}" ]; then
+    # Log directory: 755 (needs execute permission for nginx/php-fpm)
+    chmod 755 ${wwwlogs_dir}
+    chown ${run_user}:${run_group} ${wwwlogs_dir}
+    
+    # Ensure log files have appropriate permissions
+    find ${wwwlogs_dir} -type f -exec chmod 644 {} \; 2>/dev/null
+  fi
+  
+  echo "${CMSG}Enhanced web directory permissions configured${CEND}"
+}

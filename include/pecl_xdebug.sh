@@ -20,7 +20,13 @@ Install_pecl_xdebug() {
       /bin/mv webgrind-master ${wwwroot_dir}/default/webgrind
       [ ! -e /tmp/xdebug ] && { mkdir /tmp/xdebug; chown ${run_user}:${run_group} /tmp/xdebug; }
       [ ! -e /tmp/webgrind ] && { mkdir /tmp/webgrind; chown ${run_user}:${run_group} /tmp/webgrind; }
-      chown -R ${run_user}:${run_group} ${wwwroot_dir}/default/webgrind
+      # Set secure permissions for webgrind
+      chmod 755 ${wwwroot_dir}/default/webgrind
+      chown ${run_user}:${run_group} ${wwwroot_dir}/default/webgrind
+      
+      # Ensure proper permissions for subdirectories and files
+      find ${wwwroot_dir}/default/webgrind -type d -exec chmod 755 {} \; 2>/dev/null
+      find ${wwwroot_dir}/default/webgrind -type f -exec chmod 644 {} \; 2>/dev/null
       sed -i 's@static $storageDir.*@static $storageDir = "/tmp/webgrind";@' ${wwwroot_dir}/default/webgrind/config.php
       sed -i 's@static $profilerDir.*@static $profilerDir = "/tmp/xdebug";@' ${wwwroot_dir}/default/webgrind/config.php
       cat > ${php_install_dir}/etc/php.d/08-xdebug.ini << EOF

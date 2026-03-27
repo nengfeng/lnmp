@@ -404,8 +404,8 @@ if [[ ${nginx_option} =~ ^[1-3]$ ]]; then
   [ ! -d ${wwwroot_dir}/default ] && mkdir -p ${wwwroot_dir}/default
   [ ! -d ${wwwlogs_dir} ] && mkdir -p ${wwwlogs_dir}
 fi
-# Set /data to 755 to allow www user access (for wwwroot and wwwlogs)
-[ -d /data ] && chmod 755 /data
+# Set improved permissions for /data to enhance security
+setup_web_directory_permissions
 
 # install wget gcc curl
 if [ ! -e ~/.lnmp ]; then

@@ -437,10 +437,18 @@ What Are You Doing?
           echo "Virtual Host Directory=${CMSG}${vhostdir}${CEND}"
         fi
         echo
-        echo "Create Virtul Host directory......"
+        echo "Create Virtual Host directory......"
         mkdir -p ${vhostdir}
-        echo "set permissions of Virtual Host directory......"
-        chown -R ${run_user}:${run_group} ${vhostdir}
+        echo "Set secure permissions for Virtual Host directory......"
+        # Set secure permissions: 750 for directories, 640 for files
+        chmod 750 ${vhostdir}
+        chown ${run_user}:${run_group} ${vhostdir}
+        
+        # Ensure proper permissions for subdirectories and files
+        if [ -d "${vhostdir}" ]; then
+          find ${vhostdir} -type d -exec chmod 750 {} \; 2>/dev/null
+          find ${vhostdir} -type f -exec chmod 640 {} \; 2>/dev/null
+        fi
         break
       fi
     done

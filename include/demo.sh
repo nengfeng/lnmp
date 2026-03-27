@@ -76,7 +76,13 @@ if ($status && $status['opcache_enabled']) {
 echo '</body></html>';
 PHP
   fi
-  chown -R ${run_user}:${run_group} ${wwwroot_dir}/default
+  # Set secure permissions for demo directory (755 for nginx access)
+  chmod 755 ${wwwroot_dir}/default
+  chown ${run_user}:${run_group} ${wwwroot_dir}/default
+  
+  # Ensure proper permissions for subdirectories and files
+  find ${wwwroot_dir}/default -type d -exec chmod 755 {} \; 2>/dev/null
+  find ${wwwroot_dir}/default -type f -exec chmod 644 {} \; 2>/dev/null
   svc_daemon_reload
   popd > /dev/null
 }

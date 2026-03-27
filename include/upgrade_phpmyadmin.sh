@@ -41,7 +41,15 @@ Upgrade_phpMyAdmin() {
     sed -i "s@SaveDir.*@SaveDir'\] = 'save';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
     sed -i "s@host'\].*@host'\] = '127.0.0.1';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
     sed -i "s@blowfish_secret.*;@blowfish_secret\'\] = \'$(cat /dev/urandom | head -1 | base64 | head -c 45)\';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
-    chown -R ${run_user}:${run_group} ${wwwroot_dir}/default/phpMyAdmin
+    # Set secure permissions for upgraded phpMyAdmin
+    chmod 755 ${wwwroot_dir}/default/phpMyAdmin
+    chown ${run_user}:${run_group} ${wwwroot_dir}/default/phpMyAdmin
+    chmod 755 ${wwwroot_dir}/default/phpMyAdmin/{upload,save}
+    chown ${run_user}:${run_group} ${wwwroot_dir}/default/phpMyAdmin/{upload,save}
+    
+    # Ensure proper permissions for subdirectories and files
+    find ${wwwroot_dir}/default/phpMyAdmin -type d -exec chmod 755 {} \; 2>/dev/null
+    find ${wwwroot_dir}/default/phpMyAdmin -type f -exec chmod 644 {} \; 2>/dev/null
     echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}$OLD_phpmyadmin_ver${CEND} to ${CWARNING}$NEW_phpmyadmin_ver${CEND}"
   fi
   popd > /dev/null
