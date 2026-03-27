@@ -707,3 +707,126 @@ setup_web_directory_permissions() {
   
   echo "${CMSG}Enhanced web directory permissions configured${CEND}"
 }
+
+# ============================================
+# System Resource and Dependency Checks
+# ============================================
+
+# Check system resources before compilation
+# Usage: check_system_resources
+# Set SKIP_RESOURCE_CHECK=1 to bypass checks
+check_system_resources() {
+  echo "${CMSG}Checking system resources...${CEND}"
+  
+  # Check memory
+  local mem_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+  local mem_mb=$((mem_kb / 1024))
+  local mem_gb=$((mem_mb / 1024))
+  
+  echo "Memory: ${mem_gb}GB (${mem_mb}MB)"
+  
+  if [ $mem_mb -lt 1024 ]; then
+    echo "${CWARNING}Warning: Less than 1GB RAM detected. Compilation may fail.${CEND}"
+    echo "${CWARNING}Recommended: At least 2GB RAM for stable compilation.${CEND}"
+    if [[ "${SKIP_RESOURCE_CHECK}" != "1" ]]; then
+      confirm "Continue anyway?" continue_low_mem "n"
+      [[ "$continue_low_mem" != "y" ]] && exit 1
+    fi
+  elif [ $mem_mb -lt 2048 ]; then
+    echo "${CWARNING}Warning: Less than 2GB RAM. Consider adding swap space.${CEND}"
+  fi
+  
+  # Check disk space
+  local available_kb=$(df . 2>/dev/null | tail -1 | awk '{print $4}')
+  local available_mb=$((available_kb / 1024))
+  local available_gb=$((available_mb / 1024))
+  
+  echo "Available disk space: ${available_gb}GB (${available_mb}MB)"
+  
+  if [ $available_mb -lt 5120 ]; then
+    echo "${CWARNING}Warning: Less than 5GB free disk space.${CEND}"
+    echo "${CWARNING}Recommended: At least 10GB for compilation cache.${CEND}"
+    if [[ "${SKIP_RESOURCE_CHECK}" != "1" ]]; then
+      confirm "Continue anyway?" continue_low_space "n"
+      [[ "$continue_low_space" != "y" ]] && exit 1
+    fi
+  elif [ $available_mb -lt 10240 ]; then
+    echo "${CWARNING}Warning: Less than 10GB free disk space.${CEND}"
+  fi
+  
+  echo "${CSUCCESS}System resource check passed${CEND}"
+}
+
+# Check compilation dependencies
+# Usage: check_compilation_dependencies
+check_compilation_dependencies() {
+  echo "${CMSG}Checking compilation dependencies...${CEND}"
+  
+  local missing_deps=()
+  
+  # Check essential compilation tools
+  if ! command -v gcc >/dev/null 2>&1; then
+    missing_deps+=("gcc")
+  fi
+  
+  if ! command -v make >/dev/null 2>&1; then
+    missing_deps+=("make")
+  fi
+  
+  # Check for cmake (needed for MySQL/MariaDB)
+  if ! command -v cmake >/dev/null 2>&1; then
+    missing_deps+=("cmake")
+  fi
+  
+  # Check for wget/curl
+  if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
+    missing_deps+=("wget or curl")
+  fi
+  
+  if [ ${#missing_deps[@]} -gt 0 ]; then
+    echo "${CFAILURE}Missing compilation dependencies:${CEND}"
+    for dep in "${missing_deps[@]}"; do
+      echo "  - $dep"
+    done
+    echo ""
+    echo "Install with:"
+    echo "  apt-get install -y gcc make cmake wget curl"
+    exit 1
+  fi
+  
+  echo "${CSUCCESS}Compilation dependencies check passed${CEND}"
+}
+
+# Compile with timeout and progress monitoring
+# Usage: compile_with_progress [timeout_seconds] [extra_make_args]
+compile_with_progress() {
+  local timeout=${1:-3600}  # Default 1 hour
+  local extra_args=${2:-}
+  local log_file="${current_dir:-.}/compile_$(date +%Y%m%d_%H%M%S).log"
+  
+  echo "${CMSG}Starting compilation (timeout: ${timeout}s)...${CEND}"
+  echo "Log file: ${log_file}"
+  
+  # Start compilation with timeout
+  local exit_status=0
+  if command -v timeout >/dev/null 2>&1; then
+    # Use timeout command if available
+    timeout ${timeout} make -j ${THREAD} ${extra_args} 2>&1 | tee "${log_file}"
+    exit_status=${PIPESTATUS[0]}
+  else
+    # Fallback without timeout
+    make -j ${THREAD} ${extra_args} 2>&1 | tee "${log_file}"
+    exit_status=${PIPESTATUS[0]}
+  fi
+  
+  if [ $exit_status -eq 0 ]; then
+    echo "${CSUCCESS}Compilation successful${CEND}"
+    make install 2>&1 | tee -a "${log_file}"
+    return $?
+  else
+    echo "${CFAILURE}Compilation failed${CEND}"
+    echo "Last 30 lines of log:"
+    tail -30 "${log_file}"
+    return 1
+  fi
+}
