@@ -56,7 +56,6 @@ EOF
   else
     echo; echo "${CFAILURE}fail2ban install failed, Please try again! ${CEND}"
   fi
-  popd > /dev/null
 }
 
 Uninstall_fail2ban() {
