@@ -385,19 +385,26 @@ What Are You Doing?
 
   NGX_CONF=$(printf "%b" "location ~ [^/]\.php(/|$) {\n    #fastcgi_pass remote_php_ip:9000;\n    fastcgi_pass unix:/dev/shm/php${mphp_ver}-cgi.sock;\n    fastcgi_index index.php;\n    include fastcgi.conf;\n  }\n")
 
-  if [[ "${Domain_Mode}" == 3 || "${dnsapi_flag}" == y ]] && [ ! -e ~/.acme.sh/acme.sh ]; then
-    pushd ${current_dir}/src > /dev/null
-    init_mirror
-    # acme.sh 仅在 GitHub 官方源，无国内镜像
-    local acme_url="https://github.com/acmesh-official/acme.sh/archive/refs/heads/master.tar.gz"
-    if [ ! -e acme.sh-master.tar.gz ]; then
-      wget --tries=6 -c -O acme.sh-master.tar.gz "${acme_url}"
+  if [[ "${Domain_Mode}" == 3 || "${dnsapi_flag}" == y ]]; then
+    if [ ! -e ~/.acme.sh/acme.sh ]; then
+      pushd ${current_dir}/src > /dev/null
+      init_mirror
+      # acme.sh 仅在 GitHub 官方源，无国内镜像
+      local acme_url="https://github.com/acmesh-official/acme.sh/archive/master.tar.gz"
+      if [ ! -e acme.sh-master.tar.gz ]; then
+        wget --tries=6 -c -O acme.sh-master.tar.gz "${acme_url}"
+      fi
+      tar xzf acme.sh-master.tar.gz
+      pushd acme.sh-master > /dev/null
+      ./acme.sh --install > /dev/null 2>&1
+      popd > /dev/null
+      popd > /dev/null
     fi
-    tar xzf acme.sh-master.tar.gz
-    pushd acme.sh-master > /dev/null
-    ./acme.sh --install > /dev/null 2>&1
-    popd > /dev/null
-    popd > /dev/null
+    # 启用自动升级和安装 cronjob（无论是否刚安装）
+    [ -e ~/.acme.sh/acme.sh ] && {
+      ~/.acme.sh/acme.sh --upgrade --auto-upgrade > /dev/null 2>&1
+      ~/.acme.sh/acme.sh --install-cronjob > /dev/null 2>&1
+    }
   fi
   [ -e ~/.acme.sh/account.conf ] && sed -i '/^CERT_HOME=/d' ~/.acme.sh/account.conf
   if [[ "${Domain_Mode}" =~ ^[2-4]$ ]] || [[ "${dnsapi_flag}" == y ]]; then
