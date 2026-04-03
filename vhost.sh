@@ -396,6 +396,8 @@ What Are You Doing?
     tar xzf acme.sh-master.tar.gz
     pushd acme.sh-master > /dev/null
     ./acme.sh --install > /dev/null 2>&1
+    ~/.acme.sh/acme.sh --upgrade --auto-upgrade > /dev/null 2>&1
+    ~/.acme.sh/acme.sh --install-cronjob > /dev/null 2>&1
     popd > /dev/null
     popd > /dev/null
   fi
