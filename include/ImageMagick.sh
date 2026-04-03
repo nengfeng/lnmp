@@ -34,7 +34,6 @@ Install_ImageMagick() {
     
     popd > /dev/null
     cleanup_src ${src_dir}
-    popd > /dev/null
   fi
 }
 
