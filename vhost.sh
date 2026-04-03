@@ -390,7 +390,7 @@ What Are You Doing?
       pushd ${current_dir}/src > /dev/null
       init_mirror
       # acme.sh 仅在 GitHub 官方源，无国内镜像
-      local acme_url="https://github.com/acmesh-official/acme.sh/archive/refs/heads/master.tar.gz"
+      local acme_url="https://github.com/acmesh-official/acme.sh/archive/master.tar.gz"
       if [ ! -e acme.sh-master.tar.gz ]; then
         wget --tries=6 -c -O acme.sh-master.tar.gz "${acme_url}"
       fi
