@@ -172,9 +172,7 @@ input_password() {
   while :; do
     read -e -p "${prompt} (default: ${default}): " value
     value=${value:-${default}}
-    # Reject dangerous characters
-    if [[ "$value" =~ [+|\&] ]]; then
-      echo "${CWARNING}Password cannot contain + or | or & ${CEND}"
+    if ! validate_password_value "$value"; then
       continue
     fi
     if (( ${#value} >= ${min_len} )); then
@@ -184,6 +182,24 @@ input_password() {
     fi
   done
   declare -g "${var_name}=${value}"
+}
+
+# Validate password characters before using them in SQL/config substitutions.
+# Returns 0 when safe, 1 when unsafe.
+validate_password_value() {
+  local value=$1
+
+  if [[ "$value" =~ [+|\&] ]]; then
+    echo "${CWARNING}Password cannot contain + or | or & ${CEND}"
+    return 1
+  fi
+
+  if [[ "$value" =~ [\'\\] ]]; then
+    echo "${CWARNING}Password cannot contain single quotes (') or backslashes (\\)${CEND}"
+    return 1
+  fi
+
+  return 0
 }
 
 # Check if a component is already installed, warn and return 1 if so
@@ -675,6 +691,12 @@ cleanup_versions() {
 # Improve web directory permissions for enhanced security
 # Usage: setup_web_directory_permissions
 setup_web_directory_permissions() {
+  local owner_ready=0
+
+  if id -u "${run_user}" >/dev/null 2>&1 && id -g "${run_group}" >/dev/null 2>&1; then
+    owner_ready=1
+  fi
+
   # Set /data to 755 (keep existing behavior for compatibility)
   [ -d /data ] && chmod 755 /data
   
@@ -683,7 +705,7 @@ setup_web_directory_permissions() {
     # Web root: 750 (owner: rwx, group: r-x, others: none)
     # This prevents other users from accessing web files
     chmod 750 ${wwwroot_dir}
-    chown ${run_user}:${run_group} ${wwwroot_dir}
+    [ ${owner_ready} -eq 1 ] && chown ${run_user}:${run_group} ${wwwroot_dir}
     
     # Ensure subdirectories have appropriate permissions
     find ${wwwroot_dir} -type d -exec chmod 750 {} \; 2>/dev/null
@@ -692,17 +714,21 @@ setup_web_directory_permissions() {
     # Special case for default directory (may need 755 for nginx access)
     if [ -d "${wwwroot_dir}/default" ]; then
       chmod 755 ${wwwroot_dir}/default
-      chown ${run_user}:${run_group} ${wwwroot_dir}/default
+      [ ${owner_ready} -eq 1 ] && chown ${run_user}:${run_group} ${wwwroot_dir}/default
     fi
   fi
   
   if [ -d "${wwwlogs_dir}" ]; then
     # Log directory: 755 (needs execute permission for nginx/php-fpm)
     chmod 755 ${wwwlogs_dir}
-    chown ${run_user}:${run_group} ${wwwlogs_dir}
+    [ ${owner_ready} -eq 1 ] && chown ${run_user}:${run_group} ${wwwlogs_dir}
     
     # Ensure log files have appropriate permissions
     find ${wwwlogs_dir} -type f -exec chmod 644 {} \; 2>/dev/null
+  fi
+
+  if [ ${owner_ready} -ne 1 ]; then
+    echo "${CWARNING}Skip ownership update for web directories because ${run_user}:${run_group} does not exist yet${CEND}"
   fi
   
   echo "${CMSG}Enhanced web directory permissions configured${CEND}"

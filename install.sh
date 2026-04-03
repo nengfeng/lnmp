@@ -158,6 +158,7 @@ parse_args() {
         ;;
       --dbrootpwd)
         dbrootpwd=$2; dbpostgrespwd="${dbrootpwd}"; shift 2
+        validate_password_value "${dbrootpwd}" || exit 1
         ;;
       --dbinstallmethod)
         dbinstallmethod=$2; shift 2
@@ -536,10 +537,11 @@ PHP_addons() {
 [ "${mphp_addons_flag}" != 'y' ] && PHP_addons
 
 if [[ "${mphp_flag}" == y ]]; then
+  main_php_install_dir=${php_install_dir}
   . include/mphp.sh
   Install_MPHP 2>&1 | tee -a ${current_dir}/install.log
-  php_install_dir=${php_install_dir}${mphp_ver}
   PHP_addons
+  php_install_dir=${main_php_install_dir}
 fi
 
 # Nginx server

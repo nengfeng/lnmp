@@ -15,6 +15,7 @@ current_dir=$(dirname "$(readlink -f $0)")
 pushd ${current_dir} > /dev/null
 . ./options.conf
 . ./include/color.sh
+. ./include/common.sh
 . ./include/check_dir.sh
 [ ! -d "${db_install_dir}" ] && { echo "${CFAILURE}Database is not installed on your system! ${CEND}"; exit 1; }
 
@@ -41,6 +42,7 @@ while [ $# -gt 0 ]; do
       ;;
     -p|--password)
       New_dbrootpwd=$2; shift 2
+      validate_password_value "${New_dbrootpwd}" || exit 1
       password_flag=y
       ;;
     --)
@@ -55,11 +57,7 @@ done
 Input_dbrootpwd() {
   while :; do echo
     read -e -p "Please input the root password of database: " New_dbrootpwd
-    [ -n "$(echo ${New_dbrootpwd} | grep '[+|&]')" ] && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
-    # Security: Block characters that could cause SQL injection
-    # Single quotes and backslashes are particularly dangerous
-    if [[ "${New_dbrootpwd}" =~ [\'\\] ]]; then
-      echo "${CWARNING}input error, password cannot contain single quotes (') or backslashes (\\)${CEND}"
+    if ! validate_password_value "${New_dbrootpwd}"; then
       continue
     fi
     (( ${#New_dbrootpwd} >= 5 )) && break || echo "${CWARNING}database root password least 5 characters! ${CEND}"

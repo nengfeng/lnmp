@@ -67,6 +67,8 @@ EOF
   # Start PostgreSQL
   service_action start postgresql
   sleep 5
+
+  validate_password_value "${dbpostgrespwd}" || return 1
   
   # Set postgres password
   su - postgres -c "psql -c \"alter user postgres with password '$dbpostgrespwd';\""
@@ -103,6 +105,7 @@ Install_PostgreSQL_Source() {
   su - postgres -c "${pgsql_install_dir}/bin/initdb -D ${pgsql_data_dir}"
   service_action start postgresql
   sleep 5
+  validate_password_value "${dbpostgrespwd}" || return 1
   su - postgres -c "${pgsql_install_dir}/bin/psql -c \"alter user postgres with password '$dbpostgrespwd';\""
   sed -i 's@^host.*@#&@g' ${pgsql_data_dir}/pg_hba.conf
   sed -i 's@^local.*@#&@g' ${pgsql_data_dir}/pg_hba.conf
