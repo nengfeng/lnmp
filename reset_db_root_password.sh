@@ -92,24 +92,32 @@ Reset_force_dbrootpwd() {
   DB_Ver="$(${db_install_dir}/bin/mysql_config --version)"
   echo "${CMSG}Stopping MySQL...${CEND}"
   svc_stop mysqld > /dev/null 2>&1
+  local timeout=60
   while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
+    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
   echo "${CMSG}skip grant tables...${CEND}"
   sed -i '/\[mysqld\]/a\skip-grant-tables' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
+  timeout=60
   while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
+    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
   sleep 2
   echo "${CMSG}Removing skip-grant-tables and restarting MySQL...${CEND}"
   svc_stop mysqld > /dev/null 2>&1
+  timeout=60
   while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
+    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
   sed -i '/^skip-grant-tables/d' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
+  timeout=60
   while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
+    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
   # Detect MySQL or MariaDB
@@ -139,7 +147,9 @@ EOF
   fi
   if [ $? -eq 0 ]; then
     killall mysqld
+    timeout=60
     while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
+      [ $((timeout--)) -le 0 ] && { ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1; break; }
       sleep 1
     done
     [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ] && ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1
