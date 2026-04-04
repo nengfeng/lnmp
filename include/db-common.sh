@@ -885,6 +885,105 @@ EOF
 }
 
 # Post-install MySQL/MariaDB setup
+# Unified database installation workflow
+# Handles common installation steps for both MySQL and MariaDB
+# Usage: install_db_common db_type install_dir data_dir install_method boost_ver thread_count init_cmd cleanup_func root_setup_func
+#   db_type: mysql or mariadb
+#   install_dir: installation directory
+#   data_dir: data directory
+#   install_method: 1 (binary) or 2 (source)
+#   boost_ver: boost version for source install
+#   thread_count: number of threads for compilation
+#   init_cmd: initialization command (callback)
+#   cleanup_func: cleanup function name (callback)
+#   root_setup_func: root setup function name (callback)
+install_db_common() {
+  local db_type=$1
+  local install_dir=$2
+  local data_dir=$3
+  local install_method=$4
+  local boost_ver=$5
+  local thread_count=$6
+  local init_cmd=$7
+  local cleanup_func=$8
+  local root_setup_func=$9
+
+  # Fix libaio symlink for Debian 13+ / Ubuntu 24.04+
+  fix_libaio_symlink
+
+  pushd ${current_dir}/src > /dev/null
+  create_mysql_user
+
+  # Check if data directory is non-empty
+  if [ -d "${data_dir}" ] && [ -n "$(ls -A ${data_dir} 2>/dev/null)" ]; then
+    echo "${CFAILURE}Data directory ${data_dir} is not empty!${CEND}"
+    echo "${CWARNING}Existing data may be overwritten. Please backup or remove existing data first.${CEND}"
+    popd
+    return 1
+  fi
+
+  [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
+  mkdir -p ${data_dir}
+  chown mysql:mysql -R ${data_dir}
+
+  # Installation (binary or source)
+  if [[ "${install_method}" == "1" ]]; then
+    if [[ "${db_type}" == "mysql" ]]; then
+      install_mysql_binary ${mysql_ver} ${install_dir}
+    else
+      install_mariadb_binary ${mariadb_ver} ${install_dir}
+    fi
+  elif [[ "${install_method}" == "2" ]]; then
+    if [[ "${db_type}" == "mysql" ]]; then
+      install_mysql_source ${mysql_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count}
+    else
+      install_mariadb_source ${mariadb_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count}
+    fi
+  fi
+
+  # Post-installation validation and configuration
+  if [ -d "${install_dir}/support-files" ]; then
+    # Add tcmalloc to mysqld_safe
+    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${install_dir}/bin/mysqld_safe 2>/dev/null || true
+    # Update password in options.conf
+    local pwd_escaped=$(escape_password "${dbrootpwd}")
+    sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
+    chmod 600 ../options.conf
+    success_msg "${db_type}"
+    # Call cleanup callback
+    ${cleanup_func} ${mysql_ver:-${mariadb_ver}} ${install_method}
+  else
+    rm -rf ${install_dir}
+    fail_msg "${db_type}"
+    popd
+    return 1
+  fi
+
+  setup_db_service ${install_dir} ${data_dir}
+  popd
+
+  # Call cnf generation (MySQL uses cnf_func, MariaDB uses generate_my_cnf_mariadb)
+  if [[ "${db_type}" == "mysql" ]]; then
+    ${cnf_func} ${install_dir} ${data_dir}
+  else
+    generate_my_cnf_mariadb ${install_dir} ${data_dir}
+  fi
+  config_my_cnf_scenario /etc/my.cnf ${server_scenario} ${Mem}
+
+  # Initialize database
+  eval "${init_cmd}"
+
+  chown mysql:mysql -R ${data_dir}
+  [ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk}
+  svc_start mysqld
+  add_to_path ${install_dir}/bin
+
+  # Setup root password
+  ${root_setup_func} ${install_dir} ${dbrootpwd} ${reset_master:-${root_cmd:-}}
+
+  post_install_db ${install_dir} ${db_type} ${data_dir}
+}
+
 # Usage: post_install_db install_dir db_type data_dir
 post_install_db() {
   local install_dir=$1

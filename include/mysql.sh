@@ -12,61 +12,20 @@
 #   reset_master: yes or no (MySQL 8.0 needs reset master)
 Install_MySQL() {
   local mysql_ver=$1
-  local cnf_func=$2
+  cnf_func=$2  # Global variable used by install_db_common
   local reset_master=${3:-no}
 
-  # Fix libaio symlink for Debian 13+ / Ubuntu 24.04+
-  fix_libaio_symlink
+  local init_cmd="${mysql_install_dir}/bin/mysqld --initialize-insecure --user=mysql --basedir=${mysql_install_dir} --datadir=${mysql_data_dir}"
+  local cleanup_func="cleanup_mysql_files"
 
-  pushd ${current_dir}/src > /dev/null
-  create_mysql_user
-
-  if [ -d "${mysql_data_dir}" ] && [ -n "$(ls -A ${mysql_data_dir} 2>/dev/null)" ]; then
-    echo "${CFAILURE}Data directory ${mysql_data_dir} is not empty!${CEND}"
-    echo "${CWARNING}Existing data may be overwritten. Please backup or remove existing data first.${CEND}"
-    popd
-    return 1
-  fi
-
-  [ ! -d "${mysql_install_dir}" ] && mkdir -p ${mysql_install_dir}
-  mkdir -p ${mysql_data_dir}
-  chown mysql:mysql -R ${mysql_data_dir}
-
-  if [[ "${dbinstallmethod}" == "1" ]]; then
-    install_mysql_binary ${mysql_ver} ${mysql_install_dir}
-  elif [[ "${dbinstallmethod}" == "2" ]]; then
-    install_mysql_source ${mysql_ver} ${mysql_install_dir} ${mysql_data_dir} ${boost_ver} ${THREAD}
-  fi
-
-  if [ -d "${mysql_install_dir}/support-files" ]; then
-    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${mysql_install_dir}/bin/mysqld_safe
-    local pwd_escaped=$(escape_password "${dbrootpwd}")
-    sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
-    chmod 600 ../options.conf
-    success_msg "MySQL"
-    cleanup_mysql_files ${mysql_ver} ${dbinstallmethod}
-  else
-    rm -rf ${mysql_install_dir}
-    fail_msg "MySQL"
-    popd
-    return 1
-  fi
-
-  setup_db_service ${mysql_install_dir} ${mysql_data_dir}
-  popd
-
-  ${cnf_func} ${mysql_install_dir} ${mysql_data_dir}
-  config_my_cnf_scenario /etc/my.cnf ${server_scenario} ${Mem}
-
-  ${mysql_install_dir}/bin/mysqld --initialize-insecure --user=mysql --basedir=${mysql_install_dir} --datadir=${mysql_data_dir}
-
-  chown mysql:mysql -R ${mysql_data_dir}
-  [ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk}
-  svc_start mysqld
-  add_to_path ${mysql_install_dir}/bin
-
-  setup_mysql_root ${mysql_install_dir} ${dbrootpwd} ${reset_master}
-
-  post_install_db ${mysql_install_dir} mysql ${mysql_data_dir}
-  # Keep service running - install.sh will handle final service check
+  install_db_common \
+    "mysql" \
+    "${mysql_install_dir}" \
+    "${mysql_data_dir}" \
+    "${dbinstallmethod}" \
+    "${boost_ver}" \
+    "${THREAD}" \
+    "${init_cmd}" \
+    "${cleanup_func}" \
+    "setup_mysql_root"
 }
