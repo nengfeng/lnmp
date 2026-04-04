@@ -313,7 +313,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 4)" ]; then
     echo
     read -e -p "Please enter the Qcloud COS BUCKET: " COS_BUCKET
     [ -z "${COS_BUCKET}" ] && continue
-    cat > ~/.cos.yaml << EOF
+    cat > "${HOME}/.cos.yaml" << EOF
 cos:
   base:
     secretid: ${SECRET_ID}

@@ -190,7 +190,7 @@ What Are You Doing?
           Upgrade_Script
           ;;
         8)
-          [ -e ~/.acme.sh/acme.sh ] && { ~/.acme.sh/acme.sh --force --upgrade; ~/.acme.sh/acme.sh --version; }
+          [ -e "${HOME}/.acme.sh/acme.sh" ] && { "${HOME}/.acme.sh/acme.sh" --force --upgrade; "${HOME}/.acme.sh/acme.sh" --version; }
           ;;
         9)
           Upgrade_Cacert
@@ -281,6 +281,6 @@ else
   [[ "${memcached_flag}" == "y" ]] && Upgrade_Memcached
   [[ "${phpmyadmin_flag}" == "y" ]] && Upgrade_phpMyAdmin
   [[ "${NEW_Script_ver}" == "latest" ]] && Upgrade_Script
-  [[ "${NEW_acme_ver}" == "latest" ]] && [ -e ~/.acme.sh/acme.sh ] && { ~/.acme.sh/acme.sh --force --upgrade; ~/.acme.sh/acme.sh --version; }
+  [[ "${NEW_acme_ver}" == "latest" ]] && [ -e "${HOME}/.acme.sh/acme.sh" ] && { "${HOME}/.acme.sh/acme.sh" --force --upgrade; "${HOME}/.acme.sh/acme.sh" --version; }
   [[ "${cacert_flag}" == "y" ]] && Upgrade_Cacert
 fi

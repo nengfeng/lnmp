@@ -208,7 +208,7 @@ parse_args "$@"
 # Check md5sum (only for tarball installations)
 [ -e "${current_dir}.tar.gz" ] && tool_file=${current_dir}.tar.gz
 [ -e "${current_dir}-full.tar.gz" ] && tool_file=${current_dir}-full.tar.gz
-if [[ ${ARG_NUM} == 0 ]] && [ ! -e ~/.lnmp ] && [ -n "${tool_file}" ]; then
+if [[ ${ARG_NUM} == 0 ]] && [ ! -e "${HOME}/.lnmp" ] && [ -n "${tool_file}" ]; then
   confirm "Do you want to check md5sum?" md5sum_flag n
 fi
 if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
@@ -248,7 +248,7 @@ if [ -e "/etc/ssh/sshd_config" ]; then
 fi
 
 if [[ ${ARG_NUM} == 0 ]]; then
-  if [ ! -e ~/.lnmp ]; then
+  if [ ! -e "${HOME}/.lnmp" ]; then
     confirm "Do you want to enable firewall?" firewall_flag n
   fi
 
@@ -412,7 +412,7 @@ fi
 setup_web_directory_permissions
 
 # install wget gcc curl
-if [ ! -e ~/.lnmp ]; then
+if [ ! -e "${HOME}/.lnmp" ]; then
   downloadDepsSrc=1
   apt-get -y update > /dev/null
   apt-get -y install wget gcc curl > /dev/null
@@ -441,7 +441,7 @@ checkDownload 2>&1 | tee -a ${current_dir}/install.log
 # get OS Memory
 . ./include/memory.sh
 
-if [ ! -e ~/.lnmp ]; then
+if [ ! -e "${HOME}/.lnmp" ]; then
   # Check binary dependencies packages
   . ./include/check_sw.sh
   case "${Family}" in

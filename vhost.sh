@@ -158,7 +158,7 @@ If you enter '.', the field will be left blank.
           echo "${CWARNING}input error!${CEND}"
         fi
       done
-    if [ ! -e ~/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key ]; then
+    if [ ! -e "${HOME}/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key ]; then
       while :; do echo
         read -e -p "Please enter your email: " EMAIL
         echo
@@ -168,15 +168,15 @@ If you enter '.', the field will be left blank.
           echo "${CWARNING}input error!${CEND}"
         fi
       done
-      ~/.acme.sh/acme.sh --register-account -m ${EMAIL}
+      "${HOME}/.acme.sh/acme.sh" --register-account -m ${EMAIL}
     fi
-    ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+    "${HOME}/.acme.sh/acme.sh" --set-default-ca --server letsencrypt
     if [[ "${moredomain}" == "*.${domain}" || "${dnsapi_flag}" == y ]]; then
       while :; do echo
         echo 'Please select DNS provider:'
         echo "${CMSG}dp${CEND},${CMSG}cx${CEND},${CMSG}ali${CEND},${CMSG}cf${CEND},${CMSG}aws${CEND},${CMSG}linode${CEND},${CMSG}he${CEND},${CMSG}namesilo${CEND},${CMSG}dgon${CEND},${CMSG}freedns${CEND},${CMSG}gd${CEND},${CMSG}namecom${CEND} and so on."
         read -e -p "Please enter your DNS provider: " DNS_PRO
-        if [ -e ~/.acme.sh/dnsapi/dns_${DNS_PRO}.sh ]; then
+        if [ -e "${HOME}/.acme.sh/dnsapi/dns_${DNS_PRO}.sh" ]; then
           break
         else
           echo "${CWARNING}You DNS api mode is not supported${CEND}"
@@ -219,7 +219,7 @@ If you enter '.', the field will be left blank.
         fi
       done
       [[ "${moredomainame_flag}" == y ]] && moredomainame_D="$(for D in ${moredomainame}; do echo -d ${D}; done)"
-      ~/.acme.sh/acme.sh --force --issue -k ${CERT_KEYLENGTH} --dns dns_${DNS_PRO} -d ${domain} ${moredomainame_D}
+      "${HOME}/.acme.sh/acme.sh" --force --issue -k ${CERT_KEYLENGTH} --dns dns_${DNS_PRO} -d ${domain} ${moredomainame_D}
     else
       if [[ "${nginx_ssl_flag}" == y ]]; then
         [ ! -d "${web_install_dir}/conf/vhost" ] && mkdir "${web_install_dir}/conf/vhost"
@@ -239,15 +239,15 @@ If you enter '.', the field will be left blank.
       done
       rm -f ${vhostdir}/${auth_file}
       [[ "${moredomainame_flag}" == y ]] && moredomainame_D="$(for D in ${moredomainame}; do echo -d ${D}; done)"
-      ~/.acme.sh/acme.sh --force --issue -k ${CERT_KEYLENGTH} -w ${vhostdir} -d ${domain} ${moredomainame_D}
+      "${HOME}/.acme.sh/acme.sh" --force --issue -k ${CERT_KEYLENGTH} -w ${vhostdir} -d ${domain} ${moredomainame_D}
     fi
       [ -e "${PATH_SSL}/${domain}.crt" ] && rm -f ${PATH_SSL}/${domain}.{crt,key}
       Nginx_cmd="svc_restart nginx"
       Command="${Nginx_cmd}"
-    if [ -s ~/.acme.sh/${domain}/fullchain.cer ] && [[ "${CERT_KEYLENGTH}" =~ ^2048$|^3072$|^4096$|^8192$ ]]; then
-      ~/.acme.sh/acme.sh --force --install-cert -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null
-    elif [ -s ~/.acme.sh/${domain}_ecc/fullchain.cer ] && [[ "${CERT_KEYLENGTH}" =~ ^ec-256$|^ec-384$|^ec-521$ ]]; then
-      ~/.acme.sh/acme.sh --force --install-cert --ecc -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null
+    if [ -s "${HOME}/.acme.sh/${domain}/fullchain.cer" ] && [[ "${CERT_KEYLENGTH}" =~ ^2048$|^3072$|^4096$|^8192$ ]]; then
+      "${HOME}/.acme.sh/acme.sh" --force --install-cert -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null
+    elif [ -s "${HOME}/.acme.sh/${domain}_ecc/fullchain.cer" ] && [[ "${CERT_KEYLENGTH}" =~ ^ec-256$|^ec-384$|^ec-521$ ]]; then
+      "${HOME}/.acme.sh/acme.sh" --force --install-cert --ecc -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null
     else
       echo "${CFAILURE}Error: Create Let's Encrypt SSL Certificate failed! ${CEND}"
       [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f ${web_install_dir}/conf/vhost/${domain}.conf
@@ -386,7 +386,7 @@ What Are You Doing?
   NGX_CONF=$(printf "%b" "location ~ [^/]\.php(/|$) {\n    #fastcgi_pass remote_php_ip:9000;\n    fastcgi_pass unix:/dev/shm/php${mphp_ver}-cgi.sock;\n    fastcgi_index index.php;\n    include fastcgi.conf;\n  }\n")
 
   if [[ "${Domain_Mode}" == 3 || "${dnsapi_flag}" == y ]]; then
-    if [ ! -e ~/.acme.sh/acme.sh ]; then
+    if [ ! -e "${HOME}/.acme.sh/acme.sh" ]; then
       pushd ${current_dir}/src > /dev/null
       init_mirror
       # acme.sh 仅在 GitHub 官方源，无国内镜像
@@ -401,12 +401,12 @@ What Are You Doing?
       popd > /dev/null
     fi
     # 启用自动升级和安装 cronjob（无论是否刚安装）
-    [ -e ~/.acme.sh/acme.sh ] && {
-      ~/.acme.sh/acme.sh --upgrade --auto-upgrade > /dev/null 2>&1
-      ~/.acme.sh/acme.sh --install-cronjob > /dev/null 2>&1
+    [ -e "${HOME}/.acme.sh/acme.sh" ] && {
+      "${HOME}/.acme.sh/acme.sh" --upgrade --auto-upgrade > /dev/null 2>&1
+      "${HOME}/.acme.sh/acme.sh" --install-cronjob > /dev/null 2>&1
     }
   fi
-  [ -e ~/.acme.sh/account.conf ] && sed -i '/^CERT_HOME=/d' ~/.acme.sh/account.conf
+  [ -e "${HOME}/.acme.sh/account.conf" ] && sed -i '/^CERT_HOME=/d' "${HOME}/.acme.sh/account.conf"
   if [[ "${Domain_Mode}" =~ ^[2-4]$ ]] || [[ "${dnsapi_flag}" == y ]]; then
     if [ -e "${web_install_dir}/sbin/nginx" ]; then
       nginx_ssl_flag=y
@@ -845,8 +845,8 @@ Del_NGX_Vhost() {
                 rm -rf ${Directory}
               fi
               echo
-              [ -d ~/.acme.sh/${domain} ] && ~/.acme.sh/acme.sh --force --remove -d ${domain} > /dev/null 2>&1
-              [ -d ~/.acme.sh/${domain}_ecc ] && ~/.acme.sh/acme.sh --force --remove --ecc -d ${domain} > /dev/null 2>&1
+              [ -d "${HOME}/.acme.sh/${domain}" ] && "${HOME}/.acme.sh/acme.sh" --force --remove -d ${domain} > /dev/null 2>&1
+              [ -d "${HOME}/.acme.sh/${domain}_ecc" ] && "${HOME}/.acme.sh/acme.sh" --force --remove --ecc -d ${domain} > /dev/null 2>&1
               echo "${CMSG}Domain: ${domain} has been deleted.${CEND}"
               echo
             else
