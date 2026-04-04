@@ -9,7 +9,7 @@ Install_composer() {
     else
       pushd ${current_dir}/src > /dev/null
       # Security: Use HTTPS with certificate verification
-      if [[ "${OUTIP_STATE}"x == "China"x ]]; then
+      if [[ "${OUTIP_STATE}"x == "CN"x ]]; then
         wget -c https://mirrors.aliyun.com/composer/composer.phar -O /usr/local/bin/composer > /dev/null 2>&1
         ${php_install_dir}/bin/php /usr/local/bin/composer config -g repo.packagist composer https://packagist.phpcomposer.com
       else
