@@ -859,7 +859,9 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=${install_dir}/bin/${daemon_cmd} --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid --user=mysql
+User=mysql
+Group=mysql
+ExecStart=${install_dir}/bin/${daemon_cmd} --basedir=${install_dir} --datadir=${data_dir} --pid-file=${data_dir}/mysql.pid
 ExecStop=/bin/kill -TERM \$MAINPID
 Restart=on-failure
 RestartSec=5
