@@ -5,6 +5,15 @@
 . include/web-common.sh
 
 Install_Tengine() {
+  if [ -e "${nginx_install_dir}/sbin/nginx" ]; then
+    echo "${CFAILURE}Nginx is already installed! Please uninstall Nginx first.${CEND}"
+    return 1
+  fi
+  if [ -e "${openresty_install_dir}/nginx/sbin/nginx" ]; then
+    echo "${CFAILURE}OpenResty is already installed! Please uninstall OpenResty first.${CEND}"
+    return 1
+  fi
+
   pushd ${current_dir}/src > /dev/null
   create_run_user
 
