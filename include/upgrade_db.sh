@@ -20,7 +20,8 @@ Upgrade_DB() {
       ${db_install_dir}/bin/mysql -uroot -p${NEW_dbrootpwd} -e "quit" >/dev/null 2>&1
       if [ $? -eq 0 ]; then
         dbrootpwd=${NEW_dbrootpwd}
-        sed -i "s+^dbrootpwd.*+dbrootpwd='$dbrootpwd'+" ../options.conf
+        local pwd_escaped=$(echo "${dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
+        sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
         chmod 600 ../options.conf
         break
       else

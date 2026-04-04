@@ -186,6 +186,14 @@ input_password() {
   declare -g "${var_name}=${value}"
 }
 
+# Escape password for safe use in config files and SQL
+# Usage: escape_password "password"
+# Returns escaped password suitable for sed replacement and SQL
+escape_password() {
+  local pwd="$1"
+  echo "${pwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g'
+}
+
 # Check if a component is already installed, warn and return 1 if so
 # Usage: check_installed <type> <path> <name>
 # type: "file" (checks -e) or "dir" (checks -d)

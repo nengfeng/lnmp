@@ -41,6 +41,10 @@ while [ $# -gt 0 ]; do
       ;;
     -p|--password)
       New_dbrootpwd=$2; shift 2
+      if [[ "${New_dbrootpwd}" =~ [\'\\] ]]; then
+        echo "${CFAILURE}Password cannot contain single quotes (') or backslashes (\\)${CEND}"
+        exit 1
+      fi
       password_flag=y
       ;;
     --)
@@ -67,12 +71,13 @@ Input_dbrootpwd() {
 }
 
 Reset_Interaction_dbrootpwd() {
+  local pwd_escaped=$(echo "${New_dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
   ${db_install_dir}/bin/mysqladmin -uroot -p"${dbrootpwd}" password "${New_dbrootpwd}" -h localhost > /dev/null 2>&1
   status_Localhost=$(echo $?)
   ${db_install_dir}/bin/mysqladmin -uroot -p"${dbrootpwd}" password "${New_dbrootpwd}" -h 127.0.0.1 > /dev/null 2>&1
   status_127=$(echo $?)
   if [[ ${status_Localhost} == '0' && ${status_127} == '0' ]]; then
-    sed -i "s+^dbrootpwd.*+dbrootpwd='${New_dbrootpwd}'+" ./options.conf
+    sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ./options.conf
     chmod 600 ./options.conf
     echo
     echo "Password reset successfully! "
@@ -98,7 +103,7 @@ Reset_force_dbrootpwd() {
     sleep 1
   done
   # Detect MySQL or MariaDB
-  local escaped_pwd="${New_dbrootpwd}"
+  local escaped_pwd=$(echo "${New_dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
   if ${db_install_dir}/bin/mysql -V | grep -qi MariaDB; then
     # MariaDB (10.11, 11.4, 11.8)
     # Detect MariaDB version to use correct command (mysql or mariadb)
@@ -129,7 +134,7 @@ EOF
     done
     [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ] && ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1
     svc_start mysqld > /dev/null 2>&1
-    sed -i "s+^dbrootpwd.*+dbrootpwd='${New_dbrootpwd}'+" ./options.conf
+    sed -i "s+^dbrootpwd.*+dbrootpwd='${escaped_pwd}'+" ./options.conf
     chmod 600 ./options.conf
     [ -e ~/ReadMe ] && sed -i "s+^MySQL root password:.*+MySQL root password: ${New_dbrootpwd}+"  ~/ReadMe
     echo

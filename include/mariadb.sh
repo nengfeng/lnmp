@@ -30,7 +30,8 @@ Install_MariaDB() {
   fi
 
   if [ -d "${mariadb_install_dir}/support-files" ]; then
-    sed -i "s+^dbrootpwd.*+dbrootpwd='${dbrootpwd}'+" ../options.conf
+    local pwd_escaped=$(escape_password "${dbrootpwd}")
+    sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
     chmod 600 ../options.conf
     success_msg "MariaDB"
     cleanup_mariadb_files ${mariadb_ver} ${dbinstallmethod}

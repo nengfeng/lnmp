@@ -69,11 +69,12 @@ EOF
   sleep 5
   
   # Set postgres password
-  su - postgres -c "psql -c \"alter user postgres with password '$dbpostgrespwd';\""
+  local pwd_escaped=$(escape_password "${dbpostgrespwd}")
+  su - postgres -c "psql -c \"alter user postgres with password '$pwd_escaped';\""
   service_action reload postgresql
-  
+   
   if command -v psql &> /dev/null; then
-    sed -i "s+^dbpostgrespwd.*+dbpostgrespwd='$dbpostgrespwd'+" ../options.conf
+    sed -i "s+^dbpostgrespwd.*+dbpostgrespwd='${pwd_escaped}'+" ../options.conf
     chmod 600 ../options.conf
     success_msg "PostgreSQL (APT)"
   else
@@ -103,7 +104,8 @@ Install_PostgreSQL_Source() {
   su - postgres -c "${pgsql_install_dir}/bin/initdb -D ${pgsql_data_dir}"
   service_action start postgresql
   sleep 5
-  su - postgres -c "${pgsql_install_dir}/bin/psql -c \"alter user postgres with password '$dbpostgrespwd';\""
+  local pwd_escaped=$(escape_password "${dbpostgrespwd}")
+  su - postgres -c "${pgsql_install_dir}/bin/psql -c \"alter user postgres with password '$pwd_escaped';\""
   sed -i 's@^host.*@#&@g' ${pgsql_data_dir}/pg_hba.conf
   sed -i 's@^local.*@#&@g' ${pgsql_data_dir}/pg_hba.conf
   echo 'local   all             all                                     md5' >> ${pgsql_data_dir}/pg_hba.conf
@@ -112,7 +114,7 @@ Install_PostgreSQL_Source() {
   service_action reload postgresql
 
   if [ -e "${pgsql_install_dir}/bin/psql" ]; then
-    sed -i "s+^dbpostgrespwd.*+dbpostgrespwd='$dbpostgrespwd'+" ../options.conf
+    sed -i "s+^dbpostgrespwd.*+dbpostgrespwd='${pwd_escaped}'+" ../options.conf
     chmod 600 ../options.conf
     success_msg "PostgreSQL (source)"
   else

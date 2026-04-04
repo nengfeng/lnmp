@@ -33,7 +33,8 @@ Install_MySQL() {
 
   if [ -d "${mysql_install_dir}/support-files" ]; then
     sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${mysql_install_dir}/bin/mysqld_safe
-    sed -i "s+^dbrootpwd.*+dbrootpwd='${dbrootpwd}'+" ../options.conf
+    local pwd_escaped=$(escape_password "${dbrootpwd}")
+    sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
     chmod 600 ../options.conf
     success_msg "MySQL"
     cleanup_mysql_files ${mysql_ver} ${dbinstallmethod}
