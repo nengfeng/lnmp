@@ -60,19 +60,19 @@ ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime
 # /etc/sysctl.conf
 [ -z "$(grep 'fs.file-max' /etc/sysctl.conf)" ] && cat >> /etc/sysctl.conf << EOF
 fs.file-max = 1000000
-fs.inotify.max_user_instances = 8192
+fs.inotify.max_user_instances = 16384
 net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_fin_timeout = 30
 net.ipv4.tcp_tw_reuse = 1
-net.ipv4.ip_local_port_range = 1024 65000
+net.ipv4.ip_local_port_range = 1024 65535
 net.ipv4.tcp_max_syn_backlog = 16384
-net.ipv4.tcp_max_tw_buckets = 6000
+net.ipv4.tcp_max_tw_buckets = 100000
 net.ipv4.route.gc_timeout = 100
 net.ipv4.tcp_syn_retries = 1
 net.ipv4.tcp_synack_retries = 1
 net.core.somaxconn = 32768
 net.core.netdev_max_backlog = 32768
-net.ipv4.tcp_timestamps = 0
+net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_max_orphans = 32768
 EOF
 if ! sysctl -p > /dev/null 2>&1; then
