@@ -42,7 +42,7 @@ while :; do echo
   do
     [ -z "$(echo ${array_all[@]} | grep -w ${v})" ] && desc_flag=1
   done
-  if [[ "${1}" == 1 ]]; then
+  if [[ "${desc_bk}" != 1 ]]; then
     unset desc_flag
     echo; echo "${CWARNING}input error! Please only input number 1~8${CEND}"; echo
     continue
@@ -76,9 +76,9 @@ while :; do echo
   fi
 done
 
-[[ "${1}" == 1 ]] && sed -i 's@^backup_content=.*@backup_content=db@' ./options.conf
-[[ "${1}" == 2 ]] && sed -i 's@^backup_content=.*@backup_content=web@' ./options.conf
-[[ "${1}" == 3 ]] && sed -i 's@^backup_content=.*@backup_content=db,web@' ./options.conf
+[[ "${content_bk}" == 1 ]] && sed -i 's@^backup_content=.*@backup_content=db@' ./options.conf
+[[ "${content_bk}" == 2 ]] && sed -i 's@^backup_content=.*@backup_content=web@' ./options.conf
+[[ "${content_bk}" == 3 ]] && sed -i 's@^backup_content=.*@backup_content=db,web@' ./options.conf
 
 if [ -n "$(echo ${desc_bk} | grep -Ew '1|2')" ]; then
   while :; do echo
@@ -169,7 +169,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 2)" ]; then
           break
         fi
       done
-      [[ "${1}" == n ]] && break
+      [[ "${morehost_flag}" == n ]] && break
     fi
   done
 fi
@@ -202,33 +202,33 @@ if [ -n "$(echo ${desc_bk} | grep -w 3)" ]; then
       echo "${CWARNING}input error! Please only input number 1~27${CEND}"
     fi
   done
-  [[ "${1}" == 1 ]] && Host=oss-cn-hangzhou-internal.aliyuncs.com
-  [[ "${1}" == 2 ]] && Host=oss-cn-shanghai-internal.aliyuncs.com
-  [[ "${1}" == 3 ]] && Host=oss-cn-nanjing-internal.aliyuncs.com
-  [[ "${1}" == 4 ]] && Host=oss-cn-fuzhou-internal.aliyuncs.com
-  [[ "${1}" == 5 ]] && Host=oss-cn-wuhan-lr-internal.aliyuncs.com
-  [[ "${1}" == 6 ]] && Host=oss-cn-qingdao-internal.aliyuncs.com
-  [[ "${1}" == 7 ]] && Host=oss-cn-beijing-internal.aliyuncs.com
-  [[ "${1}" == 8 ]] && Host=oss-cn-zhangjiakou-internal.aliyuncs.com
-  [[ "${1}" == 9 ]] && Host=oss-cn-huhehaote-internal.aliyuncs.com
-  [[ "${1}" == 10 ]] && Host=oss-cn-wulanchabu-internal.aliyuncs.com
-  [[ "${1}" == 11 ]] && Host=oss-cn-shenzhen-internal.aliyuncs.com
-  [[ "${1}" == 12 ]] && Host=oss-cn-heyuan-internal.aliyuncs.com
-  [[ "${1}" == 13 ]] && Host=oss-cn-guangzhou-internal.aliyuncs.com
-  [[ "${1}" == 14 ]] && Host=oss-cn-chengdu-internal.aliyuncs.com
-  [[ "${1}" == 15 ]] && Host=oss-cn-hongkong-internal.aliyuncs.com
-  [[ "${1}" == 16 ]] && Host=oss-us-west-1-internal.aliyuncs.com
-  [[ "${1}" == 17 ]] && Host=oss-us-east-1-internal.aliyuncs.com
-  [[ "${1}" == 18 ]] && Host=oss-ap-northeast-1-internal.aliyuncs.com
-  [[ "${1}" == 19 ]] && Host=oss-ap-northeast-2-internal.aliyuncs.com
-  [[ "${1}" == 20 ]] && Host=oss-ap-southeast-1-internal.aliyuncs.com
-  [[ "${1}" == 21 ]] && Host=oss-ap-southeast-3-internal.aliyuncs.com
-  [[ "${1}" == 22 ]] && Host=oss-ap-southeast-5-internal.aliyuncs.com
-  [[ "${1}" == 23 ]] && Host=oss-ap-southeast-6-internal.aliyuncs.com
-  [[ "${1}" == 24 ]] && Host=oss-ap-southeast-7-internal.aliyuncs.com
-  [[ "${1}" == 25 ]] && Host=oss-eu-central-1-internal.aliyuncs.com
-  [[ "${1}" == 26 ]] && Host=oss-eu-west-1-internal.aliyuncs.com
-  [[ "${1}" == 27 ]] && Host=oss-me-east-1-internal.aliyuncs.com
+  [[ "${Location}" == 1 ]] && Host=oss-cn-hangzhou-internal.aliyuncs.com
+  [[ "${Location}" == 2 ]] && Host=oss-cn-shanghai-internal.aliyuncs.com
+  [[ "${Location}" == 3 ]] && Host=oss-cn-nanjing-internal.aliyuncs.com
+  [[ "${Location}" == 4 ]] && Host=oss-cn-fuzhou-internal.aliyuncs.com
+  [[ "${Location}" == 5 ]] && Host=oss-cn-wuhan-lr-internal.aliyuncs.com
+  [[ "${Location}" == 6 ]] && Host=oss-cn-qingdao-internal.aliyuncs.com
+  [[ "${Location}" == 7 ]] && Host=oss-cn-beijing-internal.aliyuncs.com
+  [[ "${Location}" == 8 ]] && Host=oss-cn-zhangjiakou-internal.aliyuncs.com
+  [[ "${Location}" == 9 ]] && Host=oss-cn-huhehaote-internal.aliyuncs.com
+  [[ "${Location}" == 10 ]] && Host=oss-cn-wulanchabu-internal.aliyuncs.com
+  [[ "${Location}" == 11 ]] && Host=oss-cn-shenzhen-internal.aliyuncs.com
+  [[ "${Location}" == 12 ]] && Host=oss-cn-heyuan-internal.aliyuncs.com
+  [[ "${Location}" == 13 ]] && Host=oss-cn-guangzhou-internal.aliyuncs.com
+  [[ "${Location}" == 14 ]] && Host=oss-cn-chengdu-internal.aliyuncs.com
+  [[ "${Location}" == 15 ]] && Host=oss-cn-hongkong-internal.aliyuncs.com
+  [[ "${Location}" == 16 ]] && Host=oss-us-west-1-internal.aliyuncs.com
+  [[ "${Location}" == 17 ]] && Host=oss-us-east-1-internal.aliyuncs.com
+  [[ "${Location}" == 18 ]] && Host=oss-ap-northeast-1-internal.aliyuncs.com
+  [[ "${Location}" == 19 ]] && Host=oss-ap-northeast-2-internal.aliyuncs.com
+  [[ "${Location}" == 20 ]] && Host=oss-ap-southeast-1-internal.aliyuncs.com
+  [[ "${Location}" == 21 ]] && Host=oss-ap-southeast-3-internal.aliyuncs.com
+  [[ "${Location}" == 22 ]] && Host=oss-ap-southeast-5-internal.aliyuncs.com
+  [[ "${Location}" == 23 ]] && Host=oss-ap-southeast-6-internal.aliyuncs.com
+  [[ "${Location}" == 24 ]] && Host=oss-ap-southeast-7-internal.aliyuncs.com
+  [[ "${Location}" == 25 ]] && Host=oss-eu-central-1-internal.aliyuncs.com
+  [[ "${Location}" == 26 ]] && Host=oss-eu-west-1-internal.aliyuncs.com
+  [[ "${Location}" == 27 ]] && Host=oss-me-east-1-internal.aliyuncs.com
   [[ "$(conn_port --host ${Host} --port 80)" == "false" ]] && Host=$(echo ${Host} | sed 's@-internal@@g')
   [ -e "/root/.ossutilconfig" ] && rm -f /root/.ossutilconfig
   while :; do echo
@@ -283,27 +283,27 @@ if [ -n "$(echo ${desc_bk} | grep -w 4)" ]; then
       echo "${CWARNING}input error! Please only input number 1~21${CEND}"
     fi
   done
-  [[ "${1}" == 1 ]] && REGION='ap-beijing'
-  [[ "${1}" == 2 ]] && REGION='ap-nanjing'
-  [[ "${1}" == 3 ]] && REGION='ap-shanghai'
-  [[ "${1}" == 4 ]] && REGION='ap-guangzhou'
-  [[ "${1}" == 5 ]] && REGION='ap-chengdu'
-  [[ "${1}" == 6 ]] && REGION='ap-chongqing'
-  [[ "${1}" == 7 ]] && REGION='ap-shenzhen-fsi'
-  [[ "${1}" == 8 ]] && REGION='ap-shanghai-fsi'
-  [[ "${1}" == 9 ]] && REGION='ap-beijing-fsi'
-  [[ "${1}" == 10 ]] && REGION='ap-hongkong'
-  [[ "${1}" == 11 ]] && REGION='ap-singapore'
-  [[ "${1}" == 12 ]] && REGION='ap-mumbai'
-  [[ "${1}" == 13 ]] && REGION='ap-jakarta'
-  [[ "${1}" == 14 ]] && REGION='ap-seoul'
-  [[ "${1}" == 15 ]] && REGION='ap-bangkok'
-  [[ "${1}" == 16 ]] && REGION='ap-tokyo'
-  [[ "${1}" == 17 ]] && REGION='na-siliconvalley'
-  [[ "${1}" == 18 ]] && REGION='na-ashburn'
-  [[ "${1}" == 19 ]] && REGION='na-toronto'
-  [[ "${1}" == 20 ]] && REGION='sa-saopaulo'
-  [[ "${1}" == 21 ]] && REGION='eu-frankfurt'
+  [[ "${Location}" == 1 ]] && REGION='ap-beijing'
+  [[ "${Location}" == 2 ]] && REGION='ap-nanjing'
+  [[ "${Location}" == 3 ]] && REGION='ap-shanghai'
+  [[ "${Location}" == 4 ]] && REGION='ap-guangzhou'
+  [[ "${Location}" == 5 ]] && REGION='ap-chengdu'
+  [[ "${Location}" == 6 ]] && REGION='ap-chongqing'
+  [[ "${Location}" == 7 ]] && REGION='ap-shenzhen-fsi'
+  [[ "${Location}" == 8 ]] && REGION='ap-shanghai-fsi'
+  [[ "${Location}" == 9 ]] && REGION='ap-beijing-fsi'
+  [[ "${Location}" == 10 ]] && REGION='ap-hongkong'
+  [[ "${Location}" == 11 ]] && REGION='ap-singapore'
+  [[ "${Location}" == 12 ]] && REGION='ap-mumbai'
+  [[ "${Location}" == 13 ]] && REGION='ap-jakarta'
+  [[ "${Location}" == 14 ]] && REGION='ap-seoul'
+  [[ "${Location}" == 15 ]] && REGION='ap-bangkok'
+  [[ "${Location}" == 16 ]] && REGION='ap-tokyo'
+  [[ "${Location}" == 17 ]] && REGION='na-siliconvalley'
+  [[ "${Location}" == 18 ]] && REGION='na-ashburn'
+  [[ "${Location}" == 19 ]] && REGION='na-toronto'
+  [[ "${Location}" == 20 ]] && REGION='sa-saopaulo'
+  [[ "${Location}" == 21 ]] && REGION='eu-frankfurt'
   while :; do echo
     read -e -p "Please enter the Qcloud COS SECRET_ID: " SECRET_ID
     [ -z "${SECRET_ID}" ] && continue
@@ -409,12 +409,12 @@ if [ -n "$(echo ${desc_bk} | grep -w 6)" ]; then
       echo "${CWARNING}input error! Please only input number 1~6${CEND}"
     fi
   done
-  [[ "${1}" == 1 ]] && zone='z0'
-  [[ "${1}" == 2 ]] && zone='z1'
-  [[ "${1}" == 3 ]] && zone='z2'
-  [[ "${1}" == 4 ]] && zone='na0'
-  [[ "${1}" == 5 ]] && zone='as0'
-  [[ "${1}" == 6 ]] && zone='cn-east-2'
+  [[ "${Location}" == 1 ]] && zone='z0'
+  [[ "${Location}" == 2 ]] && zone='z1'
+  [[ "${Location}" == 3 ]] && zone='z2'
+  [[ "${Location}" == 4 ]] && zone='na0'
+  [[ "${Location}" == 5 ]] && zone='as0'
+  [[ "${Location}" == 6 ]] && zone='cn-east-2'
   while :; do echo
     read -e -p "Please enter the qiniu AccessKey: " AccessKey
     [ -z "${AccessKey}" ] && continue
@@ -473,37 +473,37 @@ if [ -n "$(echo ${desc_bk} | grep -w 7)" ]; then
       echo "${CWARNING}input error! Please only input number 1~31${CEND}"
     fi
   done
-  [[ "${1}" == 1 ]] && REGION='us-east-2'
-  [[ "${1}" == 2 ]] && REGION='us-east-1'
-  [[ "${1}" == 3 ]] && REGION='us-west-1'
-  [[ "${1}" == 4 ]] && REGION='us-west-2'
-  [[ "${1}" == 5 ]] && REGION='af-south-1'
-  [[ "${1}" == 6 ]] && REGION='ap-east-1'
-  [[ "${1}" == 7 ]] && REGION='ap-south-2'
-  [[ "${1}" == 8 ]] && REGION='ap-southeast-3'
-  [[ "${1}" == 9 ]] && REGION='ap-southeast-4'
-  [[ "${1}" == 10 ]] && REGION='ap-south-1'
-  [[ "${1}" == 11 ]] && REGION='ap-northeast-3'
-  [[ "${1}" == 12 ]] && REGION='ap-northeast-2'
-  [[ "${1}" == 13 ]] && REGION='ap-southeast-1'
-  [[ "${1}" == 14 ]] && REGION='ap-southeast-2'
-  [[ "${1}" == 15 ]] && REGION='ap-northeast-1'
-  [[ "${1}" == 16 ]] && REGION='ca-central-1'
-  [[ "${1}" == 17 ]] && REGION='eu-central-1'
-  [[ "${1}" == 18 ]] && REGION='eu-west-1'
-  [[ "${1}" == 19 ]] && REGION='eu-west-2'
-  [[ "${1}" == 20 ]] && REGION='eu-south-1'
-  [[ "${1}" == 21 ]] && REGION='eu-west-3'
-  [[ "${1}" == 22 ]] && REGION='eu-south-2'
-  [[ "${1}" == 23 ]] && REGION='eu-north-1'
-  [[ "${1}" == 24 ]] && REGION='eu-central-2'
-  [[ "${1}" == 25 ]] && REGION='me-south-1'
-  [[ "${1}" == 26 ]] && REGION='me-central-1'
-  [[ "${1}" == 27 ]] && REGION='sa-east-1'
-  [[ "${1}" == 28 ]] && REGION='us-gov-east-1'
-  [[ "${1}" == 29 ]] && REGION='us-gov-west-1'
-  [[ "${1}" == 30 ]] && REGION='cn-north-1'
-  [[ "${1}" == 31 ]] && REGION='cn-northwest-1'
+  [[ "${Location}" == 1 ]] && REGION='us-east-2'
+  [[ "${Location}" == 2 ]] && REGION='us-east-1'
+  [[ "${Location}" == 3 ]] && REGION='us-west-1'
+  [[ "${Location}" == 4 ]] && REGION='us-west-2'
+  [[ "${Location}" == 5 ]] && REGION='af-south-1'
+  [[ "${Location}" == 6 ]] && REGION='ap-east-1'
+  [[ "${Location}" == 7 ]] && REGION='ap-south-2'
+  [[ "${Location}" == 8 ]] && REGION='ap-southeast-3'
+  [[ "${Location}" == 9 ]] && REGION='ap-southeast-4'
+  [[ "${Location}" == 10 ]] && REGION='ap-south-1'
+  [[ "${Location}" == 11 ]] && REGION='ap-northeast-3'
+  [[ "${Location}" == 12 ]] && REGION='ap-northeast-2'
+  [[ "${Location}" == 13 ]] && REGION='ap-southeast-1'
+  [[ "${Location}" == 14 ]] && REGION='ap-southeast-2'
+  [[ "${Location}" == 15 ]] && REGION='ap-northeast-1'
+  [[ "${Location}" == 16 ]] && REGION='ca-central-1'
+  [[ "${Location}" == 17 ]] && REGION='eu-central-1'
+  [[ "${Location}" == 18 ]] && REGION='eu-west-1'
+  [[ "${Location}" == 19 ]] && REGION='eu-west-2'
+  [[ "${Location}" == 20 ]] && REGION='eu-south-1'
+  [[ "${Location}" == 21 ]] && REGION='eu-west-3'
+  [[ "${Location}" == 22 ]] && REGION='eu-south-2'
+  [[ "${Location}" == 23 ]] && REGION='eu-north-1'
+  [[ "${Location}" == 24 ]] && REGION='eu-central-2'
+  [[ "${Location}" == 25 ]] && REGION='me-south-1'
+  [[ "${Location}" == 26 ]] && REGION='me-central-1'
+  [[ "${Location}" == 27 ]] && REGION='sa-east-1'
+  [[ "${Location}" == 28 ]] && REGION='us-gov-east-1'
+  [[ "${Location}" == 29 ]] && REGION='us-gov-west-1'
+  [[ "${Location}" == 30 ]] && REGION='cn-north-1'
+  [[ "${Location}" == 31 ]] && REGION='cn-northwest-1'
   while :; do echo
     read -e -p "Please enter the AWS Access Key: " ACCESS_KEY
     [ -z "${ACCESS_KEY}" ] && continue
