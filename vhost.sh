@@ -814,6 +814,10 @@ Del_NGX_Vhost() {
           else
             if [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ]; then
               Directory=$(grep '^  root' ${web_install_dir}/conf/vhost/${domain}.conf | head -1 | awk -F'[ ;]' '{print $(NF-1)}')
+              if [ -z "${Directory}" ] || [ "${Directory}" == "/" ] || ! echo "${Directory}" | grep -q "^${wwwroot_dir}"; then
+                echo "${CFAILURE}Invalid directory path detected. Only directories under ${wwwroot_dir} can be deleted.${CEND}"
+                continue
+              fi
               /bin/mv ${web_install_dir}/conf/vhost/${domain}.conf ${web_install_dir}/conf/vhost/${domain}.conf.bak
               if ${web_install_dir}/sbin/nginx -t; then
                 rm -f ${web_install_dir}/conf/vhost/${domain}.conf.bak
