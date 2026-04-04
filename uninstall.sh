@@ -253,22 +253,6 @@ Uninstall_MongoDB() {
   fi
 }
 
-Uninstall_MongoDB() {
-  # uninstall mongodb
-  if [ -e "${mongo_install_dir}/bin/mongo" ]; then
-    svc_stop mongod > /dev/null 2>&1
-    rm -rf ${mongo_install_dir} /etc/mongod.conf /etc/init.d/mongod /tmp/mongo*.sock
-    [ -e "/lib/systemd/system/mongod.service" ] && { svc_disable mongod > /dev/null 2>&1; rm -f /lib/systemd/system/mongod.service; }
-    [ -e "${php_install_dir}/etc/php.d/07-mongo.ini" ] && rm -f ${php_install_dir}/etc/php.d/07-mongo.ini
-    [ -e "${php_install_dir}/etc/php.d/07-mongodb.ini" ] && rm -f ${php_install_dir}/etc/php.d/07-mongodb.ini
-    id -u mongod > /dev/null 2>&1 ; [ $? -eq 0 ] && userdel mongod
-    [ -e "${mongo_data_dir}" ] && /bin/mv ${mongo_data_dir}{,$(date +%Y%m%d%H)}
-    sed -i 's@^dbmongopwd=.*@dbmongopwd=@' ./options.conf
-    sed -i "s@${mongo_install_dir}/bin:@@" /etc/profile
-    echo "${CMSG}MongoDB uninstall completed! ${CEND}"
-  fi
-}
-
 Print_PHP() {
   [ -e "${php_install_dir}" ] && echo ${php_install_dir}
   [ -e "/etc/init.d/php-fpm" ] && echo /etc/init.d/php-fpm
