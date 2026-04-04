@@ -412,7 +412,7 @@ post_install_php() {
   fi
 
   add_to_path ${install_dir}/bin
-  /bin/cp php-${php_ver}/php.ini-production ${install_dir}/etc/php.ini
+  /bin/cp ${current_dir}/src/php-${php_ver}/php.ini-production ${install_dir}/etc/php.ini
   generate_php_ini ${install_dir}
   
   # PHP 8.5 has opcache built-in
@@ -444,5 +444,5 @@ EOF
   # Setup logrotate
   setup_php_fpm_logrotate ${install_dir}
 
-  rm -rf php-${php_ver}
+  rm -rf ${current_dir}/src/php-${php_ver}
 }
