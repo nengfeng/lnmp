@@ -19,6 +19,13 @@ Install_MariaDB() {
   pushd ${current_dir}/src > /dev/null
   create_mysql_user
 
+  if [ -d "${mariadb_data_dir}" ] && [ -n "$(ls -A ${mariadb_data_dir} 2>/dev/null)" ]; then
+    echo "${CFAILURE}Data directory ${mariadb_data_dir} is not empty!${CEND}"
+    echo "${CWARNING}Existing data may be overwritten. Please backup or remove existing data first.${CEND}"
+    popd
+    return 1
+  fi
+
   [ ! -d "${mariadb_install_dir}" ] && mkdir -p ${mariadb_install_dir}
   mkdir -p ${mariadb_data_dir}
   chown mysql:mysql -R ${mariadb_data_dir}

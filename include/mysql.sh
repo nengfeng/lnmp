@@ -21,6 +21,13 @@ Install_MySQL() {
   pushd ${current_dir}/src > /dev/null
   create_mysql_user
 
+  if [ -d "${mysql_data_dir}" ] && [ -n "$(ls -A ${mysql_data_dir} 2>/dev/null)" ]; then
+    echo "${CFAILURE}Data directory ${mysql_data_dir} is not empty!${CEND}"
+    echo "${CWARNING}Existing data may be overwritten. Please backup or remove existing data first.${CEND}"
+    popd
+    return 1
+  fi
+
   [ ! -d "${mysql_install_dir}" ] && mkdir -p ${mysql_install_dir}
   mkdir -p ${mysql_data_dir}
   chown mysql:mysql -R ${mysql_data_dir}
