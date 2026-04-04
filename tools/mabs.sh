@@ -118,7 +118,7 @@ do
     #[ -z "$(echo $IP | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|CNS')" ] && continue
     if [[ "$(conn_port --host ${IP} --port ${PORT})" == "false" ]]; then
       [ ! -e ipnologin.txt ] && > ipnologin.txt
-      [ -z "$(grep $IP ipnologin.txt | grep $(date +%F))" ] && echo "$(date +%F_%H%M) $IP" >> ipnologin.txt
+      [ -z "$(grep "$IP" ipnologin.txt | grep $(date +%F))" ] && echo "$(date +%F_%H%M) $IP" >> ipnologin.txt
       continue
     fi
 

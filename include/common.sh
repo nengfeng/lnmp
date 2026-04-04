@@ -191,7 +191,7 @@ input_password() {
 # Returns escaped password suitable for sed replacement and SQL
 escape_password() {
   local pwd="$1"
-  echo "${pwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g'
+  echo "${pwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g; s/\$/\\$/g; s/`/\\`/g; s/"/\\"/g'
 }
 
 # Check if a component is already installed, warn and return 1 if so
@@ -654,7 +654,7 @@ refresh_path() {
 # Usage: add_lib_path /path/to/lib
 add_lib_path() {
   local lib_path=$1
-  [ -z "$(grep ${lib_path} /etc/ld.so.conf.d/*.conf 2>/dev/null)" ] && {
+  [ -z "$(grep "${lib_path}" /etc/ld.so.conf.d/*.conf 2>/dev/null)" ] && {
     echo "${lib_path}" > /etc/ld.so.conf.d/${lib_path##*/}.conf
     ldconfig
   }

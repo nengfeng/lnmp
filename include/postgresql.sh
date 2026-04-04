@@ -57,12 +57,12 @@ EOF
   echo 'local   all             all                                     md5' >> ${PG_HBA}
   echo 'host    all             all             0.0.0.0/0               md5' >> ${PG_HBA}
   
-  # Update postgresql.conf
+  # Update postgresql.conf - only listen on localhost for security
   PG_CONF="/etc/postgresql/${PG_VER_MAJOR}/main/postgresql.conf"
   [ -f "${pgsql_data_dir}/postgresql.conf" ] && PG_CONF="${pgsql_data_dir}/postgresql.conf"
   
-  sed -i "s@^#listen_addresses.*@listen_addresses = '*'@" ${PG_CONF}
-  sed -i "s@^listen_addresses.*@listen_addresses = '*'@" ${PG_CONF}
+  sed -i "s@^#listen_addresses.*@listen_addresses = '127.0.0.1'@" ${PG_CONF}
+  sed -i "s@^listen_addresses.*@listen_addresses = '127.0.0.1'@" ${PG_CONF}
   
   # Start PostgreSQL
   service_action start postgresql
@@ -109,8 +109,8 @@ Install_PostgreSQL_Source() {
   sed -i 's@^host.*@#&@g' ${pgsql_data_dir}/pg_hba.conf
   sed -i 's@^local.*@#&@g' ${pgsql_data_dir}/pg_hba.conf
   echo 'local   all             all                                     md5' >> ${pgsql_data_dir}/pg_hba.conf
-  echo 'host    all             all             0.0.0.0/0               md5' >> ${pgsql_data_dir}/pg_hba.conf
-  sed -i "s@^#listen_addresses.*@listen_addresses = '*'@" ${pgsql_data_dir}/postgresql.conf
+  echo 'host    all             all             127.0.0.1/0            md5' >> ${pgsql_data_dir}/pg_hba.conf
+  sed -i "s@^#listen_addresses.*@listen_addresses = '127.0.0.1'@" ${pgsql_data_dir}/postgresql.conf
   service_action reload postgresql
 
   if [ -e "${pgsql_install_dir}/bin/psql" ]; then

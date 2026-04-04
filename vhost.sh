@@ -222,16 +222,16 @@ If you enter '.', the field will be left blank.
       ~/.acme.sh/acme.sh --force --issue -k ${CERT_KEYLENGTH} --dns dns_${DNS_PRO} -d ${domain} ${moredomainame_D}
     else
       if [[ "${nginx_ssl_flag}" == y ]]; then
-        [ ! -d ${web_install_dir}/conf/vhost ] && mkdir ${web_install_dir}/conf/vhost
+        [ ! -d "${web_install_dir}/conf/vhost" ] && mkdir "${web_install_dir}/conf/vhost"
         if [ -n "$(ifconfig | grep inet6)" ]; then
-          echo "server {  listen 80;  listen [::]:80;  server_name ${domain}${moredomainame};  root ${vhostdir};  access_log off; }" > ${web_install_dir}/conf/vhost/${domain}.conf
+          echo "server {  listen 80;  listen [::]:80;  server_name ${domain}${moredomainame};  root ${vhostdir};  access_log off; }" > "${web_install_dir}/conf/vhost/${domain}.conf"
         else
-          echo "server {  listen 80;  server_name ${domain}${moredomainame};  root ${vhostdir};  access_log off; }" > ${web_install_dir}/conf/vhost/${domain}.conf
+          echo "server {  listen 80;  server_name ${domain}${moredomainame};  root ${vhostdir};  access_log off; }" > "${web_install_dir}/conf/vhost/${domain}.conf"
         fi
         ${web_install_dir}/sbin/nginx -s reload
       fi
       auth_file="$(< /dev/urandom tr -dc A-Za-z0-9 | head -c8)".html
-      auth_str=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16); echo ${auth_str} > ${vhostdir}/${auth_file}
+      auth_str=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16); echo "${auth_str}" > "${vhostdir}/${auth_file}"
       for D in ${domain} ${moredomainame}
       do
         curl_str=$(curl --connect-timeout 30 -4 -s $D/${auth_file} 2>&1)
@@ -438,6 +438,8 @@ What Are You Doing?
       read -e -p "(Default directory: ${wwwroot_dir}/${domain}): " vhostdir
       if [[ -n "${vhostdir}" && -z "$(echo ${vhostdir} | grep '^/')" ]]; then
         echo "${CWARNING}input error! Press Enter to continue...${CEND}"
+      elif [[ -n "${vhostdir}" && "${vhostdir}" == *".."* ]]; then
+        echo "${CWARNING}input error! Path traversal not allowed. Press Enter to continue...${CEND}"
       else
         if [ -z "${vhostdir}" ]; then
           vhostdir="${wwwroot_dir}/${domain}"
@@ -445,7 +447,7 @@ What Are You Doing?
         fi
         echo
         echo "Create Virtual Host directory......"
-        mkdir -p ${vhostdir}
+        mkdir -p "${vhostdir}"
         echo "Set secure permissions for Virtual Host directory......"
         # Set secure permissions: 750 for directories, 640 for files
         chmod 750 ${vhostdir}
@@ -713,7 +715,7 @@ server {
   root /dev/null;
   ${Nginx_redirect}
   location / {
-    proxy_pass ${Proxy_Pass};
+    proxy_pass "${Proxy_Pass}";
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header Host \$http_host;
     proxy_set_header X-NginX-Proxy true;

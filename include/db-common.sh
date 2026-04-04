@@ -172,7 +172,7 @@ cleanup_mysql_files() {
 # Usage: setup_mysql_root install_dir root_password [reset_master]
 setup_mysql_root() {
   local install_dir=$1
-  local root_pwd=$2
+  local root_pwd=$(echo "$2" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g; s/\$/\\$/g; s/`/\\`/g; s/"/\\"/g')
   local reset_master=${3:-no}
   
   # Wait for database to be ready
@@ -282,7 +282,7 @@ cleanup_mariadb_files() {
 # cmd_name: 'mariadb' (default) or 'mysql' for older versions
 setup_mariadb_root() {
   local install_dir=$1
-  local root_pwd=$2
+  local root_pwd=$(echo "$2" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g; s/\$/\\$/g; s/`/\\`/g; s/"/\\"/g')
   local cmd=${3:-mariadb}
 
   # Wait for database to be ready

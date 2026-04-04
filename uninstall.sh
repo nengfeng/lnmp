@@ -157,20 +157,23 @@ Print_Warn() {
 }
 
 Print_web() {
-  [ -d "${nginx_install_dir}" ] && echo ${nginx_install_dir}
-  [ -d "${tengine_install_dir}" ] && echo ${tengine_install_dir}
-  [ -d "${openresty_install_dir}" ] && echo ${openresty_install_dir}
+  [ -d "${nginx_install_dir}" ] && echo "${nginx_install_dir}"
+  [ -d "${tengine_install_dir}" ] && echo "${tengine_install_dir}"
+  [ -d "${openresty_install_dir}" ] && echo "${openresty_install_dir}"
   [ -e "/etc/init.d/nginx" ] && echo /etc/init.d/nginx
   [ -e "/lib/systemd/system/nginx.service" ] && echo /lib/systemd/system/nginx.service
   [ -e "/etc/logrotate.d/nginx" ] && echo /etc/logrotate.d/nginx
 }
 
 Uninstall_Web() {
-  [ -d "${nginx_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf ${nginx_install_dir} /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "s@${nginx_install_dir}/sbin:@@" /etc/profile; echo "${CMSG}Nginx uninstall completed! ${CEND}"; }
-  [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf ${tengine_install_dir} /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "s@${tengine_install_dir}/sbin:@@" /etc/profile; echo "${CMSG}Tengine uninstall completed! ${CEND}"; }
-  [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf ${openresty_install_dir} /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "s@${openresty_install_dir}/nginx/sbin:@@" /etc/profile; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; }
+  [ -d "${nginx_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${nginx_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${nginx_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Nginx uninstall completed! ${CEND}"; }
+  [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${tengine_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Tengine uninstall completed! ${CEND}"; }
+  [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${openresty_install_dir}/nginx/sbin:d" /etc/profile; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; }
   [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
-  [ -e "${wwwroot_dir}" ] && /bin/mv ${wwwroot_dir}{,$(date +%Y%m%d%H)}
+  if [ -e "${wwwroot_dir}" ]; then
+    read -e -p "Move ${wwwroot_dir} to ${wwwroot_dir}_bak? (y/n): " move_www
+    [[ "${move_www}" == "y" ]] && /bin/mv "${wwwroot_dir}" "${wwwroot_dir}_$(date +%Y%m%d%H)"
+  fi
   sed -i 's@^website_name=.*@website_name=@' ./options.conf
   sed -i 's@^backup_content=.*@backup_content=@' ./options.conf
 }
@@ -199,13 +202,16 @@ Uninstall_MySQL() {
   # uninstall mysql,mariadb
   if [ -d "${db_install_dir}/support-files" ]; then
     svc_stop mysqld > /dev/null 2>&1
-    rm -rf ${db_install_dir} /etc/init.d/mysqld /etc/my.cnf /etc/logrotate.d/mysql*
+    rm -rf "${db_install_dir}" /etc/init.d/mysqld /etc/my.cnf /etc/logrotate.d/mysql*
     # Remove ld.so.conf.d entries for mysql/mariadb
     rm -f /etc/ld.so.conf.d/*mysql*.conf /etc/ld.so.conf.d/*mariadb*.conf
     id -u mysql >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mysql
-    [ -e "${db_data_dir}" ] && /bin/mv ${db_data_dir}{,$(date +%Y%m%d%H)}
+    if [ -e "${db_data_dir}" ]; then
+      read -e -p "Move ${db_data_dir} to ${db_data_dir}_bak? (y/n): " move_db
+      [[ "${move_db}" == "y" ]] && /bin/mv "${db_data_dir}" "${db_data_dir}_$(date +%Y%m%d%H)"
+    fi
     sed -i 's@^dbrootpwd=.*@dbrootpwd=@' ./options.conf
-    sed -i "s@${db_install_dir}/bin:@@" /etc/profile
+    sed -i "\:${db_install_dir}/bin:d" /etc/profile
     echo "${CMSG}MySQL uninstall completed! ${CEND}"
   fi
 }
@@ -214,14 +220,36 @@ Uninstall_PostgreSQL() {
   # uninstall postgresql
   if [ -e "${pgsql_install_dir}/bin/psql" ]; then
     svc_stop postgresql > /dev/null 2>&1
-    rm -rf ${pgsql_install_dir} /etc/init.d/postgresql
+    rm -rf "${pgsql_install_dir}" /etc/init.d/postgresql
     [ -e "/lib/systemd/system/postgresql.service" ] && { svc_disable postgresql > /dev/null 2>&1; rm -f /lib/systemd/system/postgresql.service; }
-    [ -e "${php_install_dir}/etc/php.d/07-pgsql.ini" ] && rm -f ${php_install_dir}/etc/php.d/07-pgsql.ini
+    [ -e "${php_install_dir}/etc/php.d/07-pgsql.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-pgsql.ini"
     id -u postgres >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel postgres
-    [ -e "${pgsql_data_dir}" ] && /bin/mv ${pgsql_data_dir}{,$(date +%Y%m%d%H)}
+    if [ -e "${pgsql_data_dir}" ]; then
+      read -e -p "Move ${pgsql_data_dir} to ${pgsql_data_dir}_bak? (y/n): " move_pg
+      [[ "${move_pg}" == "y" ]] && /bin/mv "${pgsql_data_dir}" "${pgsql_data_dir}_$(date +%Y%m%d%H)"
+    fi
     sed -i 's@^dbpostgrespwd=.*@dbpostgrespwd=@' ./options.conf
-    sed -i "s@${pgsql_install_dir}/bin:@@" /etc/profile
+    sed -i "\:${pgsql_install_dir}/bin:d" /etc/profile
     echo "${CMSG}PostgreSQL uninstall completed! ${CEND}"
+  fi
+}
+
+Uninstall_MongoDB() {
+  # uninstall mongodb
+  if [ -e "${mongo_install_dir}/bin/mongo" ]; then
+    svc_stop mongod > /dev/null 2>&1
+    rm -rf "${mongo_install_dir}" /etc/mongod.conf /etc/init.d/mongod /tmp/mongo*.sock
+    [ -e "/lib/systemd/system/mongod.service" ] && { svc_disable mongod > /dev/null 2>&1; rm -f /lib/systemd/system/mongod.service; }
+    [ -e "${php_install_dir}/etc/php.d/07-mongo.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-mongo.ini"
+    [ -e "${php_install_dir}/etc/php.d/07-mongodb.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-mongodb.ini"
+    id -u mongod >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mongod
+    if [ -e "${mongo_data_dir}" ]; then
+      read -e -p "Move ${mongo_data_dir} to ${mongo_data_dir}_bak? (y/n): " move_mongo
+      [[ "${move_mongo}" == "y" ]] && /bin/mv "${mongo_data_dir}" "${mongo_data_dir}_$(date +%Y%m%d%H)"
+    fi
+    sed -i 's@^dbmongopwd=.*@dbmongopwd=@' ./options.conf
+    sed -i "\:${mongo_install_dir}/bin:d" /etc/profile
+    echo "${CMSG}MongoDB uninstall completed! ${CEND}"
   fi
 }
 
