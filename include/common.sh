@@ -385,7 +385,8 @@ get_file_size() {
 # Compile and install from source
 # Usage: compile_and_install [extra_make_args]
 compile_and_install() {
-  make -j ${THREAD} ${1:+${1}} && make install
+  make -j ${THREAD} ${1:+${1}} || return 1
+  make install
 }
 
 # Compile with error handling
