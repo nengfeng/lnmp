@@ -34,7 +34,7 @@ Install_pecl_xdebug() {
 zend_extension=xdebug.so
 xdebug.trace_output_dir=/tmp/xdebug
 xdebug.profiler_output_dir = /tmp/xdebug
-xdebug.profiler_enable = On
+xdebug.profiler_enable = 0
 xdebug.profiler_enable_trigger = 1
 EOF
       success_msg "PHP xdebug module"
