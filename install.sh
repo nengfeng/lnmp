@@ -538,7 +538,6 @@ PHP_addons() {
 if [[ "${mphp_flag}" == y ]]; then
   . include/mphp.sh
   Install_MPHP 2>&1 | tee -a ${current_dir}/install.log
-  php_install_dir=${php_install_dir}${mphp_ver}
   PHP_addons
 fi
 
@@ -603,7 +602,7 @@ fi
 
 # reload php
 [ -e "${php_install_dir}/sbin/php-fpm" ] && svc_reload php-fpm yes
-[[ -n "${mphp_ver}" && -e "${php_install_dir}${mphp_ver}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes
+[[ -n "${mphp_ver}" && -e "${php_install_dir}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes
 
 endTime=$(date +%s)
 ((installTime=($endTime-$startTime)/60))
