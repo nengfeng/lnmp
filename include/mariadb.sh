@@ -38,6 +38,8 @@ Install_MariaDB() {
   else
     rm -rf ${mariadb_install_dir}
     fail_msg "MariaDB"
+    popd
+    return 1
   fi
 
   setup_db_service ${mariadb_install_dir} ${mariadb_data_dir}

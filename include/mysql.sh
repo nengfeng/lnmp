@@ -41,6 +41,8 @@ Install_MySQL() {
   else
     rm -rf ${mysql_install_dir}
     fail_msg "MySQL"
+    popd
+    return 1
   fi
 
   setup_db_service ${mysql_install_dir} ${mysql_data_dir}
