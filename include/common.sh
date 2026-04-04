@@ -330,7 +330,7 @@ download_verify() {
       wget -c ${url}
     fi
     let "try_count++"
-    [["$(md5sum ${filename} 2>/dev/null | awk '{print $1}')" == "${expected_md5}" || "${try_count}" == 6]] && break || continue
+    [[ "$(md5sum ${filename} 2>/dev/null | awk '{print $1}')" == "${expected_md5}" || "${try_count}" == 6 ]] && break || continue
   done
   
   if [[ "${try_count}" == 6 ]]; then

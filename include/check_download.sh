@@ -181,7 +181,7 @@ verify_md5_with_retry() {
     wget -c "$download_url" -O "$file_name" 2>/dev/null
     ((try_count++))
     actual_md5=$(compute_md5 "$file_name")
-    [["$actual_md5" == "$expected_md5"]] || [ "$try_count" -ge 6 ] && break
+    [[ "$actual_md5" == "$expected_md5" ]] || [ "$try_count" -ge 6 ] && break
   done
   
   if [ "$try_count" -ge 6 ] && [ "$actual_md5" != "$expected_md5" ]; then
