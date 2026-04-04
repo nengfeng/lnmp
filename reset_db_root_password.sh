@@ -98,7 +98,17 @@ Reset_force_dbrootpwd() {
   echo "${CMSG}skip grant tables...${CEND}"
   sed -i '/\[mysqld\]/a\skip-grant-tables' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
+  while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
+    sleep 1
+  done
+  sleep 2
+  echo "${CMSG}Removing skip-grant-tables and restarting MySQL...${CEND}"
+  svc_stop mysqld > /dev/null 2>&1
+  while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
+    sleep 1
+  done
   sed -i '/^skip-grant-tables/d' /etc/my.cnf
+  svc_start mysqld > /dev/null 2>&1
   while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
     sleep 1
   done
