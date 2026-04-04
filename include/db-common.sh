@@ -531,7 +531,6 @@ no-auto-rehash
 [mysqld]
 port = 3306
 socket = /tmp/mysql.sock
-mysql_native_password = on 
 
 basedir = ${install_dir}
 datadir = ${data_dir}
