@@ -404,6 +404,8 @@ if [[ ${nginx_option} =~ ^[1-3]$ ]]; then
   [ ! -d ${wwwroot_dir}/default ] && mkdir -p ${wwwroot_dir}/default
   [ ! -d ${wwwlogs_dir} ] && mkdir -p ${wwwlogs_dir}
 fi
+# Create www user before setting permissions (nginx/php-fpm runs as www)
+[[ ${nginx_option} =~ ^[1-3]$ ]] && create_run_user
 # Set improved permissions for /data to enhance security
 setup_web_directory_permissions
 
