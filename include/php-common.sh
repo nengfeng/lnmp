@@ -226,7 +226,7 @@ listen.backlog = -1
 listen.allowed_clients = 127.0.0.1
 listen.owner = ${run_user}
 listen.group = ${run_group}
-listen.mode = 0666
+listen.mode = 0660
 user = ${run_user}
 group = ${run_group}
 
