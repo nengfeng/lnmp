@@ -170,7 +170,7 @@ If you enter '.', the field will be left blank.
       done
       "${HOME}/.acme.sh/acme.sh" --register-account -m ${EMAIL}
     fi
-    "${HOME}/.acme.sh/acme.sh" --set-default-ca --server letsencrypt
+    "${HOME}/.acme.sh/acme.sh" --set-default-ca --server zerossl
     if [[ "${moredomain}" == "*.${domain}" || "${dnsapi_flag}" == y ]]; then
       while :; do echo
         echo 'Please select DNS provider:'
