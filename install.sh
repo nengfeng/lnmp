@@ -5,7 +5,7 @@
 #
 
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-set -e
+#set -e
 set -o pipefail
 clear
 printf "
