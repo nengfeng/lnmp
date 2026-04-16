@@ -268,38 +268,38 @@ run_backup() {
   
   case "${DEST}" in
     local)
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_local_backup
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_local_backup
+      echo "${backup_content}" | grep -owq 'db' && db_local_backup
+      echo "${backup_content}" | grep -owq 'web' && web_local_backup
       ;;
     remote)
       echo "com:::[ ! -e \"${backup_dir}\" ] && mkdir -p ${backup_dir}" > config_backup.txt
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_remote_backup
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_remote_backup
+      echo "${backup_content}" | grep -owq 'db' && db_remote_backup
+      echo "${backup_content}" | grep -owq 'web' && web_remote_backup
       ./mabs.sh -c config_backup.txt -T -1 | tee -a mabs.log
       ;;
     oss)
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup oss "${oss_bucket}"
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup oss "${oss_bucket}"
+      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup oss "${oss_bucket}"
+      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup oss "${oss_bucket}"
       ;;
     cos)
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup cos "${cos_bucket}"
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup cos "${cos_bucket}"
+      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup cos "${cos_bucket}"
+      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup cos "${cos_bucket}"
       ;;
     upyun)
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup upyun ""
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup upyun ""
+      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup upyun ""
+      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup upyun ""
       ;;
     qiniu)
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup qiniu "${qiniu_bucket}"
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup qiniu "${qiniu_bucket}"
+      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup qiniu "${qiniu_bucket}"
+      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup qiniu "${qiniu_bucket}"
       ;;
     s3)
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup s3 "${s3_bucket}"
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup s3 "${s3_bucket}"
+      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup s3 "${s3_bucket}"
+      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup s3 "${s3_bucket}"
       ;;
     dropbox)
-      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup dropbox ""
-      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup dropbox ""
+      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup dropbox ""
+      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup dropbox ""
       ;;
   esac
 }

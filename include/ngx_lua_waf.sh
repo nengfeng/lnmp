@@ -151,9 +151,9 @@ enable_lua_waf() {
   tar xzf ngx_lua_waf.tar.gz -C ${web_install_dir}/conf
   [ -e "${web_install_dir}/conf/resty" ] && /bin/mv ${web_install_dir}/conf/resty{,_bak}
   sed -i "s@/usr/local/nginx@${web_install_dir}@g" ${web_install_dir}/conf/waf.conf
-  sed -i "s@/usr/local/nginx@${web_install_dir}@" ${web_install_dir}/conf/waf/config.lua
+  sed -i "s@/usr/local/nginx@${web_install_dir}:@" ${web_install_dir}/conf/waf/config.lua
   sed -i "s@/data/wwwlogs@${wwwlogs_dir}@" ${web_install_dir}/conf/waf/config.lua
-  [ -z "$(grep 'include waf.conf;' ${web_install_dir}/conf/nginx.conf)" ] && sed -i "s@ vhost/\*.conf;@&\n  include waf.conf;@" ${web_install_dir}/conf/nginx.conf
+  grep -q 'include waf.conf;' ${web_install_dir}/conf/nginx.conf || sed -i "s@ vhost/\*.conf;@&\n  include waf.conf;@" ${web_install_dir}/conf/nginx.conf
   ${web_install_dir}/sbin/nginx -t
   if [ $? -eq 0 ]; then
     svc_reload nginx

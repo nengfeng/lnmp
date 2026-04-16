@@ -157,19 +157,19 @@ Print_Warn() {
 }
 
 Print_web() {
-  [ -d "${nginx_install_dir}" ] && echo "${nginx_install_dir}"
-  [ -d "${tengine_install_dir}" ] && echo "${tengine_install_dir}"
-  [ -d "${openresty_install_dir}" ] && echo "${openresty_install_dir}"
-  [ -e "/etc/init.d/nginx" ] && echo /etc/init.d/nginx
-  [ -e "/lib/systemd/system/nginx.service" ] && echo /lib/systemd/system/nginx.service
-  [ -e "/etc/logrotate.d/nginx" ] && echo /etc/logrotate.d/nginx
+  [ -d "${nginx_install_dir}" ] && echo "${nginx_install_dir}" || true
+  [ -d "${tengine_install_dir}" ] && echo "${tengine_install_dir}" || true
+  [ -d "${openresty_install_dir}" ] && echo "${openresty_install_dir}" || true
+  [ -e "/etc/init.d/nginx" ] && echo /etc/init.d/nginx || true
+  [ -e "/lib/systemd/system/nginx.service" ] && echo /lib/systemd/system/nginx.service || true
+  [ -e "/etc/logrotate.d/nginx" ] && echo /etc/logrotate.d/nginx || true
 }
 
 Uninstall_Web() {
-  [ -d "${nginx_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${nginx_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${nginx_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Nginx uninstall completed! ${CEND}"; }
-  [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${tengine_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Tengine uninstall completed! ${CEND}"; }
-  [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${openresty_install_dir}/nginx/sbin:d" /etc/profile; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; }
-  [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
+  [ -d "${nginx_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${nginx_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${nginx_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Nginx uninstall completed! ${CEND}"; } || true
+  [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${tengine_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Tengine uninstall completed! ${CEND}"; } || true
+  [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${openresty_install_dir}/nginx/sbin:d" /etc/profile; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; } || true
+  [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; } || true
   if [ -e "${wwwroot_dir}" ]; then
     read -e -p "Move ${wwwroot_dir} to ${wwwroot_dir}_bak? (y/n): " move_www
     [[ "${move_www}" == "y" ]] && /bin/mv "${wwwroot_dir}" "${wwwroot_dir}_$(date +%Y%m%d%H)"
@@ -179,23 +179,23 @@ Uninstall_Web() {
 }
 
 Print_MySQL() {
-  [ -e "/etc/logrotate.d/mysql" ] && echo /etc/logrotate.d/mysql
-  [ -e "${db_install_dir}" ] && echo ${db_install_dir}
-  [ -e "/etc/init.d/mysqld" ] && echo /etc/init.d/mysqld
-  [ -e "/etc/my.cnf" ] && echo /etc/my.cnf
+  [ -e "/etc/logrotate.d/mysql" ] && echo /etc/logrotate.d/mysql || true
+  [ -e "${db_install_dir}" ] && echo ${db_install_dir} || true
+  [ -e "/etc/init.d/mysqld" ] && echo /etc/init.d/mysqld || true
+  [ -e "/etc/my.cnf" ] && echo /etc/my.cnf || true
 }
 
 Print_PostgreSQL() {
-  [ -e "${pgsql_install_dir}" ] && echo ${pgsql_install_dir}
-  [ -e "/etc/init.d/postgresql" ] && echo /etc/init.d/postgresql
-  [ -e "/lib/systemd/system/postgresql.service" ] && echo /lib/systemd/system/postgresql.service
+  [ -e "${pgsql_install_dir}" ] && echo ${pgsql_install_dir} || true
+  [ -e "/etc/init.d/postgresql" ] && echo /etc/init.d/postgresql || true
+  [ -e "/lib/systemd/system/postgresql.service" ] && echo /lib/systemd/system/postgresql.service || true
 }
 
 Print_MongoDB() {
-  [ -e "${mongo_install_dir}" ] && echo ${mongo_install_dir}
-  [ -e "/etc/init.d/mongod" ] && echo /etc/init.d/mongod
-  [ -e "/lib/systemd/system/mongod.service" ] && echo /lib/systemd/system/mongod.service
-  [ -e "/etc/mongod.conf" ] && echo /etc/mongod.conf
+  [ -e "${mongo_install_dir}" ] && echo ${mongo_install_dir} || true
+  [ -e "/etc/init.d/mongod" ] && echo /etc/init.d/mongod || true
+  [ -e "/lib/systemd/system/mongod.service" ] && echo /lib/systemd/system/mongod.service || true
+  [ -e "/etc/mongod.conf" ] && echo /etc/mongod.conf || true
 }
 
 Uninstall_MySQL() {
@@ -205,7 +205,7 @@ Uninstall_MySQL() {
     rm -rf "${db_install_dir}" /etc/init.d/mysqld /etc/my.cnf /etc/logrotate.d/mysql*
     # Remove ld.so.conf.d entries for mysql/mariadb
     rm -f /etc/ld.so.conf.d/*mysql*.conf /etc/ld.so.conf.d/*mariadb*.conf
-    id -u mysql >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mysql
+    (id -u mysql >/dev/null 2>&1) && userdel mysql
     if [ -e "${db_data_dir}" ]; then
       read -e -p "Move ${db_data_dir} to ${db_data_dir}_bak? (y/n): " move_db
       [[ "${move_db}" == "y" ]] && /bin/mv "${db_data_dir}" "${db_data_dir}_$(date +%Y%m%d%H)"
@@ -221,9 +221,9 @@ Uninstall_PostgreSQL() {
   if [ -e "${pgsql_install_dir}/bin/psql" ]; then
     svc_stop postgresql > /dev/null 2>&1
     rm -rf "${pgsql_install_dir}" /etc/init.d/postgresql
-    [ -e "/lib/systemd/system/postgresql.service" ] && { svc_disable postgresql > /dev/null 2>&1; rm -f /lib/systemd/system/postgresql.service; }
-    [ -e "${php_install_dir}/etc/php.d/07-pgsql.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-pgsql.ini"
-    id -u postgres >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel postgres
+    [ -e "/lib/systemd/system/postgresql.service" ] && { svc_disable postgresql > /dev/null 2>&1; rm -f /lib/systemd/system/postgresql.service; } || true
+    [ -e "${php_install_dir}/etc/php.d/07-pgsql.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-pgsql.ini" || true
+    (id -u postgres >/dev/null 2>&1) && userdel postgres
     if [ -e "${pgsql_data_dir}" ]; then
       read -e -p "Move ${pgsql_data_dir} to ${pgsql_data_dir}_bak? (y/n): " move_pg
       [[ "${move_pg}" == "y" ]] && /bin/mv "${pgsql_data_dir}" "${pgsql_data_dir}_$(date +%Y%m%d%H)"
@@ -239,10 +239,10 @@ Uninstall_MongoDB() {
   if [ -e "${mongo_install_dir}/bin/mongo" ]; then
     svc_stop mongod > /dev/null 2>&1
     rm -rf "${mongo_install_dir}" /etc/mongod.conf /etc/init.d/mongod /tmp/mongo*.sock
-    [ -e "/lib/systemd/system/mongod.service" ] && { svc_disable mongod > /dev/null 2>&1; rm -f /lib/systemd/system/mongod.service; }
-    [ -e "${php_install_dir}/etc/php.d/07-mongo.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-mongo.ini"
-    [ -e "${php_install_dir}/etc/php.d/07-mongodb.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-mongodb.ini"
-    id -u mongod >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mongod
+    [ -e "/lib/systemd/system/mongod.service" ] && { svc_disable mongod > /dev/null 2>&1; rm -f /lib/systemd/system/mongod.service; } || true
+    [ -e "${php_install_dir}/etc/php.d/07-mongo.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-mongo.ini" || true
+    [ -e "${php_install_dir}/etc/php.d/07-mongodb.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-mongodb.ini" || true
+    (id -u mongod >/dev/null 2>&1) && userdel mongod
     if [ -e "${mongo_data_dir}" ]; then
       read -e -p "Move ${mongo_data_dir} to ${mongo_data_dir}_bak? (y/n): " move_mongo
       [[ "${move_mongo}" == "y" ]] && /bin/mv "${mongo_data_dir}" "${mongo_data_dir}_$(date +%Y%m%d%H)"
@@ -254,57 +254,57 @@ Uninstall_MongoDB() {
 }
 
 Print_PHP() {
-  [ -e "${php_install_dir}" ] && echo ${php_install_dir}
-  [ -e "/etc/init.d/php-fpm" ] && echo /etc/init.d/php-fpm
-  [ -e "/lib/systemd/system/php-fpm.service" ] && echo /lib/systemd/system/php-fpm.service
+  [ -e "${php_install_dir}" ] && echo ${php_install_dir} || true
+  [ -e "/etc/init.d/php-fpm" ] && echo /etc/init.d/php-fpm || true
+  [ -e "/lib/systemd/system/php-fpm.service" ] && echo /lib/systemd/system/php-fpm.service || true
 }
 
 Print_MPHP() {
-  [ -e "${php_install_dir}${mphp_ver}" ] && echo ${php_install_dir}${mphp_ver}
-  [ -e "/etc/init.d/php${mphp_ver}-fpm" ] && echo /etc/init.d/php${mphp_ver}-fpm
-  [ -e "/lib/systemd/system/php${mphp_ver}-fpm.service" ] && echo /lib/systemd/system/php${mphp_ver}-fpm.service
+  [ -e "${php_install_dir}${mphp_ver}" ] && echo ${php_install_dir}${mphp_ver} || true
+  [ -e "/etc/init.d/php${mphp_ver}-fpm" ] && echo /etc/init.d/php${mphp_ver}-fpm || true
+  [ -e "/lib/systemd/system/php${mphp_ver}-fpm.service" ] && echo /lib/systemd/system/php${mphp_ver}-fpm.service || true
 }
 
 Print_ALLPHP() {
-  [ -e "${php_install_dir}" ] && echo ${php_install_dir}
-  [ -e "/etc/init.d/php-fpm" ] && echo /etc/init.d/php-fpm
-  [ -e "/lib/systemd/system/php-fpm.service" ] && echo /lib/systemd/system/php-fpm.service
+  [ -e "${php_install_dir}" ] && echo ${php_install_dir} || true
+  [ -e "/etc/init.d/php-fpm" ] && echo /etc/init.d/php-fpm || true
+  [ -e "/lib/systemd/system/php-fpm.service" ] && echo /lib/systemd/system/php-fpm.service || true
   for php_ver in 83 84 85; do
-    [ -e "${php_install_dir}${php_ver}" ] && echo ${php_install_dir}${php_ver}
-    [ -e "/etc/init.d/php${php_ver}-fpm" ] && echo /etc/init.d/php${php_ver}-fpm
-    [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && echo /lib/systemd/system/php${php_ver}-fpm.service
+    [ -e "${php_install_dir}${php_ver}" ] && echo ${php_install_dir}${php_ver} || true
+    [ -e "/etc/init.d/php${php_ver}-fpm" ] && echo /etc/init.d/php${php_ver}-fpm || true
+    [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && echo /lib/systemd/system/php${php_ver}-fpm.service || true
   done
-  [ -e "${imagick_install_dir}" ] && echo ${imagick_install_dir}
-  [ -e "${curl_install_dir}" ] && echo ${curl_install_dir}
-  [ -e "${freetype_install_dir}" ] && echo ${freetype_install_dir}
+  [ -e "${imagick_install_dir}" ] && echo ${imagick_install_dir} || true
+  [ -e "${curl_install_dir}" ] && echo ${curl_install_dir} || true
+  [ -e "${freetype_install_dir}" ] && echo ${freetype_install_dir} || true
 }
 
 Uninstall_PHP() {
-  [ -e "/etc/init.d/php-fpm" ] && { svc_stop php-fpm > /dev/null 2>&1; rm -f /etc/init.d/php-fpm /etc/logrotate.d/php-fpm; }
-  [ -e "/lib/systemd/system/php-fpm.service" ] && { svc_stop php-fpm > /dev/null 2>&1; svc_disable php-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php-fpm.service; }
-  [ -e "${php_install_dir}" ] && { rm -rf ${php_install_dir}; echo "${CMSG}PHP uninstall completed! ${CEND}"; }
+  [ -e "/etc/init.d/php-fpm" ] && { svc_stop php-fpm > /dev/null 2>&1; rm -f /etc/init.d/php-fpm /etc/logrotate.d/php-fpm; } || true
+  [ -e "/lib/systemd/system/php-fpm.service" ] && { svc_stop php-fpm > /dev/null 2>&1; svc_disable php-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php-fpm.service; } || true
+  [ -e "${php_install_dir}" ] && { rm -rf ${php_install_dir}; echo "${CMSG}PHP uninstall completed! ${CEND}"; } || true
   sed -i "s@${php_install_dir}/bin:@@" /etc/profile
 }
 
 Uninstall_MPHP() {
-  [ -e "/etc/init.d/php${mphp_ver}-fpm" ] && { svc_stop php${mphp_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${mphp_ver}-fpm; }
-  [ -e "/lib/systemd/system/php${mphp_ver}-fpm.service" ] && { svc_stop php${mphp_ver}-fpm > /dev/null 2>&1; svc_disable php${mphp_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${mphp_ver}-fpm.service; }
-  [ -e "${php_install_dir}${mphp_ver}" ] && { rm -rf ${php_install_dir}${mphp_ver}; echo "${CMSG}PHP${mphp_ver} uninstall completed! ${CEND}"; }
+  [ -e "/etc/init.d/php${mphp_ver}-fpm" ] && { svc_stop php${mphp_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${mphp_ver}-fpm; } || true
+  [ -e "/lib/systemd/system/php${mphp_ver}-fpm.service" ] && { svc_stop php${mphp_ver}-fpm > /dev/null 2>&1; svc_disable php${mphp_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${mphp_ver}-fpm.service; } || true
+  [ -e "${php_install_dir}${mphp_ver}" ] && { rm -rf ${php_install_dir}${mphp_ver}; echo "${CMSG}PHP${mphp_ver} uninstall completed! ${CEND}"; } || true
 }
 
 Uninstall_ALLPHP() {
-  [ -e "/etc/init.d/php-fpm" ] && { svc_stop php-fpm > /dev/null 2>&1; rm -f /etc/init.d/php-fpm; }
-  [ -e "/lib/systemd/system/php-fpm.service" ] && { svc_stop php-fpm > /dev/null 2>&1; svc_disable php-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php-fpm.service; }
-  [ -e "${php_install_dir}" ] && { rm -rf ${php_install_dir}; echo "${CMSG}PHP uninstall completed! ${CEND}"; }
+  [ -e "/etc/init.d/php-fpm" ] && { svc_stop php-fpm > /dev/null 2>&1; rm -f /etc/init.d/php-fpm; } || true
+  [ -e "/lib/systemd/system/php-fpm.service" ] && { svc_stop php-fpm > /dev/null 2>&1; svc_disable php-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php-fpm.service; } || true
+  [ -e "${php_install_dir}" ] && { rm -rf ${php_install_dir}; echo "${CMSG}PHP uninstall completed! ${CEND}"; } || true
   sed -i "s@${php_install_dir}/bin:@@" /etc/profile
   for php_ver in 83 84 85; do
-    [ -e "/etc/init.d/php${php_ver}-fpm" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${php_ver}-fpm; }
-    [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; svc_disable php${php_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${php_ver}-fpm.service; }
-    [ -e "${php_install_dir}${php_ver}" ] && { rm -rf ${php_install_dir}${php_ver}; echo "${CMSG}PHP${php_ver} uninstall completed! ${CEND}"; }
+    [ -e "/etc/init.d/php${php_ver}-fpm" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${php_ver}-fpm; } || true
+    [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; svc_disable php${php_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${php_ver}-fpm.service; } || true
+    [ -e "${php_install_dir}${php_ver}" ] && { rm -rf ${php_install_dir}${php_ver}; echo "${CMSG}PHP${php_ver} uninstall completed! ${CEND}"; } || true
   done
-  [ -e "${imagick_install_dir}" ] && rm -rf ${imagick_install_dir}
-  [ -e "${curl_install_dir}" ] && rm -rf ${curl_install_dir}
-  [ -e "${freetype_install_dir}" ] && rm -rf ${freetype_install_dir}
+  [ -e "${imagick_install_dir}" ] && rm -rf ${imagick_install_dir} || true
+  [ -e "${curl_install_dir}" ] && rm -rf ${curl_install_dir} || true
+  [ -e "${freetype_install_dir}" ] && rm -rf ${freetype_install_dir} || true
 }
 
 Uninstall_PHPcache() {
@@ -313,8 +313,8 @@ Uninstall_PHPcache() {
   Uninstall_ZendOPcache
   Uninstall_APCU
   # reload php
-  [ -e "${php_install_dir}/sbin/php-fpm" ] && { svc_reload php-fpm; }
-  [[ -n "${mphp_ver}" && -e "${php_install_dir}${mphp_ver}/sbin/php-fpm" ]] && { svc_reload php${mphp_ver}-fpm; }
+  [ -e "${php_install_dir}/sbin/php-fpm" ] && { svc_reload php-fpm; } || true
+  [[ -n "${mphp_ver}" && -e "${php_install_dir}${mphp_ver}/sbin/php-fpm" ]] && { svc_reload php${mphp_ver}-fpm; } || true
 }
 
 Uninstall_PHPext() {
@@ -346,84 +346,84 @@ Menu_PHPext() {
     array_all=(1 2 3 4 5 6 7 8 9 10 11 12 13)
     for v in ${array_phpext[@]}
     do
-      [ -z "$(echo ${array_all[@]} | grep -w ${v})" ] && phpext_flag=1
+      echo "${array_all[@]}" | grep -qw "${v}" || phpext_flag=1
     done
     if [[ "${phpext_flag}" == 1 ]]; then
       unset phpext_flag
       echo; echo "${CWARNING}input error! Please only input number 0~13${CEND}"; echo
       continue
     else
-      [ -n "$(echo ${array_phpext[@]} | grep -w 1)" ] && pecl_ioncube=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 2)" ] && pecl_imagick=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 3)" ] && pecl_fileinfo=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 4)" ] && pecl_imap=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 5)" ] && pecl_ldap=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 6)" ] && pecl_phalcon=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 7)" ] && pecl_yaf=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 8)" ] && pecl_redis=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 9)" ] && pecl_memcached=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 10)" ] && pecl_memcache=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 11)" ] && pecl_mongodb=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 12)" ] && pecl_swoole=1
-      [ -n "$(echo ${array_phpext[@]} | grep -w 13)" ] && pecl_xdebug=1
+      echo "${array_phpext[@]}" | grep -qw "1" && pecl_ioncube=1
+      echo "${array_phpext[@]}" | grep -qw "2" && pecl_imagick=1
+      echo "${array_phpext[@]}" | grep -qw "3" && pecl_fileinfo=1
+      echo "${array_phpext[@]}" | grep -qw "4" && pecl_imap=1
+      echo "${array_phpext[@]}" | grep -qw "5" && pecl_ldap=1
+      echo "${array_phpext[@]}" | grep -qw "6" && pecl_phalcon=1
+      echo "${array_phpext[@]}" | grep -qw "7" && pecl_yaf=1
+      echo "${array_phpext[@]}" | grep -qw "8" && pecl_redis=1
+      echo "${array_phpext[@]}" | grep -qw "9" && pecl_memcached=1
+      echo "${array_phpext[@]}" | grep -qw "10" && pecl_memcache=1
+      echo "${array_phpext[@]}" | grep -qw "11" && pecl_mongodb=1
+      echo "${array_phpext[@]}" | grep -qw "12" && pecl_swoole=1
+      echo "${array_phpext[@]}" | grep -qw "13" && pecl_xdebug=1
       break
     fi
   done
 }
 
 Print_PureFtpd() {
-  [ -e "${pureftpd_install_dir}" ] && echo ${pureftpd_install_dir}
-  [ -e "/etc/init.d/pureftpd" ] && echo /etc/init.d/pureftpd
-  [ -e "/lib/systemd/system/pureftpd.service" ] && echo /lib/systemd/system/pureftpd.service
+  [ -e "${pureftpd_install_dir}" ] && echo ${pureftpd_install_dir} || true
+  [ -e "/etc/init.d/pureftpd" ] && echo /etc/init.d/pureftpd || true
+  [ -e "/lib/systemd/system/pureftpd.service" ] && echo /lib/systemd/system/pureftpd.service || true
 }
 
 Uninstall_PureFtpd() {
-  [ -e "${pureftpd_install_dir}" ] && { svc_stop pureftpd > /dev/null 2>&1; rm -rf ${pureftpd_install_dir} /etc/init.d/pureftpd; echo "${CMSG}Pureftpd uninstall completed! ${CEND}"; }
-  [ -e "/lib/systemd/system/pureftpd.service" ] && { svc_disable pureftpd > /dev/null 2>&1; rm -f /lib/systemd/system/pureftpd.service; }
+  [ -e "${pureftpd_install_dir}" ] && { svc_stop pureftpd > /dev/null 2>&1; rm -rf ${pureftpd_install_dir} /etc/init.d/pureftpd; echo "${CMSG}Pureftpd uninstall completed! ${CEND}"; } || true
+  [ -e "/lib/systemd/system/pureftpd.service" ] && { svc_disable pureftpd > /dev/null 2>&1; rm -f /lib/systemd/system/pureftpd.service; } || true
 }
 
 Print_Redis_server() {
-  [ -e "${redis_install_dir}" ] && echo ${redis_install_dir}
-  [ -e "/etc/init.d/redis-server" ] && echo /etc/init.d/redis-server
-  [ -e "/lib/systemd/system/redis-server.service" ] && echo /lib/systemd/system/redis-server.service
+  [ -e "${redis_install_dir}" ] && echo ${redis_install_dir} || true
+  [ -e "/etc/init.d/redis-server" ] && echo /etc/init.d/redis-server || true
+  [ -e "/lib/systemd/system/redis-server.service" ] && echo /lib/systemd/system/redis-server.service || true
 }
 
 Uninstall_Redis_server() {
-  [ -e "${redis_install_dir}" ] && { svc_stop redis-server > /dev/null 2>&1; rm -rf ${redis_install_dir} /etc/init.d/redis-server /usr/local/bin/redis-*; echo "${CMSG}Redis uninstall completed! ${CEND}"; }
-  [ -e "/lib/systemd/system/redis-server.service" ] && { svc_disable redis-server > /dev/null 2>&1; rm -f /lib/systemd/system/redis-server.service; }
+  [ -e "${redis_install_dir}" ] && { svc_stop redis-server > /dev/null 2>&1; rm -rf ${redis_install_dir} /etc/init.d/redis-server /usr/local/bin/redis-*; echo "${CMSG}Redis uninstall completed! ${CEND}"; } || true
+  [ -e "/lib/systemd/system/redis-server.service" ] && { svc_disable redis-server > /dev/null 2>&1; rm -f /lib/systemd/system/redis-server.service; } || true
 }
 
 Print_Memcached_server() {
-  [ -e "${memcached_install_dir}" ] && echo ${memcached_install_dir}
-  [ -e "/etc/init.d/memcached" ] && echo /etc/init.d/memcached
-  [ -e "/usr/bin/memcached" ] && echo /usr/bin/memcached
-  [ -e "/lib/systemd/system/memcached.service" ] && echo /lib/systemd/system/memcached.service
+  [ -e "${memcached_install_dir}" ] && echo ${memcached_install_dir} || true
+  [ -e "/etc/init.d/memcached" ] && echo /etc/init.d/memcached || true
+  [ -e "/usr/bin/memcached" ] && echo /usr/bin/memcached || true
+  [ -e "/lib/systemd/system/memcached.service" ] && echo /lib/systemd/system/memcached.service || true
 }
 
 Uninstall_Memcached_server() {
-  [ -e "${memcached_install_dir}" ] && { svc_stop memcached > /dev/null 2>&1; rm -rf ${memcached_install_dir} /etc/init.d/memcached /usr/bin/memcached; echo "${CMSG}Memcached uninstall completed! ${CEND}"; }
-  [ -e "/lib/systemd/system/memcached.service" ] && { svc_disable memcached > /dev/null 2>&1; rm -f /lib/systemd/system/memcached.service; }
+  [ -e "${memcached_install_dir}" ] && { svc_stop memcached > /dev/null 2>&1; rm -rf ${memcached_install_dir} /etc/init.d/memcached /usr/bin/memcached; echo "${CMSG}Memcached uninstall completed! ${CEND}"; } || true
+  [ -e "/lib/systemd/system/memcached.service" ] && { svc_disable memcached > /dev/null 2>&1; rm -f /lib/systemd/system/memcached.service; } || true
 }
 
 Print_phpMyAdmin() {
-  [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && echo ${wwwroot_dir}/default/phpMyAdmin
+  [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && echo ${wwwroot_dir}/default/phpMyAdmin || true
 }
 
 Uninstall_phpMyAdmin() {
-  [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && rm -rf ${wwwroot_dir}/default/phpMyAdmin
+  [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && rm -rf ${wwwroot_dir}/default/phpMyAdmin || true
 }
 
 Print_openssl() {
-  [ -d "${openssl_install_dir}" ] && echo ${openssl_install_dir}
+  [ -d "${openssl_install_dir}" ] && echo ${openssl_install_dir} || true
 }
 
 Uninstall_openssl() {
-  [ -d "${openssl_install_dir}" ] && rm -rf ${openssl_install_dir}
+  [ -d "${openssl_install_dir}" ] && rm -rf ${openssl_install_dir} || true
 }
 
 Print_Nodejs() {
-  [ -e "${nodejs_install_dir}" ] && echo ${nodejs_install_dir}
-  [ -e "/etc/profile.d/nodejs.sh" ] && echo /etc/profile.d/nodejs.sh
+  [ -e "${nodejs_install_dir}" ] && echo ${nodejs_install_dir} || true
+  [ -e "/etc/profile.d/nodejs.sh" ] && echo /etc/profile.d/nodejs.sh || true
 }
 
 Menu() {

@@ -241,7 +241,7 @@ If you enter '.', the field will be left blank.
       [[ "${moredomainame_flag}" == y ]] && moredomainame_D="$(for D in ${moredomainame}; do echo -d ${D}; done)"
       "${HOME}/.acme.sh/acme.sh" --force --issue -k ${CERT_KEYLENGTH} -w ${vhostdir} -d ${domain} ${moredomainame_D}
     fi
-      [ -e "${PATH_SSL}/${domain}.crt" ] && rm -f ${PATH_SSL}/${domain}.{crt,key}
+      [ -e "${PATH_SSL}/${domain}.crt" ] && rm -f ${PATH_SSL}/${domain}.{crt,key} || true
       Nginx_cmd="svc_restart nginx"
       Command="${Nginx_cmd}"
     if [ -s "${HOME}/.acme.sh/${domain}/fullchain.cer" ] && [[ "${CERT_KEYLENGTH}" =~ ^2048$|^3072$|^4096$|^8192$ ]]; then
@@ -250,7 +250,7 @@ If you enter '.', the field will be left blank.
       "${HOME}/.acme.sh/acme.sh" --force --install-cert --ecc -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null
     else
       echo "${CFAILURE}Error: Create Let's Encrypt SSL Certificate failed! ${CEND}"
-      [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f ${web_install_dir}/conf/vhost/${domain}.conf
+      [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f ${web_install_dir}/conf/vhost/${domain}.conf || true
       exit 1
     fi
   elif [[ "${Domain_Mode}" == 4 ]]; then
@@ -365,9 +365,9 @@ What Are You Doing?
       while :; do echo
         echo 'Please select a version of the PHP:'
         printf "%b" "\t${CMSG} 0${CEND}. PHP ${PHP_main_ver} (default)\n"
-        [ -e "/dev/shm/php83-cgi.sock" ] && printf "%b" "\t${CMSG} 1${CEND}. PHP 8.3\n"
-        [ -e "/dev/shm/php84-cgi.sock" ] && printf "%b" "\t${CMSG} 2${CEND}. PHP 8.4\n"
-        [ -e "/dev/shm/php85-cgi.sock" ] && printf "%b" "\t${CMSG} 3${CEND}. PHP 8.5\n"
+        [ -e "/dev/shm/php83-cgi.sock" ] && printf "%b" "\t${CMSG} 1${CEND}. PHP 8.3\n" || true
+        [ -e "/dev/shm/php84-cgi.sock" ] && printf "%b" "\t${CMSG} 2${CEND}. PHP 8.4\n" || true
+        [ -e "/dev/shm/php85-cgi.sock" ] && printf "%b" "\t${CMSG} 3${CEND}. PHP 8.5\n" || true
         read -e -p "Please input a number:(Default 0 press Enter) " php_option
         php_option=${php_option:-0}
         if [[ ! ${php_option} =~ ^[0-3]$ ]]; then
@@ -401,12 +401,12 @@ What Are You Doing?
       popd > /dev/null
     fi
     # 启用自动升级和安装 cronjob（无论是否刚安装）
-    [ -e "${HOME}/.acme.sh/acme.sh" ] && {
+    if [ -e "${HOME}/.acme.sh/acme.sh" ]; then
       "${HOME}/.acme.sh/acme.sh" --upgrade --auto-upgrade > /dev/null 2>&1
       "${HOME}/.acme.sh/acme.sh" --install-cronjob > /dev/null 2>&1
-    }
+    fi
   fi
-  [ -e "${HOME}/.acme.sh/account.conf" ] && sed -i '/^CERT_HOME=/d' "${HOME}/.acme.sh/account.conf"
+  [ -e "${HOME}/.acme.sh/account.conf" ] && sed -i '/^CERT_HOME=/d' "${HOME}/.acme.sh/account.conf" || true
   if [[ "${Domain_Mode}" =~ ^[2-4]$ ]] || [[ "${dnsapi_flag}" == y ]]; then
     if [ -e "${web_install_dir}/sbin/nginx" ]; then
       nginx_ssl_flag=y
@@ -821,8 +821,8 @@ Del_NGX_Vhost() {
               /bin/mv ${web_install_dir}/conf/vhost/${domain}.conf ${web_install_dir}/conf/vhost/${domain}.conf.bak
               if ${web_install_dir}/sbin/nginx -t; then
                 rm -f ${web_install_dir}/conf/vhost/${domain}.conf.bak
-                [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f ${web_install_dir}/conf/rewrite/${domain}.conf
-                [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f ${web_install_dir}/conf/ssl/${domain}.{crt,key,csr}
+                [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f ${web_install_dir}/conf/rewrite/${domain}.conf || true
+                [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f ${web_install_dir}/conf/ssl/${domain}.{crt,key,csr} || true
                 ${web_install_dir}/sbin/nginx -s reload
               else
                 /bin/mv ${web_install_dir}/conf/vhost/${domain}.conf.bak ${web_install_dir}/conf/vhost/${domain}.conf

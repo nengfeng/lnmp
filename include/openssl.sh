@@ -5,7 +5,8 @@
 # Only support PHP 8.3, 8.4, 8.5
 # All supported PHP versions use the same OpenSSL configuration
 
-if openssl version | grep -Eqi 'OpenSSL 1.0.2*'; then
+openssl_ver_str=$(openssl version 2>/dev/null)
+if [[ "${openssl_ver_str}" =~ OpenSSL\ 1\.0\.2 ]]; then
   php83_with_openssl="--with-openssl"
   php84_with_openssl="--with-openssl"
   php85_with_openssl="--with-openssl"
@@ -17,7 +18,7 @@ if openssl version | grep -Eqi 'OpenSSL 1.0.2*'; then
   php83_with_curl="--with-curl"
   php84_with_curl="--with-curl"
   php85_with_curl="--with-curl"
-elif openssl version | grep -Eqi 'OpenSSL 1.1.*'; then
+elif [[ "${openssl_ver_str}" =~ OpenSSL\ 1\.1 ]]; then
   php83_with_openssl="--with-openssl"
   php84_with_openssl="--with-openssl"
   php85_with_openssl="--with-openssl"
@@ -31,7 +32,7 @@ elif openssl version | grep -Eqi 'OpenSSL 1.1.*'; then
   php85_with_curl="--with-curl"
 
   [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
-elif openssl version | grep -Eqi 'OpenSSL 3.*'; then
+elif [[ "${openssl_ver_str}" =~ OpenSSL\ 3\. ]]; then
   php83_with_openssl="--with-openssl"
   php84_with_openssl="--with-openssl"
   php85_with_openssl="--with-openssl"

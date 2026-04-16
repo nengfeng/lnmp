@@ -118,14 +118,14 @@ parse_args() {
       --nginx_option)
         nginx_option=$2; shift 2
         [[ ! ${nginx_option} =~ ^[1-3]$ ]] && { echo "${CWARNING}nginx_option input error! Please only input number 1~3${CEND}"; exit 1; }
-        [ -e "${nginx_install_dir}/sbin/nginx" ] && { echo "${CWARNING}Nginx already installed! ${CEND}"; unset nginx_option; }
-        [ -e "${tengine_install_dir}/sbin/nginx" ] && { echo "${CWARNING}Tengine already installed! ${CEND}"; unset nginx_option; }
-        [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && { echo "${CWARNING}OpenResty already installed! ${CEND}"; unset nginx_option; }
+        [ -e "${nginx_install_dir}/sbin/nginx" ] && { echo "${CWARNING}Nginx already installed! ${CEND}"; unset nginx_option; } || true
+        [ -e "${tengine_install_dir}/sbin/nginx" ] && { echo "${CWARNING}Tengine already installed! ${CEND}"; unset nginx_option; } || true
+        [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && { echo "${CWARNING}OpenResty already installed! ${CEND}"; unset nginx_option; } || true
         ;;
       --php_option)
         php_option=$2; shift 2
         [[ ! ${php_option} =~ ^[1-3]$ ]] && { echo "${CWARNING}php_option input error! Please only input number 1~3${CEND}"; exit 1; }
-        [ -e "${php_install_dir}/bin/phpize" ] && { echo "${CWARNING}PHP already installed! ${CEND}"; unset php_option; }
+        [ -e "${php_install_dir}/bin/phpize" ] && { echo "${CWARNING}PHP already installed! ${CEND}"; unset php_option; } || true
         ;;
       --mphp_ver)
         mphp_ver=$2; mphp_flag=y; shift 2
@@ -143,15 +143,15 @@ parse_args() {
         ;;
       --nodejs)
         nodejs_flag=y; shift 1
-        [ -e "${nodejs_install_dir}/bin/node" ] && { echo "${CWARNING}Nodejs already installed! ${CEND}"; unset nodejs_flag; }
+        [ -e "${nodejs_install_dir}/bin/node" ] && { echo "${CWARNING}Nodejs already installed! ${CEND}"; unset nodejs_flag; } || true
         ;;
       --db_option)
         db_option=$2; shift 2
         if [[ "${db_option}" =~ ^[1-6]$ ]]; then
           if [[ "${db_option}" == 6 ]]; then
-            [ -e "${pgsql_install_dir}/bin/psql" ] && { echo "${CWARNING}PostgreSQL already installed! ${CEND}"; unset db_option; }
+            [ -e "${pgsql_install_dir}/bin/psql" ] && { echo "${CWARNING}PostgreSQL already installed! ${CEND}"; unset db_option; } || true
           else
-            [ -d "${db_install_dir}/support-files" ] && { echo "${CWARNING}MySQL already installed! ${CEND}"; unset db_option; }
+            [ -d "${db_install_dir}/support-files" ] && { echo "${CWARNING}MySQL already installed! ${CEND}"; unset db_option; } || true
           fi
         else
           echo "${CWARNING}db_option input error! Please only input number 1~6${CEND}"
@@ -167,19 +167,19 @@ parse_args() {
         ;;
       --pureftpd)
         pureftpd_flag=y; shift 1
-        [ -e "${pureftpd_install_dir}/sbin/pure-ftpwho" ] && { echo "${CWARNING}Pure-FTPd already installed! ${CEND}"; unset pureftpd_flag; }
+        [ -e "${pureftpd_install_dir}/sbin/pure-ftpwho" ] && { echo "${CWARNING}Pure-FTPd already installed! ${CEND}"; unset pureftpd_flag; } || true
         ;;
       --redis)
         redis_flag=y; shift 1
-        [ -e "${redis_install_dir}/bin/redis-server" ] && { echo "${CWARNING}redis-server already installed! ${CEND}"; unset redis_flag; }
+        [ -e "${redis_install_dir}/bin/redis-server" ] && { echo "${CWARNING}redis-server already installed! ${CEND}"; unset redis_flag; } || true
         ;;
       --memcached)
         memcached_flag=y; shift 1
-        [ -e "${memcached_install_dir}/bin/memcached" ] && { echo "${CWARNING}memcached-server already installed! ${CEND}"; unset memcached_flag; }
+        [ -e "${memcached_install_dir}/bin/memcached" ] && { echo "${CWARNING}memcached-server already installed! ${CEND}"; unset memcached_flag; } || true
         ;;
       --phpmyadmin)
         phpmyadmin_flag=y; shift 1
-        [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && { echo "${CWARNING}phpMyAdmin already installed! ${CEND}"; unset phpmyadmin_flag; }
+        [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && { echo "${CWARNING}phpMyAdmin already installed! ${CEND}"; unset phpmyadmin_flag; } || true
         ;;
       --ssh_port)
         ssh_port=$2; shift 2
@@ -206,8 +206,8 @@ parse_args() {
 parse_args "$@"
 
 # Check md5sum (only for tarball installations)
-[ -e "${current_dir}.tar.gz" ] && tool_file=${current_dir}.tar.gz
-[ -e "${current_dir}-full.tar.gz" ] && tool_file=${current_dir}-full.tar.gz
+[ -e "${current_dir}.tar.gz" ] && tool_file=${current_dir}.tar.gz || true
+[ -e "${current_dir}-full.tar.gz" ] && tool_file=${current_dir}-full.tar.gz || true
 if [[ ${ARG_NUM} == 0 ]] && [ ! -e "${HOME}/.lnmp" ] && [ -n "${tool_file}" ]; then
   confirm "Do you want to check md5sum?" md5sum_flag n
 fi
@@ -228,7 +228,11 @@ fi
 
 # Use default SSH port 22. If you use another SSH port on your server
 if [ -e "/etc/ssh/sshd_config" ]; then
-  [ -z "$(grep ^Port /etc/ssh/sshd_config)" ] && now_ssh_port=22 || now_ssh_port=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}' | head -1)
+  if grep -q "^Port" /etc/ssh/sshd_config; then
+    now_ssh_port=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}' | head -1)
+  else
+    now_ssh_port=22
+  fi
   if [[ ${ARG_NUM} == 0 ]]; then
     input_string "Please input SSH port" ssh_port "${now_ssh_port}"
   fi
@@ -240,9 +244,9 @@ if [ -e "/etc/ssh/sshd_config" ]; then
     exit 1
   fi
 
-  if [[ -z "$(grep ^Port /etc/ssh/sshd_config)" && "${ssh_port}" != '22' ]]; then
+  if ! grep -q "^Port" /etc/ssh/sshd_config && [[ "${ssh_port}" != '22' ]]; then
     sed -i "s@^#Port.*@&\nPort ${ssh_port}@" /etc/ssh/sshd_config
-  elif [ -n "$(grep ^Port /etc/ssh/sshd_config)" ]; then
+  elif grep -q "^Port" /etc/ssh/sshd_config; then
     sed -i "s@^Port.*@Port ${ssh_port}@" /etc/ssh/sshd_config
   fi
 fi
@@ -601,12 +605,12 @@ fi
 . include/check_dir.sh
 
 # Starting DB
-[ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk}
-[ -d "${db_install_dir}/support-files" ] && ! svc_is_active mysqld && svc_start mysqld
+[ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk} || true
+[ -d "${db_install_dir}/support-files" ] && ! svc_is_active mysqld && svc_start mysqld || true
 
 # reload php
-[ -e "${php_install_dir}/sbin/php-fpm" ] && svc_reload php-fpm yes
-[[ -n "${mphp_ver}" && -e "${php_install_dir}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes
+[ -e "${php_install_dir}/sbin/php-fpm" ] && svc_reload php-fpm yes || true
+[[ -n "${mphp_ver}" && -e "${php_install_dir}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes || true
 
 endTime=$(date +%s)
 ((installTime=($endTime-$startTime)/60))

@@ -135,11 +135,11 @@ What Are You Doing?
           ACTION_FUN
           if [ "${install_flag}" = 'y' ]; then
             # shellcheck disable=SC2154
-            [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf
+            [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf || true
             # shellcheck disable=SC2154
-            [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf
+            [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf || true
             # shellcheck disable=SC2154
-            [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}"
+            [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}" || true
             enable_lua_waf
           elif [ "${uninstall_flag}" = 'y' ]; then
             disable_lua_waf
@@ -175,9 +175,9 @@ else
   fi
   if [[ "${ngx_lua_waf_flag}" == y ]]; then
     if [ "${install_flag}" = 'y' ]; then
-      [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf
-      [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf
-      [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}"
+      [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf || true
+      [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf || true
+      [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}" || true
       enable_lua_waf
     elif [ "${uninstall_flag}" = 'y' ]; then
       disable_lua_waf

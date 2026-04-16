@@ -203,9 +203,9 @@ check_installed() {
   local name=$3
 
   if [[ "${type}" == "dir" ]]; then
-    [ -d "${path}" ] && { echo "${CWARNING}${name} already installed! ${CEND}"; return 1; }
+    [ -d "${path}" ] && { echo "${CWARNING}${name} already installed! ${CEND}"; return 1; } || true
   else
-    [ -e "${path}" ] && { echo "${CWARNING}${name} already installed! ${CEND}"; return 1; }
+    [ -e "${path}" ] && { echo "${CWARNING}${name} already installed! ${CEND}"; return 1; } || true
   fi
   return 0
 }
@@ -218,7 +218,7 @@ check_installed() {
 # Usage: add_to_path /usr/local/nginx/sbin
 add_to_path() {
   local install_dir=$1
-  [ -z "$(grep ^'export PATH=' /etc/profile)" ] && echo "export PATH=${install_dir}:\$PATH" >> /etc/profile
+  grep -q "^export PATH=" /etc/profile || echo "export PATH=${install_dir}:\$PATH" >> /etc/profile
   [[ -n "$(grep ^'export PATH=' /etc/profile)" && -z "$(grep ${install_dir} /etc/profile)" ]] && sed -i "s@^export PATH=\(.*\)@export PATH=${install_dir}:\1@" /etc/profile
   . /etc/profile
 }
@@ -229,16 +229,13 @@ create_run_user() {
   local user=${1:-${run_user:-www}}
   local group=${2:-${run_group:-www}}
   
-  id -g ${group} >/dev/null 2>&1
-  [ $? -ne 0 ] && groupadd ${group}
-  id -u ${user} >/dev/null 2>&1
-  [ $? -ne 0 ] && useradd -g ${group} -M -s /sbin/nologin ${user}
+  id -g ${group} >/dev/null 2>&1 || groupadd ${group}
+  id -u ${user} >/dev/null 2>&1 || useradd -g ${group} -M -s /sbin/nologin ${user}
 }
 
 # Create mysql user if not exists
 create_mysql_user() {
-  id -u mysql >/dev/null 2>&1
-  [ $? -ne 0 ] && useradd -M -s /sbin/nologin mysql
+  id -u mysql >/dev/null 2>&1 || useradd -M -s /sbin/nologin mysql
 }
 
 # Setup logrotate for nginx
@@ -347,7 +344,7 @@ download_verify() {
 # Check if command exists
 # Usage: command_exists git
 command_exists() {
-  command -v "$1" >/dev/null 2>&1
+  (command -v "$1" >/dev/null 2>&1) || return 0
 }
 
 # Get memory size in MB

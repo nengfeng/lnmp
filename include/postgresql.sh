@@ -87,8 +87,7 @@ Install_PostgreSQL_Source() {
   echo "${CMSG}Installing PostgreSQL from source compilation...${CEND}"
   
   pushd ${current_dir}/src > /dev/null
-  id -u postgres >/dev/null 2>&1
-  [ $? -ne 0 ] && useradd -d ${pgsql_install_dir} -s /bin/bash postgres
+  id -u postgres >/dev/null 2>&1 || useradd -d ${pgsql_install_dir} -s /bin/bash postgres
   mkdir -p ${pgsql_data_dir};chown postgres.postgres -R ${pgsql_data_dir}
   tar xzf postgresql-${pgsql_ver}.tar.gz
   pushd postgresql-${pgsql_ver}
@@ -122,8 +121,8 @@ Install_PostgreSQL_Source() {
     fail_msg "PostgreSQL (source)"
   fi
   popd
-  [ -z "$(grep ^'export PATH=' /etc/profile)" ] && echo "export PATH=${pgsql_install_dir}/bin:\$PATH" >> /etc/profile
-  [[ -n "$(grep ^'export PATH=' /etc/profile)" && -z "$(grep ${pgsql_install_dir} /etc/profile)" ]] && sed -i "s@^export PATH=\(.*\)@export PATH=${pgsql_install_dir}/bin:\1@" /etc/profile
+  grep -q "^export PATH=" /etc/profile || echo "export PATH=${pgsql_install_dir}/bin:\$PATH" >> /etc/profile
+  grep -q "^export PATH=" /etc/profile && ! grep -q "${pgsql_install_dir}" /etc/profile && sed -i "s@^export PATH=\(.*\)@export PATH=${pgsql_install_dir}/bin:\1@" /etc/profile
   refresh_path
 }
 

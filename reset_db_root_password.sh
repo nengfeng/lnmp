@@ -148,15 +148,15 @@ EOF
   if [ $? -eq 0 ]; then
     killall mysqld
     timeout=60
-    while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
-      [ $((timeout--)) -le 0 ] && { ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1; break; }
+    while pgrep -x mysqld > /dev/null 2>&1; do
+      [ $((timeout--)) -le 0 ] && { pkill -9 mysqld; break; }
       sleep 1
     done
-    [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ] && ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1
+    pgrep -x mysqld > /dev/null 2>&1 && pkill -9 mysqld
     svc_start mysqld > /dev/null 2>&1
     sed -i "s+^dbrootpwd.*+dbrootpwd='${escaped_pwd}'+" ./options.conf
     chmod 600 ./options.conf
-    [ -e ~/ReadMe ] && sed -i "s+^MySQL root password:.*+MySQL root password: ${New_dbrootpwd}+"  ~/ReadMe
+    [ -e ~/ReadMe ] && sed -i "s+^MySQL root password:.*+MySQL root password: ${New_dbrootpwd}+"  ~/ReadMe || true
     echo
     echo "Password reset successfully! "
     echo "The new password: ${CMSG}${New_dbrootpwd}${CEND}"

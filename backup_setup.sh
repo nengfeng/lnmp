@@ -157,10 +157,11 @@ if [ -n "$(echo ${desc_bk} | grep -w 2)" ]; then
     IPcode=$(echo "ibase=16;$(echo "${remote_address}" | xxd -ps -u)"|bc|tr -d '\\'|tr -d '\n')
     Portcode=$(echo "ibase=16;$(echo "${remote_port}" | xxd -ps -u)"|bc|tr -d '\\'|tr -d '\n')
     PWcode=$(echo "ibase=16;$(echo "$remote_password" | xxd -ps -u)"|bc|tr -d '\\'|tr -d '\n')
-    [ -e "${HOME}/.ssh/known_hosts" ] && grep ${remote_address} ${HOME}/.ssh/known_hosts | sed -i "/${remote_address}/d" ${HOME}/.ssh/known_hosts
+    [ -e "${HOME}/.ssh/known_hosts" ] && grep -v "${remote_address}" ${HOME}/.ssh/known_hosts > ${HOME}/.ssh/known_hosts.tmp && mv ${HOME}/.ssh/known_hosts.tmp ${HOME}/.ssh/known_hosts
     ./tools/mssh.exp ${IPcode}P ${remote_user} ${PWcode}P ${Portcode}P true 10
     if [ $? -eq 0 ]; then
-      [ -z "$(grep ${remote_address} tools/iplist.txt)" ] && echo "${remote_address} ${remote_port} ${remote_user} $remote_password" >> tools/iplist.txt || echo "${CWARNING}${remote_address} has been added! ${CEND}"
+      grep -q "${remote_address}" tools/iplist.txt || echo "${remote_address} ${remote_port} ${remote_user} $remote_password" >> tools/iplist.txt
+      grep -q "${remote_address}" tools/iplist.txt && echo "${CWARNING}${remote_address} has been added! ${CEND}"
       while :; do
         read -e -p "Do you want to add more host ? [y/n]: " morehost_flag
         if [[ ! ${morehost_flag} =~ ^[y,n]$ ]]; then
@@ -174,7 +175,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 2)" ]; then
   done
 fi
 
-if [ -n "$(echo ${desc_bk} | grep -w 3)" ]; then
+if echo "${desc_bk}" | grep -qw "3"; then
   if [ ! -e "/usr/local/bin/ossutil" ]; then
     curl -sSL https://gosspublic.alicdn.com/ossutil/install.sh > /tmp/ossutil_install.sh && chmod +x /tmp/ossutil_install.sh && sudo /tmp/ossutil_install.sh
   fi
