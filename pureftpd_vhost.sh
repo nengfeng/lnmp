@@ -107,7 +107,7 @@ PASSWORD() {
       read -e -p "Please input the password: " Password
     fi
     echo "${Password}" | grep -q '[+|&]' && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
-    if (( ${#Password} >= 5 )); then
+    if [ ${#Password} -ge 5 ]; then
       printf "%b" "${Password}\n${Password}\n" > ${FTP_tmp_passfile}
       break
     else

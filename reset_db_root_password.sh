@@ -66,7 +66,7 @@ Input_dbrootpwd() {
       echo "${CWARNING}input error, password cannot contain single quotes (') or backslashes (\\)${CEND}"
       continue
     fi
-    (( ${#New_dbrootpwd} >= 5 )) && break || echo "${CWARNING}database root password least 5 characters! ${CEND}"
+    [ ${#New_dbrootpwd} -ge 5 ] && break || echo "${CWARNING}database root password least 5 characters! ${CEND}"
   done
 }
 

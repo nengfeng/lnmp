@@ -344,7 +344,7 @@ download_verify() {
 # Check if command exists
 # Usage: command_exists git
 command_exists() {
-  (command -v "$1" >/dev/null 2>&1) || return 0
+  command -v "$1" >/dev/null 2>&1
 }
 
 # Get memory size in MB

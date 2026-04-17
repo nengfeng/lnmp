@@ -612,7 +612,7 @@ fi
 [[ -n "${mphp_ver}" && -e "${php_install_dir}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes || true
 
 endTime=$(date +%s)
-((installTime=($endTime-$startTime)/60))
+installTime=$(( (endTime - startTime) / 60 ))
 echo "####################Congratulations########################"
 echo "Total Install Time: ${CQUESTION}${installTime}${CEND} minutes"
 [[ "${nginx_option}" =~ ^[1-3]$ ]] && printf "%b" "\n$(printf "%-32s" "Nginx install dir":)${CMSG}${web_install_dir}${CEND}\n"
