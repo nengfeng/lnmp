@@ -12,7 +12,7 @@ printf "
 #######################################################################
 "
 # Check if user is root
-[ "$(id -u)" != "0" ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+{ [ "$(id -u)" != "0" ]; } && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
 
 current_dir=$(dirname "$(readlink -f $0)")
 pushd ${current_dir} > /dev/null

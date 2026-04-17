@@ -14,7 +14,7 @@ printf "
 #######################################################################
 "
 # Check if user is root
-[ "$(id -u)" != "0" ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+{ [ "$(id -u)" != "0" ]; } && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
 
 current_dir=$(dirname "$(readlink -f "$0")")
 pushd "${current_dir}" > /dev/null
@@ -214,7 +214,7 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
   script_md5=${tool_file##*/}
   if [ -e "${tool_file}" ]; then
     now_script_md5=$(md5sum ${tool_file} | awk '{print $1}')
-    latest_script_md5=$(curl --connect-timeout 3 -m 5 -s "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" | grep "${script_md5}" | awk '{print $1}')
+    latest_script_md5=$(curl --connect-timeout 3 -m 5 -s "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" | grep "${script_md5}" | awk '{print $1}' || true)
     if [ "${now_script_md5}" != "${latest_script_md5}" ]; then
       echo "${CFAILURE}Error: The md5 value of the installation package does not match the official website, please download again, url: https://github.com/nengfeng/lnmp${CEND}"
       exit 1

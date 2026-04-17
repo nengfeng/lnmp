@@ -94,7 +94,7 @@ Reset_force_dbrootpwd() {
   svc_stop mysqld > /dev/null 2>&1
   local timeout=60
   while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
   echo "${CMSG}skip grant tables...${CEND}"
@@ -102,7 +102,7 @@ Reset_force_dbrootpwd() {
   svc_start mysqld > /dev/null 2>&1
   timeout=60
   while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
   sleep 2
@@ -110,14 +110,14 @@ Reset_force_dbrootpwd() {
   svc_stop mysqld > /dev/null 2>&1
   timeout=60
   while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
   sed -i '/^skip-grant-tables/d' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
   timeout=60
   while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
   # Detect MySQL or MariaDB
@@ -149,7 +149,7 @@ EOF
     killall mysqld
     timeout=60
     while pgrep -x mysqld > /dev/null 2>&1; do
-      [ $((timeout--)) -le 0 ] && { pkill -9 mysqld; break; }
+      { [ $((timeout--)) -le 0 ]; } && { pkill -9 mysqld; break; }
       sleep 1
     done
     pgrep -x mysqld > /dev/null 2>&1 && pkill -9 mysqld
