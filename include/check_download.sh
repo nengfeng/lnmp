@@ -49,7 +49,7 @@ verify_sha256() {
   local checksum_url=$2
   
   [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
-  [ -z "$checksum_url" ] && return 0
+  [ -n "$checksum_url" ] || return 0
   
   echo "Verifying SHA256 checksum for ${file_name}..."
   
@@ -80,7 +80,7 @@ verify_sha1() {
   local checksum_url=$2
   
   [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
-  [ -z "$checksum_url" ] && return 0
+  [ -n "$checksum_url" ] || return 0
   
   echo "Verifying SHA1 checksum for ${file_name}..."
   

@@ -85,7 +85,7 @@ uninstall_php_ext() {
 # Returns 0 if enabled, 1 if not
 ext_enabled() {
   local flag_name="${EXT_FLAGS[$1]}"
-  [ -z "$flag_name" ] && return 1
+  [ -n "$flag_name" ] || return 1
   [[ "${!flag_name}" == 1 ]]
 }
 

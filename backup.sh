@@ -126,7 +126,7 @@ db_cloud_backup() {
   local upload_cmd
   upload_cmd=$(get_cloud_commands "${dest_type}")
   
-  [ -z "${upload_cmd}" ] && return 1
+  [ -n "${upload_cmd}" ] || return 1
   
   for D in $(get_items "${db_name}"); do
     ./db_bk.sh "${D}"
@@ -223,7 +223,7 @@ web_cloud_backup() {
     local PUSH_FILE
     PUSH_FILE=$(create_web_archive "${W}")
     
-    [ -z "${PUSH_FILE}" ] && continue
+    [ -n "${PUSH_FILE}" ] || continue
     
     local remote_path
     remote_path="/$(date +%F)/${PUSH_FILE##*/}"

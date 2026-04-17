@@ -94,7 +94,7 @@ detect_location() {
     ip_info=$(curl -s --connect-timeout 5 https://ipinfo.io/json 2>/dev/null || true)
   fi
   
-  if [ -z "$ip_info" ] && command -v wget >/dev/null 2>&1; then
+  if [ -z "$ip_info" ] && (command -v wget >/dev/null 2>&1); then
     ip_info=$(wget -qO- --timeout=5 https://ipinfo.io/json 2>/dev/null || true)
   fi
   

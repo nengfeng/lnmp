@@ -199,7 +199,7 @@ If you enter '.', the field will be left blank.
         for pair in "${EXPORT_PAIRS[@]}"; do
           # Trim whitespace
           pair=$(echo "$pair" | xargs)
-          [ -z "$pair" ] && continue
+          [ -n "$pair" ] || continue
           # Check format: export VAR_NAME=VALUE (value must not contain $ or backticks)
           if ! [[ "$pair" =~ ^[[:space:]]*export[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^\$\`]*$ ]]; then
             echo "${CWARNING}Invalid format: '$pair'. Expected: export VAR_NAME=VALUE${CEND}"

@@ -24,7 +24,7 @@ ip_local() {
   fi
 
   # Method 3: ifconfig fallback
-  if [ -z "$ip" ] && command -v ifconfig >/dev/null 2>&1; then
+  if [ -z "$ip" ] && (command -v ifconfig >/dev/null 2>&1); then
     ip=$(ifconfig 2>/dev/null | grep -oP 'inet \K[\d.]+' | grep -v '^127\.' | head -1)
   fi
 
@@ -95,10 +95,10 @@ conn_port() {
     esac
   done
 
-  [ -z "$host" ] || [ -z "$port" ] && { echo "false"; return; }
+  [ -n "$host" ] && [ -n "$port" ] || { echo "false"; return; }
 
   # Method 1: curl
-  if command -v curl >/dev/null 2>&1; then
+  if (command -v curl >/dev/null 2>&1); then
     if curl -s --connect-timeout 3 --max-time 5 "telnet://${host}:${port}" >/dev/null 2>&1; then
       echo "true"
     else

@@ -11,7 +11,9 @@ Upgrade_PHP() {
   
   OLD_php_ver=$(${php_install_dir}/bin/php-config --version)
   pythonCtl=python
-  command -v python3 > /dev/null 2>&1 && pythonCtl=python3
+  if command -v python3 > /dev/null 2>&1; then
+    pythonCtl=python3
+  fi
   Latest_php_ver=$(curl --connect-timeout 2 -m 3 -s https://www.php.net/releases/active.php | ${pythonCtl} -mjson.tool | awk '/version/{print $2}' | sed 's/"//g' | grep "${OLD_php_ver%.*}")
   Latest_php_ver=${Latest_php_ver:-8.3.20}
   echo
