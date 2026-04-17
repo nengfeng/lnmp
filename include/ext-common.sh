@@ -56,7 +56,7 @@ install_php_ext() {
   . include/${script}
   ${func1} 2>&1 | tee -a ${current_dir}/install.log
   # Only call func2 if it's an install function (starts with Install_)
-  [[ -n "$func2" && "$func2" == Install_* ]] && ${func2} 2>&1 | tee -a ${current_dir}/install.log
+  [[ -n "$func2" && "$func2" == Install_* ]] && ${func2} 2>&1 | tee -a ${current_dir}/install.log || true
 }
 
 # Uninstall a single PHP extension
@@ -112,6 +112,6 @@ uninstall_enabled_exts() {
 # Reload PHP-FPM after extension changes
 # Usage: reload_php_fpm
 reload_php_fpm() {
-  [ -e "${php_install_dir}/sbin/php-fpm" ] && svc_reload php-fpm yes
-  [[ -n "${mphp_ver}" && -e "${php_install_dir}${mphp_ver}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes
+  [ -e "${php_install_dir}/sbin/php-fpm" ] && svc_reload php-fpm yes || true
+  [[ -n "${mphp_ver}" && -e "${php_install_dir}${mphp_ver}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes || true
 }
