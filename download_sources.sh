@@ -144,8 +144,8 @@ load_versions() {
   
   while IFS='=' read -r key value || [[ -n "$key" ]]; do
     # 跳过注释和空行
-    [[ "$key" =~ ^#.*$ ]] && continue
-    [[ -z "$key" ]] && continue
+    [[ "$key" =~ ^#.*$ ]] && continue || true
+    [[ -z "$key" ]] && continue || true
     # 去除前后空格
     key=$(echo "$key" | tr -d '[:space:]')
     value=$(echo "$value" | tr -d '[:space:]')
@@ -484,9 +484,9 @@ download_component() {
   
   while IFS= read -r line || [[ -n "$line" ]]; do
     # 跳过注释和空行
-    [[ "$line" =~ ^#.*$ ]] && continue
-    [[ -z "$line" ]] && continue
-    [[ ! "$line" =~ \| ]] && continue
+    [[ "$line" =~ ^#.*$ ]] && continue || true
+    [[ -z "$line" ]] && continue || true
+    [[ ! "$line" =~ \| ]] && continue || true
     
     # 新格式: 组件名|官方源|国内镜像|文件名|校验码URL|校验码类型|备用源|重命名目录
     local name=$(echo "$line" | cut -d'|' -f1)
@@ -618,9 +618,9 @@ list_components() {
   printf "%-20s %-12s %-15s %s\n" "---------" "-------" "-------" "--------"
   
   while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" =~ ^#.*$ ]] && continue
-    [[ -z "$line" ]] && continue
-    [[ ! "$line" =~ \| ]] && continue
+    [[ "$line" =~ ^#.*$ ]] && continue || true
+    [[ -z "$line" ]] && continue || true
+    [[ ! "$line" =~ \| ]] && continue || true
     
     local name=$(echo "$line" | cut -d'|' -f1)
     local official_url=$(echo "$line" | cut -d'|' -f2 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
@@ -661,17 +661,17 @@ download_all() {
   log INFO "Starting download all components (mirror: $mirror_mode)..."
   
   while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" =~ ^#.*$ ]] && continue
-    [[ -z "$line" ]] && continue
-    [[ ! "$line" =~ \| ]] && continue
+    [[ "$line" =~ ^#.*$ ]] && continue || true
+    [[ -z "$line" ]] && continue || true
+    [[ ! "$line" =~ \| ]] && continue || true
     
     local name=$(echo "$line" | cut -d'|' -f1)
     
-    ((++total))
+    ((++total)) || true
     if download_component "$name" "$mirror_mode"; then
-      ((++success))
+      ((++success)) || true
     else
-      ((++failed))
+      ((++failed)) || true
     fi
     echo ""
   done < "${SOURCES_FILE}"
@@ -774,8 +774,8 @@ check_existing() {
       local size=$(stat -c%s "$f" 2>/dev/null || echo "0")
       local size_mb=$((size / 1024 / 1024))
       printf "%-40s %6d MB\n" "$filename" "$size_mb"
-      ((count++))
-      ((total_size += size))
+      ((count++)) || true
+      ((total_size += size)) || true
     fi
   done
   

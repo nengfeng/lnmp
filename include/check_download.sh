@@ -179,7 +179,7 @@ verify_md5_with_retry() {
   while [ "$actual_md5" != "$expected_md5" ]; do
     echo "${CYELLOW}MD5 mismatch, retrying download... (${try_count}/6)${CEND}"
     wget -c "$download_url" -O "$file_name" 2>/dev/null
-    ((try_count++))
+    ((try_count++)) || true
     actual_md5=$(compute_md5 "$file_name")
     [[ "$actual_md5" == "$expected_md5" ]] || [ "$try_count" -ge 6 ] && break
   done
