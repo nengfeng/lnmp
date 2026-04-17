@@ -99,20 +99,19 @@ while [ $# -gt 0 ]; do
       ;;
     --php_extensions)
       php_extensions=$2; shift 2
-      [ -n "$(echo ${php_extensions} | grep -w ioncube)" ] && pecl_ioncube=1
-      [ -n "$(echo ${php_extensions} | grep -w imagick)" ] && pecl_imagick=1
-  
-      [ -n "$(echo ${php_extensions} | grep -w fileinfo)" ] && pecl_fileinfo=1
-      [ -n "$(echo ${php_extensions} | grep -w imap)" ] && pecl_imap=1
-      [ -n "$(echo ${php_extensions} | grep -w ldap)" ] && pecl_ldap=1
-      [ -n "$(echo ${php_extensions} | grep -w phalcon)" ] && pecl_phalcon=1
-      [ -n "$(echo ${php_extensions} | grep -w yaf)" ] && pecl_yaf=1
-      [ -n "$(echo ${php_extensions} | grep -w redis)" ] && pecl_redis=1
-      [ -n "$(echo ${php_extensions} | grep -w memcached)" ] && pecl_memcached=1
-      [ -n "$(echo ${php_extensions} | grep -w memcache)" ] && pecl_memcache=1
-      [ -n "$(echo ${php_extensions} | grep -w mongodb)" ] && pecl_mongodb=1
-      [ -n "$(echo ${php_extensions} | grep -w swoole)" ] && pecl_swoole=1
-      [ -n "$(echo ${php_extensions} | grep -w xdebug)" ] && pecl_xdebug=1
+      echo "${php_extensions}" | grep -qw "ioncube" && pecl_ioncube=1
+      echo "${php_extensions}" | grep -qw "imagick" && pecl_imagick=1
+      echo "${php_extensions}" | grep -qw "fileinfo" && pecl_fileinfo=1
+      echo "${php_extensions}" | grep -qw "imap" && pecl_imap=1
+      echo "${php_extensions}" | grep -qw "ldap" && pecl_ldap=1
+      echo "${php_extensions}" | grep -qw "phalcon" && pecl_phalcon=1
+      echo "${php_extensions}" | grep -qw "yaf" && pecl_yaf=1
+      echo "${php_extensions}" | grep -qw "redis" && pecl_redis=1
+      echo "${php_extensions}" | grep -qw "memcached" && pecl_memcached=1
+      echo "${php_extensions}" | grep -qw "memcache" && pecl_memcache=1
+      echo "${php_extensions}" | grep -qw "mongodb" && pecl_mongodb=1
+      echo "${php_extensions}" | grep -qw "swoole" && pecl_swoole=1
+      echo "${php_extensions}" | grep -qw "xdebug" && pecl_xdebug=1
       ;;
     --nodejs)
       nodejs_flag=y; shift 1

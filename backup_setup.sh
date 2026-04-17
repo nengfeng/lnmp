@@ -40,7 +40,7 @@ while :; do echo
   array_all=(1 2 3 4 5 6 7 8)
   for v in ${array_desc[@]}
   do
-    [ -z "$(echo ${array_all[@]} | grep -w ${v})" ] && desc_flag=1
+    echo "${array_all[@]}" | grep -qw "${v}" || desc_flag=1
   done
   if [[ "${desc_bk}" != 1 ]]; then
     unset desc_flag
@@ -52,14 +52,14 @@ while :; do echo
   fi
 done
 
-[ -n "$(echo ${desc_bk} | grep -w 1)" ] && sed -i 's@^backup_destination=.*@backup_destination=local@' ./options.conf
-[ -n "$(echo ${desc_bk} | grep -w 2)" ] && sed -i 's@^backup_destination=.*@&,remote@' ./options.conf
-[ -n "$(echo ${desc_bk} | grep -w 3)" ] && sed -i 's@^backup_destination=.*@&,oss@' ./options.conf
-[ -n "$(echo ${desc_bk} | grep -w 4)" ] && sed -i 's@^backup_destination=.*@&,cos@' ./options.conf
-[ -n "$(echo ${desc_bk} | grep -w 5)" ] && sed -i 's@^backup_destination=.*@&,upyun@' ./options.conf
-[ -n "$(echo ${desc_bk} | grep -w 6)" ] && sed -i 's@^backup_destination=.*@&,qiniu@' ./options.conf
-[ -n "$(echo ${desc_bk} | grep -w 7)" ] && sed -i 's@^backup_destination=.*@&,s3@' ./options.conf
-[ -n "$(echo ${desc_bk} | grep -w 8)" ] && sed -i 's@^backup_destination=.*@&,dropbox@' ./options.conf
+echo "${desc_bk}" | grep -qw "1" && sed -i 's@^backup_destination=.*@backup_destination=local@' ./options.conf
+echo "${desc_bk}" | grep -qw "2" && sed -i 's@^backup_destination=.*@&,remote@' ./options.conf
+echo "${desc_bk}" | grep -qw "3" && sed -i 's@^backup_destination=.*@&,oss@' ./options.conf
+echo "${desc_bk}" | grep -qw "4" && sed -i 's@^backup_destination=.*@&,cos@' ./options.conf
+echo "${desc_bk}" | grep -qw "5" && sed -i 's@^backup_destination=.*@&,upyun@' ./options.conf
+echo "${desc_bk}" | grep -qw "6" && sed -i 's@^backup_destination=.*@&,qiniu@' ./options.conf
+echo "${desc_bk}" | grep -qw "7" && sed -i 's@^backup_destination=.*@&,s3@' ./options.conf
+echo "${desc_bk}" | grep -qw "8" && sed -i 's@^backup_destination=.*@&,dropbox@' ./options.conf
 sed -i 's@^backup_destination=,@backup_destination=@' ./options.conf
 
 while :; do echo
@@ -80,12 +80,12 @@ done
 [[ "${content_bk}" == 2 ]] && sed -i 's@^backup_content=.*@backup_content=web@' ./options.conf
 [[ "${content_bk}" == 3 ]] && sed -i 's@^backup_content=.*@backup_content=db,web@' ./options.conf
 
-if [ -n "$(echo ${desc_bk} | grep -Ew '1|2')" ]; then
+if echo "${desc_bk}" | grep -Eqw '1|2'; then
   while :; do echo
     echo "Please enter the directory for save the backup file: "
     read -e -p "(Default directory: ${backup_dir}): " new_backup_dir
     new_backup_dir=${new_backup_dir:-${backup_dir}}
-    if [ -z "$(echo ${new_backup_dir}| grep '^/')" ]; then
+    if ! echo "${new_backup_dir}" | grep -q '^/'; then
       echo "${CWARNING}input error! ${CEND}"
     else
       break
@@ -98,7 +98,7 @@ while :; do echo
   echo "Please enter a valid backup number of days: "
   read -e -p "(Default days: 5): " expired_days
   expired_days=${expired_days:-5}
-  [ -n "$(echo ${expired_days} | sed -n "/^[0-9]\+$/p")" ] && break || echo "${CWARNING}input error! Please only enter numbers! ${CEND}"
+  [[ "${expired_days}" =~ ^[0-9]+$ ]] && break || echo "${CWARNING}input error! Please only enter numbers! ${CEND}"
 done
 sed -i "s@^expired_days=.*@expired_days=${expired_days}@" ./options.conf
 
@@ -141,7 +141,7 @@ echo "You have to backup the content:"
 [ "${content_bk}" != '2' ] && echo "Database: ${CMSG}${db_name}${CEND}"
 [ "${content_bk}" != '1' ] && echo "Website: ${CMSG}${website_name}${CEND}"
 
-if [ -n "$(echo ${desc_bk} | grep -w 2)" ]; then
+if echo "${desc_bk}" | grep -qw "2"; then
   > tools/iplist.txt
   while :; do echo
     read -e -p "Please enter the remote host address: " remote_address
@@ -257,7 +257,7 @@ if echo "${desc_bk}" | grep -qw "3"; then
   done
 fi
 
-if [ -n "$(echo ${desc_bk} | grep -w 4)" ]; then
+if echo "${desc_bk}" | grep -qw "4"; then
   if [ ! -e "/usr/local/bin/coscli" ]; then
     wget -qc https://cosbrowser.cloud.tencent.com/software/coscli/coscli-linux -O /usr/local/bin/coscli
     chmod +x /usr/local/bin/coscli
@@ -345,7 +345,7 @@ EOF
   done
 fi
 
-if [ -n "$(echo ${desc_bk} | grep -w 5)" ]; then
+if echo "${desc_bk}" | grep -qw "5"; then
   if [ ! -e "/usr/local/bin/upx" ]; then
     UPX_TMP_DIR=$(mktemp -d /tmp/lnmp_upx.XXXXXX)
     trap "rm -rf $UPX_TMP_DIR" EXIT
@@ -382,7 +382,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 5)" ]; then
   done
 fi
 
-if [ -n "$(echo ${desc_bk} | grep -w 6)" ]; then
+if echo "${desc_bk}" | grep -qw "6"; then
   if [ ! -e "/usr/local/bin/qshell" ]; then
     QSHELL_TMP_DIR=$(mktemp -d /tmp/lnmp_qshell.XXXXXX)
     trap "rm -rf $QSHELL_TMP_DIR" EXIT
@@ -438,7 +438,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 6)" ]; then
   done
 fi
 
-if [ -n "$(echo ${desc_bk} | grep -w 7)" ]; then
+if echo "${desc_bk}" | grep -qw "7"; then
   if [ ! -e "/usr/local/bin/aws" ] && [ ! -e "/usr/bin/aws" ]; then
     AWS_TMP_DIR=$(mktemp -d /tmp/lnmp_aws.XXXXXX)
     trap "rm -rf $AWS_TMP_DIR" EXIT
@@ -545,7 +545,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 7)" ]; then
   done
 fi
 
-if [ -n "$(echo ${desc_bk} | grep -w 8)" ]; then
+if echo "${desc_bk}" | grep -qw "8"; then
   if [ ! -e "/usr/local/bin/dbxcli" ]; then
     if [[ "${1}" == y ]]; then
       wget -qc https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-arm -O /usr/local/bin/dbxcli

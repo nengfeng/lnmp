@@ -59,7 +59,7 @@ done
 Input_dbrootpwd() {
   while :; do echo
     read -e -p "Please input the root password of database: " New_dbrootpwd
-    [ -n "$(echo ${New_dbrootpwd} | grep '[+|&]')" ] && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
+    echo "${New_dbrootpwd}" | grep -q '[+|&]' && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
     # Security: Block characters that could cause SQL injection
     # Single quotes and backslashes are particularly dangerous
     if [[ "${New_dbrootpwd}" =~ [\'\\] ]]; then

@@ -10,7 +10,7 @@ installDepsDebian() {
     for Package in ${pkgList};do
       apt-get -y purge ${Package}
     done
-    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P
+    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P 2>/dev/null || true
   fi
 
   echo "${CMSG}Installing dependencies packages...${CEND}"
@@ -57,7 +57,7 @@ installDepsUbuntu() {
     for Package in ${pkgList};do
       apt-get -y purge ${Package}
     done
-    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P
+    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P 2>/dev/null || true
   fi
 
   echo "${CMSG}Installing dependencies packages...${CEND}"

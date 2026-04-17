@@ -28,7 +28,7 @@ get_items() {
 # Check if local backup is also configured
 # Usage: has_local_backup
 has_local_backup() {
-  [ -n "$(echo "${backup_destination}" | grep -ow 'local')" ]
+  echo "${backup_destination}" | grep -qw 'local'
 }
 
 # Get cloud storage command based on destination type

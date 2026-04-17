@@ -6,7 +6,7 @@ Nginx_lua_waf() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${nginx_install_dir}/sbin/nginx" ] && echo "${CWARNING}Nginx is not installed on your system! ${CEND}" && exit 1
   if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* | xargs rm -rf
+    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* -exec rm -rf {} + 2>/dev/null || true
     src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
     tar xzf luajit2-${luajit2_ver}.tar.gz
     pushd luajit2-${luajit2_ver}
@@ -83,7 +83,7 @@ Tengine_lua_waf() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${tengine_install_dir}/sbin/nginx" ] && echo "${CWARNING}Tengine is not installed on your system! ${CEND}" && exit 1
   if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* | xargs rm -rf
+    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* -exec rm -rf {} + 2>/dev/null || true
     src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
     tar xzf luajit2-${luajit2_ver}.tar.gz
     pushd luajit2-${luajit2_ver}

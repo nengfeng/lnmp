@@ -70,39 +70,38 @@ ARG_NUM=$#
 # Usage: parse_php_extensions "imagick,redis,swoole"
 parse_php_extensions() {
   local exts=$1
-  [ -n "$(echo ${exts} | grep -w ioncube)" ] && pecl_ioncube=1
-  [ -n "$(echo ${exts} | grep -w imagick)" ] && pecl_imagick=1
-
-  [ -n "$(echo ${exts} | grep -w fileinfo)" ] && pecl_fileinfo=1
-  [ -n "$(echo ${exts} | grep -w imap)" ] && pecl_imap=1
-  [ -n "$(echo ${exts} | grep -w ldap)" ] && pecl_ldap=1
-  [ -n "$(echo ${exts} | grep -w phalcon)" ] && pecl_phalcon=1
-  [ -n "$(echo ${exts} | grep -w yaf)" ] && pecl_yaf=1
-  [ -n "$(echo ${exts} | grep -w redis)" ] && pecl_redis=1
-  [ -n "$(echo ${exts} | grep -w memcached)" ] && pecl_memcached=1
-  [ -n "$(echo ${exts} | grep -w memcache)" ] && pecl_memcache=1
-  [ -n "$(echo ${exts} | grep -w mongodb)" ] && pecl_mongodb=1
-  [ -n "$(echo ${exts} | grep -w swoole)" ] && pecl_swoole=1
-  [ -n "$(echo ${exts} | grep -w xdebug)" ] && pecl_xdebug=1
+  echo "${exts}" | grep -qw "ioncube" && pecl_ioncube=1
+  echo "${exts}" | grep -qw "imagick" && pecl_imagick=1
+  echo "${exts}" | grep -qw "fileinfo" && pecl_fileinfo=1
+  echo "${exts}" | grep -qw "imap" && pecl_imap=1
+  echo "${exts}" | grep -qw "ldap" && pecl_ldap=1
+  echo "${exts}" | grep -qw "phalcon" && pecl_phalcon=1
+  echo "${exts}" | grep -qw "yaf" && pecl_yaf=1
+  echo "${exts}" | grep -qw "redis" && pecl_redis=1
+  echo "${exts}" | grep -qw "memcached" && pecl_memcached=1
+  echo "${exts}" | grep -qw "memcache" && pecl_memcache=1
+  echo "${exts}" | grep -qw "mongodb" && pecl_mongodb=1
+  echo "${exts}" | grep -qw "swoole" && pecl_swoole=1
+  echo "${exts}" | grep -qw "xdebug" && pecl_xdebug=1
 }
 
 # Set PHP extension flags from number list
 # Usage: set_php_ext_from_numbers "2 8 9"
 set_php_ext_from_numbers() {
   local nums=$1
-  [ -n "$(echo ${nums} | grep -w 1)" ]  && pecl_ioncube=1
-  [ -n "$(echo ${nums} | grep -w 2)" ]  && pecl_imagick=1
-  [ -n "$(echo ${nums} | grep -w 3)" ]  && pecl_fileinfo=1
-  [ -n "$(echo ${nums} | grep -w 4)" ]  && pecl_imap=1
-  [ -n "$(echo ${nums} | grep -w 5)" ]  && pecl_ldap=1
-  [ -n "$(echo ${nums} | grep -w 6)" ]  && pecl_phalcon=1
-  [ -n "$(echo ${nums} | grep -w 7)" ]  && pecl_yaf=1
-  [ -n "$(echo ${nums} | grep -w 8)" ]  && pecl_redis=1
-  [ -n "$(echo ${nums} | grep -w 9)" ]  && pecl_memcached=1
-  [ -n "$(echo ${nums} | grep -w 10)" ] && pecl_memcache=1
-  [ -n "$(echo ${nums} | grep -w 11)" ] && pecl_mongodb=1
-  [ -n "$(echo ${nums} | grep -w 12)" ] && pecl_swoole=1
-  [ -n "$(echo ${nums} | grep -w 13)" ] && pecl_xdebug=1
+  echo "${nums}" | grep -qw "1" && pecl_ioncube=1
+  echo "${nums}" | grep -qw "2" && pecl_imagick=1
+  echo "${nums}" | grep -qw "3" && pecl_fileinfo=1
+  echo "${nums}" | grep -qw "4" && pecl_imap=1
+  echo "${nums}" | grep -qw "5" && pecl_ldap=1
+  echo "${nums}" | grep -qw "6" && pecl_phalcon=1
+  echo "${nums}" | grep -qw "7" && pecl_yaf=1
+  echo "${nums}" | grep -qw "8" && pecl_redis=1
+  echo "${nums}" | grep -qw "9" && pecl_memcached=1
+  echo "${nums}" | grep -qw "10" && pecl_memcache=1
+  echo "${nums}" | grep -qw "11" && pecl_mongodb=1
+  echo "${nums}" | grep -qw "12" && pecl_swoole=1
+  echo "${nums}" | grep -qw "13" && pecl_xdebug=1
 }
 
 # Parse command-line arguments (pure bash, no eval)

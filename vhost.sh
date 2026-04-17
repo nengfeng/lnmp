@@ -536,7 +536,7 @@ Nginx_anti_hotlinking() {
     fi
   done
 
-  if [ -n "$(echo ${domain} | grep '.*\..*\..*')" ]; then
+  if echo "${domain}" | grep -q '.*\..*\..*'; then
     domain_allow="*.${domain#*.} ${domain}"
   else
     domain_allow="*.${domain} ${domain}"
