@@ -230,8 +230,8 @@ If you enter '.', the field will be left blank.
         fi
         ${web_install_dir}/sbin/nginx -s reload
       fi
-      auth_file="$(< /dev/urandom tr -dc A-Za-z0-9 | head -c8)".html
-      auth_str=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16); echo "${auth_str}" > "${vhostdir}/${auth_file}"
+      auth_file="$(head -c8 /dev/urandom | tr -dc A-Za-z0-9)".html
+      auth_str=$(head -c16 /dev/urandom | tr -dc A-Za-z0-9); echo "${auth_str}" > "${vhostdir}/${auth_file}"
       for D in ${domain} ${moredomainame}
       do
         curl_str=$(curl --connect-timeout 30 -4 -s $D/${auth_file} 2>&1)

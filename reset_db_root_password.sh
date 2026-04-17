@@ -27,7 +27,7 @@ Show_Help() {
   "
 }
 
-New_dbrootpwd="$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16)"
+New_dbrootpwd="$(head -c16 /dev/urandom | tr -dc A-Za-z0-9)" || New_dbrootpwd="$(date +%s%N | sha256sum | head -c16)"
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help)

@@ -29,8 +29,8 @@ pushd "${current_dir}" > /dev/null
 . ./include/get_char.sh
 . ./include/ext-common.sh
 
-dbrootpwd=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16)
-dbpostgrespwd=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16)
+dbrootpwd=$(head -c16 /dev/urandom | tr -dc A-Za-z0-9) || dbrootpwd=$(date +%s%N | sha256sum | head -c16)
+dbpostgrespwd=$(head -c16 /dev/urandom | tr -dc A-Za-z0-9) || dbpostgrespwd=$(date +%s%N | sha256sum | head -c16)
 dbinstallmethod=1
 
 version() {
