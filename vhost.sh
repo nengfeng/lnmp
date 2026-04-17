@@ -328,7 +328,7 @@ Print_SSL() {
 Input_Add_proxy() {
   while :; do echo
     read -e -p "Please input the correct proxy_pass: " Proxy_Pass
-    if [ -z "$(echo "$Proxy_Pass" | grep -E '^http://|https://')" ]; then
+    if ! echo "$Proxy_Pass" | grep -qE '^http://|https://'; then
       echo "${CFAILURE}input error! Please only input example https://192.168.1.1:8080${CEND}"
     else
       echo "proxy_pass=${Proxy_Pass}"
@@ -419,7 +419,7 @@ What Are You Doing?
 
   while :; do echo
     read -e -p "Please input domain(example: www.example.com): " domain
-    if [ -z "$(echo ${domain} | grep '.*\..*')" ]; then
+    if ! echo "${domain}" | grep -q '.*\..*'; then
       echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
     else
       break
@@ -475,7 +475,7 @@ What Are You Doing?
   if [[ "${moredomainame_flag}" == y ]]; then
     while :; do echo
       read -e -p "Type domainname or IP(example: example.com other.example.com): " moredomain
-      if [ -z "$(echo ${moredomain} | grep '.*\..*')" ]; then
+      if ! echo "${moredomain}" | grep -q '.*\..*'; then
         echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
       else
         [[ "${moredomain}" == "${domain}" ]] && echo "${CWARNING}Domain name already exists! ${CEND}" && continue
@@ -809,7 +809,7 @@ Del_NGX_Vhost() {
       echo ${CMSG}${Domain_List}${CEND}
         while :; do echo
           read -e -p "Please input a domain you want to delete: " domain
-          if [ -z "$(echo ${domain} | grep '.*\..*')" ]; then
+          if ! echo "${domain}" | grep -q '.*\..*'; then
             echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
           else
             if [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ]; then

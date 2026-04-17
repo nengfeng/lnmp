@@ -112,7 +112,7 @@ if [ "${content_bk}" != '2' ]; then
     D_tmp=0
     for D in $(echo ${db_name} | tr ',' ' ')
     do
-      [ -z "$(echo $databases | grep -w $D)" ] && { echo "${CWARNING}$D was not exist! ${CEND}" ; D_tmp=1; }
+      echo "$databases" | grep -qw "$D" || { echo "${CWARNING}$D was not exist! ${CEND}" ; D_tmp=1; }
     done
     [ "$D_tmp" != '1' ] && break
   done
