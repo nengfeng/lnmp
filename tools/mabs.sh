@@ -12,8 +12,7 @@ ignore_init() {
   # ignore password
   array_ignore_pwd_length=0
   if [ -f ./ignore_pwd ]; then
-    while read IGNORE_PWD
-    do
+    while IFS= read -r IGNORE_PWD || [[ -n "$IGNORE_PWD" ]]; do
       array_ignore_pwd[$array_ignore_pwd_length]=$IGNORE_PWD
       let array_ignore_pwd_length=$array_ignore_pwd_length+1
     done < ./ignore_pwd
@@ -22,8 +21,7 @@ ignore_init() {
   # ignore ip address
   array_ignore_ip_length=0
   if [ -f ./ignore_ip ]; then
-    while read IGNORE_IP
-    do
+    while IFS= read -r IGNORE_IP || [[ -n "$IGNORE_IP" ]]; do
       array_ignore_ip[$array_ignore_ip_length]=$IGNORE_IP
       let array_ignore_ip_length=$array_ignore_ip_length+1
     done < ./ignore_ip
@@ -112,7 +110,7 @@ do
 
   IPSEQ=0
 
-  while read IP PORT USER PASSWD PASSWD_2ND PASSWD_3RD PASSWD_4TH OTHERS
+  while IFS= read -r IP PORT USER PASSWD PASSWD_2ND PASSWD_3RD PASSWD_4TH OTHERS || [[ -n "$IP" ]]; do
   # while read Line
   do
     #[ -z "$(echo $IP | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|CNS')" ] && continue

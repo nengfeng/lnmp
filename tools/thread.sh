@@ -13,8 +13,7 @@ SSHTIMEOUT=$6
 SCPTIMEOUT=$7
 BWLIMIT=$8
 
-while read eachline
-do
+while IFS= read -r eachline || [[ -n "$eachline" ]]; do
   echo "$eachline" | grep -qE '^com|^file' || continue
 
   myKEYWORD=$(echo $eachline | awk -F"$myIFS" '{ print $1 }')

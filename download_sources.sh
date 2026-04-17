@@ -142,7 +142,7 @@ load_versions() {
     exit 1
   fi
   
-  while IFS='=' read -r key value; do
+  while IFS='=' read -r key value || [[ -n "$key" ]]; do
     # 跳过注释和空行
     [[ "$key" =~ ^#.*$ ]] && continue
     [[ -z "$key" ]] && continue
@@ -482,7 +482,7 @@ download_component() {
   local mirror_mode=$2
   local found=0
   
-  while IFS= read -r line; do
+  while IFS= read -r line || [[ -n "$line" ]]; do
     # 跳过注释和空行
     [[ "$line" =~ ^#.*$ ]] && continue
     [[ -z "$line" ]] && continue
@@ -617,7 +617,7 @@ list_components() {
   printf "%-20s %-12s %-15s %s\n" "Component" "Version" "Mirrors" "Checksum"
   printf "%-20s %-12s %-15s %s\n" "---------" "-------" "-------" "--------"
   
-  while IFS= read -r line; do
+  while IFS= read -r line || [[ -n "$line" ]]; do
     [[ "$line" =~ ^#.*$ ]] && continue
     [[ -z "$line" ]] && continue
     [[ ! "$line" =~ \| ]] && continue
@@ -660,7 +660,7 @@ download_all() {
   
   log INFO "Starting download all components (mirror: $mirror_mode)..."
   
-  while IFS= read -r line; do
+  while IFS= read -r line || [[ -n "$line" ]]; do
     [[ "$line" =~ ^#.*$ ]] && continue
     [[ -z "$line" ]] && continue
     [[ ! "$line" =~ \| ]] && continue
