@@ -117,19 +117,40 @@ parse_args() {
         ;;
       --nginx_option)
         nginx_option=$2; shift 2
-        [[ ! ${nginx_option} =~ ^[1-3]$ ]] && { echo "${CWARNING}nginx_option input error! Please only input number 1~3${CEND}"; exit 1; }
-        [ -e "${nginx_install_dir}/sbin/nginx" ] && { echo "${CWARNING}Nginx already installed! ${CEND}"; unset nginx_option; }
-        [ -e "${tengine_install_dir}/sbin/nginx" ] && { echo "${CWARNING}Tengine already installed! ${CEND}"; unset nginx_option; }
-        [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && { echo "${CWARNING}OpenResty already installed! ${CEND}"; unset nginx_option; }
+        if [[ ! ${nginx_option} =~ ^[1-3]$ ]]; then
+          echo "${CWARNING}nginx_option input error! Please only input number 1~3${CEND}"
+          exit 1
+        fi
+        if [ -e "${nginx_install_dir}/sbin/nginx" ]; then
+          echo "${CWARNING}Nginx already installed! ${CEND}"
+          unset nginx_option || true
+        fi
+        if [ -e "${tengine_install_dir}/sbin/nginx" ]; then
+          echo "${CWARNING}Tengine already installed! ${CEND}"
+          unset nginx_option || true
+        fi
+        if [ -e "${openresty_install_dir}/nginx/sbin/nginx" ]; then
+          echo "${CWARNING}OpenResty already installed! ${CEND}"
+          unset nginx_option || true
+        fi
         ;;
       --php_option)
         php_option=$2; shift 2
-        [[ ! ${php_option} =~ ^[1-3]$ ]] && { echo "${CWARNING}php_option input error! Please only input number 1~3${CEND}"; exit 1; }
-        [ -e "${php_install_dir}/bin/phpize" ] && { echo "${CWARNING}PHP already installed! ${CEND}"; unset php_option; }
+        if [[ ! ${php_option} =~ ^[1-3]$ ]]; then
+          echo "${CWARNING}php_option input error! Please only input number 1~3${CEND}"
+          exit 1
+        fi
+        if [ -e "${php_install_dir}/bin/phpize" ]; then
+          echo "${CWARNING}PHP already installed! ${CEND}"
+          unset php_option || true
+        fi
         ;;
       --mphp_ver)
         mphp_ver=$2; mphp_flag=y; shift 2
-        [[ ! "${mphp_ver}" =~ ^8[3-5]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 83~85${CEND}"; exit 1; }
+        if [[ ! "${mphp_ver}" =~ ^8[3-5]$ ]]; then
+          echo "${CWARNING}mphp_ver input error! Please only input number 83~85${CEND}"
+          exit 1
+        fi
         ;;
       --mphp_addons)
         mphp_addons_flag=y; shift 1
@@ -143,15 +164,24 @@ parse_args() {
         ;;
       --nodejs)
         nodejs_flag=y; shift 1
-        [ -e "${nodejs_install_dir}/bin/node" ] && { echo "${CWARNING}Nodejs already installed! ${CEND}"; unset nodejs_flag; }
+        if [ -e "${nodejs_install_dir}/bin/node" ]; then
+          echo "${CWARNING}Nodejs already installed! ${CEND}"
+          unset nodejs_flag || true
+        fi
         ;;
       --db_option)
         db_option=$2; shift 2
         if [[ "${db_option}" =~ ^[1-6]$ ]]; then
           if [[ "${db_option}" == 6 ]]; then
-            [ -e "${pgsql_install_dir}/bin/psql" ] && { echo "${CWARNING}PostgreSQL already installed! ${CEND}"; unset db_option; }
+            if [ -e "${pgsql_install_dir}/bin/psql" ]; then
+              echo "${CWARNING}PostgreSQL already installed! ${CEND}"
+              unset db_option || true
+            fi
           else
-            [ -d "${db_install_dir}/support-files" ] && { echo "${CWARNING}MySQL already installed! ${CEND}"; unset db_option; }
+            if [ -d "${db_install_dir}/support-files" ]; then
+              echo "${CWARNING}MySQL already installed! ${CEND}"
+              unset db_option || true
+            fi
           fi
         else
           echo "${CWARNING}db_option input error! Please only input number 1~6${CEND}"
@@ -163,23 +193,38 @@ parse_args() {
         ;;
       --dbinstallmethod)
         dbinstallmethod=$2; shift 2
-        [[ ! ${dbinstallmethod} =~ ^[1-2]$ ]] && { echo "${CWARNING}dbinstallmethod input error! Please only input number 1~2${CEND}"; exit 1; }
+        if [[ ! ${dbinstallmethod} =~ ^[1-2]$ ]]; then
+          echo "${CWARNING}dbinstallmethod input error! Please only input number 1~2${CEND}"
+          exit 1
+        fi
         ;;
       --pureftpd)
         pureftpd_flag=y; shift 1
-        [ -e "${pureftpd_install_dir}/sbin/pure-ftpwho" ] && { echo "${CWARNING}Pure-FTPd already installed! ${CEND}"; unset pureftpd_flag; }
+        if [ -e "${pureftpd_install_dir}/sbin/pure-ftpwho" ]; then
+          echo "${CWARNING}Pure-FTPd already installed! ${CEND}"
+          unset pureftpd_flag || true
+        fi
         ;;
       --redis)
         redis_flag=y; shift 1
-        [ -e "${redis_install_dir}/bin/redis-server" ] && { echo "${CWARNING}redis-server already installed! ${CEND}"; unset redis_flag; }
+        if [ -e "${redis_install_dir}/bin/redis-server" ]; then
+          echo "${CWARNING}redis-server already installed! ${CEND}"
+          unset redis_flag || true
+        fi
         ;;
       --memcached)
         memcached_flag=y; shift 1
-        [ -e "${memcached_install_dir}/bin/memcached" ] && { echo "${CWARNING}memcached-server already installed! ${CEND}"; unset memcached_flag; }
+        if [ -e "${memcached_install_dir}/bin/memcached" ]; then
+          echo "${CWARNING}memcached-server already installed! ${CEND}"
+          unset memcached_flag || true
+        fi
         ;;
       --phpmyadmin)
         phpmyadmin_flag=y; shift 1
-        [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && { echo "${CWARNING}phpMyAdmin already installed! ${CEND}"; unset phpmyadmin_flag; }
+        if [ -d "${wwwroot_dir}/default/phpMyAdmin" ]; then
+          echo "${CWARNING}phpMyAdmin already installed! ${CEND}"
+          unset phpmyadmin_flag || true
+        fi
         ;;
       --ssh_port)
         ssh_port=$2; shift 2
@@ -208,6 +253,7 @@ parse_args() {
 parse_args "$@"
 
 # Check md5sum (only for tarball installations)
+tool_file=""
 [ -e "${current_dir}.tar.gz" ] && tool_file=${current_dir}.tar.gz
 [ -e "${current_dir}-full.tar.gz" ] && tool_file=${current_dir}-full.tar.gz
 if [[ ${ARG_NUM} == 0 ]] && [ ! -e "${HOME}/.lnmp" ] && [ -n "${tool_file}" ]; then

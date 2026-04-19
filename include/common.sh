@@ -229,16 +229,19 @@ create_run_user() {
   local user=${1:-${run_user:-www}}
   local group=${2:-${run_group:-www}}
   
-  id -g ${group} >/dev/null 2>&1
-  [ $? -ne 0 ] && groupadd ${group}
-  id -u ${user} >/dev/null 2>&1
-  [ $? -ne 0 ] && useradd -g ${group} -M -s /sbin/nologin ${user}
+  if ! id -g ${group} >/dev/null 2>&1; then
+    groupadd ${group}
+  fi
+  if ! id -u ${user} >/dev/null 2>&1; then
+    useradd -g ${group} -M -s /sbin/nologin ${user}
+  fi
 }
 
 # Create mysql user if not exists
 create_mysql_user() {
-  id -u mysql >/dev/null 2>&1
-  [ $? -ne 0 ] && useradd -M -s /sbin/nologin mysql
+  if ! id -u mysql >/dev/null 2>&1; then
+    useradd -M -s /sbin/nologin mysql
+  fi
 }
 
 # Setup logrotate for nginx
@@ -693,27 +696,27 @@ setup_web_directory_permissions() {
   if [ -d "${wwwroot_dir}" ]; then
     # Web root: 750 (owner: rwx, group: r-x, others: none)
     # This prevents other users from accessing web files
-    chmod 750 ${wwwroot_dir}
-    chown ${run_user}:${run_group} ${wwwroot_dir}
+    chmod 750 ${wwwroot_dir} || true
+    chown ${run_user}:${run_group} ${wwwroot_dir} || true
     
     # Ensure subdirectories have appropriate permissions
-    find ${wwwroot_dir} -type d -exec chmod 750 {} \; 2>/dev/null
-    find ${wwwroot_dir} -type f -exec chmod 640 {} \; 2>/dev/null
+    find ${wwwroot_dir} -type d -exec chmod 750 {} \; 2>/dev/null || true
+    find ${wwwroot_dir} -type f -exec chmod 640 {} \; 2>/dev/null || true
     
     # Special case for default directory (may need 755 for nginx access)
     if [ -d "${wwwroot_dir}/default" ]; then
-      chmod 755 ${wwwroot_dir}/default
-      chown ${run_user}:${run_group} ${wwwroot_dir}/default
+      chmod 755 ${wwwroot_dir}/default || true
+      chown ${run_user}:${run_group} ${wwwroot_dir}/default || true
     fi
   fi
   
   if [ -d "${wwwlogs_dir}" ]; then
     # Log directory: 755 (needs execute permission for nginx/php-fpm)
-    chmod 755 ${wwwlogs_dir}
-    chown ${run_user}:${run_group} ${wwwlogs_dir}
+    chmod 755 ${wwwlogs_dir} || true
+    chown ${run_user}:${run_group} ${wwwlogs_dir} || true
     
     # Ensure log files have appropriate permissions
-    find ${wwwlogs_dir} -type f -exec chmod 644 {} \; 2>/dev/null
+    find ${wwwlogs_dir} -type f -exec chmod 644 {} \; 2>/dev/null || true
   fi
   
   echo "${CMSG}Enhanced web directory permissions configured${CEND}"
