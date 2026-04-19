@@ -90,11 +90,11 @@ confirm() {
   fi
   
   while :; do
-    read -e -p "${prompt} [y/n] (default: ${default}): " value
+    read -e -p "${prompt} [y/n] (default: ${default}): " value || value="${default}"
     value=${value:-${default}}
     case "${value}" in
       y|Y|n|N) break ;;
-      *) echo "${CWARNING}input error! Please only input 'y' or 'n'${CEND}" ;;
+      *) echo "${CWARNING}input error! Please only input 'y' or 'n${CEND}" ;;
     esac
   done
   # Security: Use declare -g instead of eval for indirect variable assignment
@@ -118,7 +118,7 @@ select_number() {
   fi
   
   while :; do
-    read -e -p "${prompt} [${min}-${max}] (default: ${default}): " value
+    read -e -p "${prompt} [${min}-${max}] (default: ${default}): " value || value="${default}"
     value=${value:-${default}}
     if [[ "${value}" =~ ^[0-9]+$ ]] && [ "${value}" -ge "${min}" ] && [ "${value}" -le "${max}" ]; then
       break
@@ -218,8 +218,8 @@ check_installed() {
 # Usage: add_to_path /usr/local/nginx/sbin
 add_to_path() {
   local install_dir=$1
-  [ -z "$(grep ^'export PATH=' /etc/profile)" ] && echo "export PATH=${install_dir}:\$PATH" >> /etc/profile
-  [[ -n "$(grep ^'export PATH=' /etc/profile)" && -z "$(grep ${install_dir} /etc/profile)" ]] && sed -i "s@^export PATH=\(.*\)@export PATH=${install_dir}:\1@" /etc/profile
+  [ -z "$(grep ^'export PATH=' /etc/profile)" ] && echo "export PATH=${install_dir}:\$PATH" >> /etc/profile || true
+  [[ -n "$(grep ^'export PATH=' /etc/profile)" && -z "$(grep ${install_dir} /etc/profile)" ]] && sed -i "s@^export PATH=\(.*\)@export PATH=${install_dir}:\1@" /etc/profile || true
   . /etc/profile
 }
 
@@ -329,8 +329,10 @@ download_verify() {
     else
       wget -c ${url}
     fi
-    let "try_count++"
-    [[ "$(md5sum ${filename} 2>/dev/null | awk '{print $1}')" == "${expected_md5}" || "${try_count}" == 6 ]] && break || continue
+    try_count=$((try_count + 1))
+    if [[ "$(md5sum ${filename} 2>/dev/null | awk '{print $1}')" == "${expected_md5}" || "${try_count}" == 6 ]]; then
+      break
+    fi
   done
   
   if [[ "${try_count}" == 6 ]]; then
@@ -363,7 +365,7 @@ get_cpu_count() {
 # Check if directory exists and create if not
 # Usage: ensure_dir /path/to/directory
 ensure_dir() {
-  [ ! -d "$1" ] && mkdir -p "$1"
+  mkdir -p "$1"
 }
 
 # Check if file exists
@@ -449,7 +451,7 @@ warn_msg() {
 # Check if systemd is available
 # Usage: has_systemd
 has_systemd() {
-  [ -e "/bin/systemctl" ] && [ -d "/run/systemd/system" ]
+  [ -e "/bin/systemctl" ] && [ -d "/run/systemd/system" ] && return 0 || return 1
 }
 
 # Core service management function (internal)
@@ -615,7 +617,7 @@ svc_is_active() {
         ;;
     esac
   else
-    pgrep -x "${service}" >/dev/null 2>&1 || pgrep -f "${service}" >/dev/null 2>&1
+    pgrep -x "${service}" >/dev/null 2>&1 || pgrep -f "${service}" >/dev/null 2>&1 || return 1
   fi
 }
 
@@ -685,7 +687,7 @@ cleanup_versions() {
 # Usage: setup_web_directory_permissions
 setup_web_directory_permissions() {
   # Set /data to 755 (keep existing behavior for compatibility)
-  [ -d /data ] && chmod 755 /data
+  [ -d /data ] && chmod 755 /data || true
   
   # Set more restrictive permissions for web directories
   if [ -d "${wwwroot_dir}" ]; then
@@ -739,7 +741,7 @@ check_system_resources() {
     echo "${CWARNING}Recommended: At least 2GB RAM for stable compilation.${CEND}"
     if [[ "${SKIP_RESOURCE_CHECK}" != "1" ]]; then
       confirm "Continue anyway?" continue_low_mem "n"
-      [[ "$continue_low_mem" != "y" ]] && exit 1
+      [[ "$continue_low_mem" != "y" ]] && exit 1 || true
     fi
   elif [ $mem_mb -lt 2048 ]; then
     echo "${CWARNING}Warning: Less than 2GB RAM. Consider adding swap space.${CEND}"
@@ -757,7 +759,7 @@ check_system_resources() {
     echo "${CWARNING}Recommended: At least 10GB for compilation cache.${CEND}"
     if [[ "${SKIP_RESOURCE_CHECK}" != "1" ]]; then
       confirm "Continue anyway?" continue_low_space "n"
-      [[ "$continue_low_space" != "y" ]] && exit 1
+      [[ "$continue_low_space" != "y" ]] && exit 1 || true
     fi
   elif [ $available_mb -lt 10240 ]; then
     echo "${CWARNING}Warning: Less than 10GB free disk space.${CEND}"

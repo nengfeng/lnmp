@@ -45,7 +45,7 @@ Upgrade_Nginx() {
     nginx_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
     rm -rf $$
     nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-\w.\w\+.\w\+ @lua-nginx-module-${lua_nginx_module_ver} @" | sed "s@lua-nginx-module @lua-nginx-module-${lua_nginx_module_ver} @" | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
-    if [ -n "$(echo $nginx_configure_args | grep lua-nginx-module)" ]; then
+    if echo "$nginx_configure_args" | grep -q lua-nginx-module; then
       ${current_dir}/upgrade.sh --script > /dev/null
       src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
       tar xzf luajit2-${luajit2_ver}.tar.gz

@@ -1,8 +1,8 @@
 # newest software version
 # Web
-nginx_ver=1.30.0
+nginx_ver=1.28.2
 tengine_ver=3.1.0
-openresty_ver=1.29.2.3
+openresty_ver=1.29.2.1
 openssl_ver=3.5.5
 
 pcre_ver=10.45
@@ -22,11 +22,11 @@ pgsql16_ver=16.13
 
 # PHP
 php83_ver=8.3.30
-php84_ver=8.4.20
-php85_ver=8.5.5
+php84_ver=8.4.19
+php85_ver=8.5.4
 
 # Nodejs
-nodejs_ver=20.20.2
+nodejs_ver=20.20.1
 
 libiconv_ver=1.17
 curl_ver=8.18.0
@@ -43,7 +43,7 @@ imagemagick_ver=7.1.2-13
 imagick_ver=3.8.1
 zendopcache_ver=7.0.5
 apcu_ver=5.1.28
-phalcon_ver=5.11.1
+phalcon_ver=5.10.0
 yaf_ver=3.3.6
 yar_ver=2.3.4
 swoole_ver=6.2.0
@@ -53,7 +53,7 @@ xdebug_ver=3.5.1
 pureftpd_ver=1.0.53
 
 # Redis
-redis_ver=8.6.2
+redis_ver=8.6.1
 pecl_redis_ver=6.3.0
 
 # Memcached

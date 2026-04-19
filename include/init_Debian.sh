@@ -23,13 +23,13 @@ EOF
 sed -i 's@^"syntax on@syntax on@' /etc/vim/vimrc
 
 # history
-[ -z "$(grep history-timestamp ~/.bashrc)" ] && echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\$(pwd)/:\$msg ---- \$(who am i); } >> ~/.history-timestamp'" >> ~/.bashrc
+grep -q history-timestamp ~/.bashrc || echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\$(pwd)/:\$msg ---- \$(who am i); } >> ~/.history-timestamp'" >> ~/.bashrc
 # Set secure permissions for history file
-[ -e ~/.history-timestamp ] && chmod 600 ~/.history-timestamp
+[ -e ~/.history-timestamp ] && chmod 600 ~/.history-timestamp || true
 
 # /etc/security/limits.conf
-[ -e /etc/security/limits.d/*nproc.conf ] && rename nproc.conf nproc.conf_bk /etc/security/limits.d/*nproc.conf
-[ -z "$(grep 'session required pam_limits.so' /etc/pam.d/common-session)" ] && echo "session required pam_limits.so" >> /etc/pam.d/common-session
+[ -e /etc/security/limits.d/*nproc.conf ] && rename nproc.conf nproc.conf_bk /etc/security/limits.d/*nproc.conf || true
+grep -q 'session required pam_limits.so' /etc/pam.d/common-session || echo "session required pam_limits.so" >> /etc/pam.d/common-session
 sed -i '/^# End of file/,$d' /etc/security/limits.conf
 cat >> /etc/security/limits.conf <<EOF
 # End of file
@@ -45,7 +45,7 @@ EOF
 
 # /etc/hosts
 if [ "$(hostname -i | awk '{print $1}')" != "127.0.0.1" ]; then
-  [ -z "$(grep $(hostname) /etc/hosts)" ] && sed -i "s@127.0.0.1.*localhost@&\n127.0.0.1 $(hostname)@g" /etc/hosts
+  grep -q "$(hostname)" /etc/hosts || sed -i "s@127.0.0.1.*localhost@&\n127.0.0.1 $(hostname)@g" /etc/hosts
 fi
 
 # Set timezone
@@ -58,7 +58,7 @@ ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime
 #EOF
 
 # /etc/sysctl.conf
-[ -z "$(grep 'fs.file-max' /etc/sysctl.conf)" ] && cat >> /etc/sysctl.conf << EOF
+grep -q 'fs.file-max' /etc/sysctl.conf || cat >> /etc/sysctl.conf << EOF
 fs.file-max = 1000000
 fs.inotify.max_user_instances = 16384
 net.ipv4.tcp_syncookies = 1
