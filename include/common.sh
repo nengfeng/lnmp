@@ -90,11 +90,11 @@ confirm() {
   fi
   
   while :; do
-    read -e -p "${prompt} [y/n] (default: ${default}): " value
+    read -e -p "${prompt} [y/n] (default: ${default}): " value || value="${default}"
     value=${value:-${default}}
     case "${value}" in
       y|Y|n|N) break ;;
-      *) echo "${CWARNING}input error! Please only input 'y' or 'n'${CEND}" ;;
+      *) echo "${CWARNING}input error! Please only input 'y' or 'n${CEND}" ;;
     esac
   done
   # Security: Use declare -g instead of eval for indirect variable assignment
@@ -118,7 +118,7 @@ select_number() {
   fi
   
   while :; do
-    read -e -p "${prompt} [${min}-${max}] (default: ${default}): " value
+    read -e -p "${prompt} [${min}-${max}] (default: ${default}): " value || value="${default}"
     value=${value:-${default}}
     if [[ "${value}" =~ ^[0-9]+$ ]] && [ "${value}" -ge "${min}" ] && [ "${value}" -le "${max}" ]; then
       break
