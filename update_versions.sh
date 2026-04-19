@@ -293,9 +293,8 @@ for item in "${pecl_repos[@]}"; do
 done
 
 # --- Others ---
-# phpMyAdmin: use context-aware regex to avoid matching unrelated numbers
 check_latest "phpMyAdmin" "$phpmyadmin_ver" \
-  "https://www.phpmyadmin.net/" 'Download\s+\K[0-9]+\.[0-9]+\.[0-9]+'
+  "https://www.phpmyadmin.net/" '[0-9]+\.[0-9]+\.[0-9]+'
 
 check_latest "Pure-FTPd" "$pureftpd_ver" \
   "https://download.pureftpd.org/pub/pure-ftpd/releases/" \

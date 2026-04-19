@@ -12,7 +12,7 @@ printf "
 #######################################################################
 "
 # Check if user is root
-[ "$(id -u)" != "0" ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+{ [ "$(id -u)" != "0" ]; } && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
 
 current_dir=$(dirname "$(readlink -f $0)")
 pushd ${current_dir} > /dev/null
@@ -158,7 +158,7 @@ If you enter '.', the field will be left blank.
           echo "${CWARNING}input error!${CEND}"
         fi
       done
-    if [ ! -e "${HOME}/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key" ]; then
+    if [ ! -e "${HOME}/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key ]; then
       while :; do echo
         read -e -p "Please enter your email: " EMAIL
         echo
@@ -187,8 +187,8 @@ If you enter '.', the field will be left blank.
         read -e -p "Please enter your dnsapi parameters: " DNS_PAR
         echo
         # Security: Validate input to prevent command injection
-        # Block dangerous characters: | and $ ( ) { } less than greater than backslash newline
-        if [[ "${DNS_PAR}" =~ [\|\&\$\(\)\{\}\<\>\\] ]] || [[ "${DNS_PAR}" == *$'\n'* ]]; then
+        # Block dangerous characters: | & $ ` ( ) { } < > \ newline
+        if [[ "${DNS_PAR}" =~ [\|\&\$\`\(\)\{\}\<\>\\] ]] || [[ "${DNS_PAR}" == *$'\n'* ]]; then
           echo "${CWARNING}Invalid characters detected! Only alphanumeric, underscore, equals, and semicolons are allowed.${CEND}"
           continue
         fi
@@ -199,12 +199,9 @@ If you enter '.', the field will be left blank.
         for pair in "${EXPORT_PAIRS[@]}"; do
           # Trim whitespace
           pair=$(echo "$pair" | xargs)
-          [ -z "$pair" ] && continue
+          [ -n "$pair" ] || continue
           # Check format: export VAR_NAME=VALUE (value must not contain $ or backticks)
-          local pair_regex="^[[:space:]]*export[[:space:]]+[A-Za-z_][A-Za-z0-9_]*="
-          local backtick_char
-          backtick_char=$(printf '\140')
-          if ! [[ "$pair" =~ $pair_regex ]] || [[ "$pair" == *'$'* ]] || [[ "$pair" == *"$backtick_char"* ]]; then
+          if ! [[ "$pair" =~ ^[[:space:]]*export[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^\$\`]*$ ]]; then
             echo "${CWARNING}Invalid format: '$pair'. Expected: export VAR_NAME=VALUE${CEND}"
             valid_format=0
             break
@@ -233,8 +230,8 @@ If you enter '.', the field will be left blank.
         fi
         ${web_install_dir}/sbin/nginx -s reload
       fi
-      auth_file="$(< /dev/urandom tr -dc A-Za-z0-9 | head -c8)".html
-      auth_str=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16); echo "${auth_str}" > "${vhostdir}/${auth_file}"
+      auth_file="$(head -c8 /dev/urandom | tr -dc A-Za-z0-9)".html
+      auth_str=$(head -c16 /dev/urandom | tr -dc A-Za-z0-9); echo "${auth_str}" > "${vhostdir}/${auth_file}"
       for D in ${domain} ${moredomainame}
       do
         curl_str=$(curl --connect-timeout 30 -4 -s $D/${auth_file} 2>&1)
@@ -244,7 +241,7 @@ If you enter '.', the field will be left blank.
       [[ "${moredomainame_flag}" == y ]] && moredomainame_D="$(for D in ${moredomainame}; do echo -d ${D}; done)"
       "${HOME}/.acme.sh/acme.sh" --force --issue -k ${CERT_KEYLENGTH} -w ${vhostdir} -d ${domain} ${moredomainame_D}
     fi
-      [ -e "${PATH_SSL}/${domain}.crt" ] && rm -f ${PATH_SSL}/${domain}.{crt,key}
+      [ -e "${PATH_SSL}/${domain}.crt" ] && rm -f ${PATH_SSL}/${domain}.{crt,key} || true
       Nginx_cmd="svc_restart nginx"
       Command="${Nginx_cmd}"
     if [ -s "${HOME}/.acme.sh/${domain}/fullchain.cer" ] && [[ "${CERT_KEYLENGTH}" =~ ^2048$|^3072$|^4096$|^8192$ ]]; then
@@ -253,7 +250,7 @@ If you enter '.', the field will be left blank.
       "${HOME}/.acme.sh/acme.sh" --force --install-cert --ecc -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null
     else
       echo "${CFAILURE}Error: Create Let's Encrypt SSL Certificate failed! ${CEND}"
-      [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f ${web_install_dir}/conf/vhost/${domain}.conf
+      [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f ${web_install_dir}/conf/vhost/${domain}.conf || true
       exit 1
     fi
   elif [[ "${Domain_Mode}" == 4 ]]; then
@@ -262,7 +259,7 @@ If you enter '.', the field will be left blank.
     echo "You can purchase certificates from providers like DigiCert, Sectigo, TrustAsia, etc."
     echo
     while :; do
-      read -e -p "Please enter SSL Certificate file path: " CUSTOM_CERT_PATH
+      read -e -p "Please enter SSL Certificate file path (.crt/.pem): " CUSTOM_CERT_PATH
       if [ -z "${CUSTOM_CERT_PATH}" ]; then
         echo "${CWARNING}Path cannot be empty${CEND}"
         continue
@@ -279,7 +276,7 @@ If you enter '.', the field will be left blank.
       break
     done
     while :; do
-      read -e -p "Please enter SSL Private Key file path: " CUSTOM_KEY_PATH
+      read -e -p "Please enter SSL Private Key file path (.key): " CUSTOM_KEY_PATH
       if [ -z "${CUSTOM_KEY_PATH}" ]; then
         echo "${CWARNING}Path cannot be empty${CEND}"
         continue
@@ -331,7 +328,7 @@ Print_SSL() {
 Input_Add_proxy() {
   while :; do echo
     read -e -p "Please input the correct proxy_pass: " Proxy_Pass
-    if [ -z "$(echo "$Proxy_Pass" | grep -E '^http://|https://')" ]; then
+    if ! echo "$Proxy_Pass" | grep -qE '^http://|https://'; then
       echo "${CFAILURE}input error! Please only input example https://192.168.1.1:8080${CEND}"
     else
       echo "proxy_pass=${Proxy_Pass}"
@@ -368,9 +365,9 @@ What Are You Doing?
       while :; do echo
         echo 'Please select a version of the PHP:'
         printf "%b" "\t${CMSG} 0${CEND}. PHP ${PHP_main_ver} (default)\n"
-        [ -e "/dev/shm/php83-cgi.sock" ] && printf "%b" "\t${CMSG} 1${CEND}. PHP 8.3\n"
-        [ -e "/dev/shm/php84-cgi.sock" ] && printf "%b" "\t${CMSG} 2${CEND}. PHP 8.4\n"
-        [ -e "/dev/shm/php85-cgi.sock" ] && printf "%b" "\t${CMSG} 3${CEND}. PHP 8.5\n"
+        [ -e "/dev/shm/php83-cgi.sock" ] && printf "%b" "\t${CMSG} 1${CEND}. PHP 8.3\n" || true
+        [ -e "/dev/shm/php84-cgi.sock" ] && printf "%b" "\t${CMSG} 2${CEND}. PHP 8.4\n" || true
+        [ -e "/dev/shm/php85-cgi.sock" ] && printf "%b" "\t${CMSG} 3${CEND}. PHP 8.5\n" || true
         read -e -p "Please input a number:(Default 0 press Enter) " php_option
         php_option=${php_option:-0}
         if [[ ! ${php_option} =~ ^[0-3]$ ]]; then
@@ -404,12 +401,12 @@ What Are You Doing?
       popd > /dev/null
     fi
     # 启用自动升级和安装 cronjob（无论是否刚安装）
-    [ -e "${HOME}/.acme.sh/acme.sh" ] && {
+    if [ -e "${HOME}/.acme.sh/acme.sh" ]; then
       "${HOME}/.acme.sh/acme.sh" --upgrade --auto-upgrade > /dev/null 2>&1
       "${HOME}/.acme.sh/acme.sh" --install-cronjob > /dev/null 2>&1
-    }
+    fi
   fi
-  [ -e "${HOME}/.acme.sh/account.conf" ] && sed -i '/^CERT_HOME=/d' "${HOME}/.acme.sh/account.conf"
+  [ -e "${HOME}/.acme.sh/account.conf" ] && sed -i '/^CERT_HOME=/d' "${HOME}/.acme.sh/account.conf" || true
   if [[ "${Domain_Mode}" =~ ^[2-4]$ ]] || [[ "${dnsapi_flag}" == y ]]; then
     if [ -e "${web_install_dir}/sbin/nginx" ]; then
       nginx_ssl_flag=y
@@ -422,7 +419,7 @@ What Are You Doing?
 
   while :; do echo
     read -e -p "Please input domain(example: www.example.com): " domain
-    if [ -z "$(echo ${domain} | grep '.*\..*')" ]; then
+    if ! echo "${domain}" | grep -q '.*\..*'; then
       echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
     else
       break
@@ -478,7 +475,7 @@ What Are You Doing?
   if [[ "${moredomainame_flag}" == y ]]; then
     while :; do echo
       read -e -p "Type domainname or IP(example: example.com other.example.com): " moredomain
-      if [ -z "$(echo ${moredomain} | grep '.*\..*')" ]; then
+      if ! echo "${moredomain}" | grep -q '.*\..*'; then
         echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
       else
         [[ "${moredomain}" == "${domain}" ]] && echo "${CWARNING}Domain name already exists! ${CEND}" && continue
@@ -539,7 +536,7 @@ Nginx_anti_hotlinking() {
     fi
   done
 
-  if [ -n "$(echo ${domain} | grep '.*\..*\..*')" ]; then
+  if echo "${domain}" | grep -q '.*\..*\..*'; then
     domain_allow="*.${domain#*.} ${domain}"
   else
     domain_allow="*.${domain} ${domain}"
@@ -812,7 +809,7 @@ Del_NGX_Vhost() {
       echo ${CMSG}${Domain_List}${CEND}
         while :; do echo
           read -e -p "Please input a domain you want to delete: " domain
-          if [ -z "$(echo ${domain} | grep '.*\..*')" ]; then
+          if ! echo "${domain}" | grep -q '.*\..*'; then
             echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
           else
             if [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ]; then
@@ -824,8 +821,8 @@ Del_NGX_Vhost() {
               /bin/mv ${web_install_dir}/conf/vhost/${domain}.conf ${web_install_dir}/conf/vhost/${domain}.conf.bak
               if ${web_install_dir}/sbin/nginx -t; then
                 rm -f ${web_install_dir}/conf/vhost/${domain}.conf.bak
-                [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f ${web_install_dir}/conf/rewrite/${domain}.conf
-                [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f ${web_install_dir}/conf/ssl/${domain}.{crt,key,csr}
+                [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f ${web_install_dir}/conf/rewrite/${domain}.conf || true
+                [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f ${web_install_dir}/conf/ssl/${domain}.{crt,key,csr} || true
                 ${web_install_dir}/sbin/nginx -s reload
               else
                 /bin/mv ${web_install_dir}/conf/vhost/${domain}.conf.bak ${web_install_dir}/conf/vhost/${domain}.conf
@@ -841,10 +838,10 @@ Del_NGX_Vhost() {
                 fi
               done
               if [[ "${Del_Vhost_wwwroot_flag}" == y ]]; then
-                if [ "${quiet_flag}" != 'y' ]; then
+		if [ "${quiet_flag}" != 'y' ]; then
                   echo "Press Ctrl+c to cancel or Press any key to continue..."
                   char=$(get_char)
-                fi
+		fi
                 rm -rf ${Directory}
               fi
               echo

@@ -38,5 +38,5 @@ if [ ! -e ~/.lnmp ] && [[ "${Swap}" == '0' ]] && [[ "${Mem}" -le 2048 ]]; then
   mkswap /swapfile
   swapon /swapfile
   chmod 600 /swapfile
-  [ -z "$(grep swapfile /etc/fstab)" ] && echo '/swapfile    swap    swap    defaults    0 0' >> /etc/fstab
+  grep -q swapfile /etc/fstab || echo '/swapfile    swap    swap    defaults    0 0' >> /etc/fstab
 fi

@@ -24,7 +24,7 @@ ip_local() {
   fi
 
   # Method 3: ifconfig fallback
-  if [ -z "$ip" ] && command -v ifconfig >/dev/null 2>&1; then
+  if [ -z "$ip" ] && (command -v ifconfig >/dev/null 2>&1); then
     ip=$(ifconfig 2>/dev/null | grep -oP 'inet \K[\d.]+' | grep -v '^127\.' | head -1)
   fi
 
@@ -39,20 +39,20 @@ ip_state() {
 
   # API 1: Cloudflare trace (fastest, no rate limit, raw text)
   if command -v curl >/dev/null 2>&1; then
-    country=$(curl -s --connect-timeout 3 --max-time 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | grep "^loc=" | cut -d= -f2)
+    country=$(curl -s --connect-timeout 3 --max-time 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | grep "^loc=" | cut -d= -f2) || country=""
   fi
 
   # API 2: ip.sb/geoip (reliable, JSON grep)
   if [[ ! "$country" =~ ^[A-Z]{2}$ ]]; then
     if command -v curl >/dev/null 2>&1; then
-      country=$(curl -s --connect-timeout 5 --max-time 10 https://api.ip.sb/geoip 2>/dev/null | grep -o '"country_code":"[^"]*"' | cut -d'"' -f4)
+      country=$(curl -s --connect-timeout 5 --max-time 10 https://api.ip.sb/geoip 2>/dev/null | grep -o '"country_code":"[^"]*"' | cut -d'"' -f4) || country=""
     fi
   fi
 
   # API 3: ifconfig.co/country (returns full name, convert to ISO code)
   if [[ ! "$country" =~ ^[A-Z]{2}$ ]]; then
     if command -v curl >/dev/null 2>&1; then
-      local fullname=$(curl -s --connect-timeout 5 --max-time 10 https://ifconfig.co/country 2>/dev/null | tr -d '[:space:]')
+      local fullname=$(curl -s --connect-timeout 5 --max-time 10 https://ifconfig.co/country 2>/dev/null | tr -d '[:space:]') || fullname=""
       case "$fullname" in
         China) country="CN" ;; Singapore) country="SG" ;; "United States") country="US" ;;
         Japan) country="JP" ;; "South Korea") country="KR" ;; Germany) country="DE" ;;
@@ -67,7 +67,7 @@ ip_state() {
   # API 4: ipinfo.io (may rate limit, last resort)
   if [[ ! "$country" =~ ^[A-Z]{2}$ ]]; then
     if command -v curl >/dev/null 2>&1; then
-      country=$(curl -s --connect-timeout 5 --max-time 10 https://ipinfo.io/country 2>/dev/null | grep -oE '^[A-Z]{2}$')
+      country=$(curl -s --connect-timeout 5 --max-time 10 https://ipinfo.io/country 2>/dev/null | grep -oE '^[A-Z]{2}$') || country=""
     fi
   fi
 
@@ -95,10 +95,10 @@ conn_port() {
     esac
   done
 
-  [ -z "$host" ] || [ -z "$port" ] && { echo "false"; return; }
+  [ -n "$host" ] && [ -n "$port" ] || { echo "false"; return; }
 
   # Method 1: curl
-  if command -v curl >/dev/null 2>&1; then
+  if (command -v curl >/dev/null 2>&1); then
     if curl -s --connect-timeout 3 --max-time 5 "telnet://${host}:${port}" >/dev/null 2>&1; then
       echo "true"
     else

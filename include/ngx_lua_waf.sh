@@ -6,7 +6,7 @@ Nginx_lua_waf() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${nginx_install_dir}/sbin/nginx" ] && echo "${CWARNING}Nginx is not installed on your system! ${CEND}" && exit 1
   if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* | xargs rm -rf
+    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* -exec rm -rf {} + 2>/dev/null || true
     src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
     tar xzf luajit2-${luajit2_ver}.tar.gz
     pushd luajit2-${luajit2_ver}
@@ -44,7 +44,7 @@ Nginx_lua_waf() {
   nginx_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
   rm -rf $$
   nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
-  if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
+  if ! echo "${nginx_configure_args}" | grep -q lua-nginx-module; then
     src_url=https://nginx.org/download/nginx-${nginx_ver}.tar.gz && Download_src
     src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
     src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
@@ -83,7 +83,7 @@ Tengine_lua_waf() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${tengine_install_dir}/sbin/nginx" ] && echo "${CWARNING}Tengine is not installed on your system! ${CEND}" && exit 1
   if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* | xargs rm -rf
+    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* -exec rm -rf {} + 2>/dev/null || true
     src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
     tar xzf luajit2-${luajit2_ver}.tar.gz
     pushd luajit2-${luajit2_ver}
@@ -106,7 +106,7 @@ Tengine_lua_waf() {
   tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
   rm -rf $$
   tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
-  if [ -z "$(echo ${tengine_configure_args} | grep lua)" ]; then
+  if ! echo "${tengine_configure_args}" | grep -q lua; then
     src_url=https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz && Download_src
     src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
     src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
@@ -151,9 +151,9 @@ enable_lua_waf() {
   tar xzf ngx_lua_waf.tar.gz -C ${web_install_dir}/conf
   [ -e "${web_install_dir}/conf/resty" ] && /bin/mv ${web_install_dir}/conf/resty{,_bak}
   sed -i "s@/usr/local/nginx@${web_install_dir}@g" ${web_install_dir}/conf/waf.conf
-  sed -i "s@/usr/local/nginx@${web_install_dir}@" ${web_install_dir}/conf/waf/config.lua
+  sed -i "s@/usr/local/nginx@${web_install_dir}:@" ${web_install_dir}/conf/waf/config.lua
   sed -i "s@/data/wwwlogs@${wwwlogs_dir}@" ${web_install_dir}/conf/waf/config.lua
-  [ -z "$(grep 'include waf.conf;' ${web_install_dir}/conf/nginx.conf)" ] && sed -i "s@ vhost/\*.conf;@&\n  include waf.conf;@" ${web_install_dir}/conf/nginx.conf
+  grep -q 'include waf.conf;' ${web_install_dir}/conf/nginx.conf || sed -i "s@ vhost/\*.conf;@&\n  include waf.conf;@" ${web_install_dir}/conf/nginx.conf
   ${web_install_dir}/sbin/nginx -t
   if [ $? -eq 0 ]; then
     svc_reload nginx

@@ -27,7 +27,7 @@ Show_Help() {
   "
 }
 
-New_dbrootpwd="$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16)"
+New_dbrootpwd="$(head -c16 /dev/urandom | tr -dc A-Za-z0-9)" || New_dbrootpwd="$(date +%s%N | sha256sum | head -c16)"
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help)
@@ -59,14 +59,14 @@ done
 Input_dbrootpwd() {
   while :; do echo
     read -e -p "Please input the root password of database: " New_dbrootpwd
-    [ -n "$(echo ${New_dbrootpwd} | grep '[+|&]')" ] && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
+    echo "${New_dbrootpwd}" | grep -q '[+|&]' && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
     # Security: Block characters that could cause SQL injection
     # Single quotes and backslashes are particularly dangerous
     if [[ "${New_dbrootpwd}" =~ [\'\\] ]]; then
       echo "${CWARNING}input error, password cannot contain single quotes (') or backslashes (\\)${CEND}"
       continue
     fi
-    (( ${#New_dbrootpwd} >= 5 )) && break || echo "${CWARNING}database root password least 5 characters! ${CEND}"
+    [ ${#New_dbrootpwd} -ge 5 ] && break || echo "${CWARNING}database root password least 5 characters! ${CEND}"
   done
 }
 
@@ -94,7 +94,7 @@ Reset_force_dbrootpwd() {
   svc_stop mysqld > /dev/null 2>&1
   local timeout=60
   while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
   echo "${CMSG}skip grant tables...${CEND}"
@@ -102,7 +102,7 @@ Reset_force_dbrootpwd() {
   svc_start mysqld > /dev/null 2>&1
   timeout=60
   while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
   sleep 2
@@ -110,14 +110,14 @@ Reset_force_dbrootpwd() {
   svc_stop mysqld > /dev/null 2>&1
   timeout=60
   while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
   sed -i '/^skip-grant-tables/d' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
   timeout=60
   while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
+    { [ $((timeout--)) -le 0 ]; } && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
   # Detect MySQL or MariaDB
@@ -148,15 +148,15 @@ EOF
   if [ $? -eq 0 ]; then
     killall mysqld
     timeout=60
-    while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
-      [ $((timeout--)) -le 0 ] && { ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1; break; }
+    while pgrep -x mysqld > /dev/null 2>&1; do
+      { [ $((timeout--)) -le 0 ]; } && { pkill -9 mysqld; break; }
       sleep 1
     done
-    [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ] && ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1
+    pgrep -x mysqld > /dev/null 2>&1 && pkill -9 mysqld
     svc_start mysqld > /dev/null 2>&1
     sed -i "s+^dbrootpwd.*+dbrootpwd='${escaped_pwd}'+" ./options.conf
     chmod 600 ./options.conf
-    [ -e ~/ReadMe ] && sed -i "s+^MySQL root password:.*+MySQL root password: ${New_dbrootpwd}+"  ~/ReadMe
+    [ -e ~/ReadMe ] && sed -i "s+^MySQL root password:.*+MySQL root password: ${New_dbrootpwd}+"  ~/ReadMe || true
     echo
     echo "Password reset successfully! "
     echo "The new password: ${CMSG}${New_dbrootpwd}${CEND}"
