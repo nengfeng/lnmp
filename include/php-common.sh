@@ -121,8 +121,10 @@ EOF
   if [ ! -e "/usr/local/lib/libzip.la" ]; then
     tar xzf libzip-${libzip_ver}.tar.gz
     pushd libzip-${libzip_ver} > /dev/null
-    ./configure
-    compile_and_install
+    mkdir -p build && pushd build > /dev/null
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+    make && make install
+    popd > /dev/null
     popd > /dev/null
     cleanup_src libzip-${libzip_ver}
   fi
