@@ -30,7 +30,7 @@ elif openssl version | grep -Eqi 'OpenSSL 1.1.*'; then
   php84_with_curl="--with-curl"
   php85_with_curl="--with-curl"
 
-  [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
+  [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y || true
 elif openssl version | grep -Eqi 'OpenSSL 3.*'; then
   php83_with_openssl="--with-openssl"
   php84_with_openssl="--with-openssl"
@@ -44,7 +44,7 @@ elif openssl version | grep -Eqi 'OpenSSL 3.*'; then
   php84_with_curl="--with-curl"
   php85_with_curl="--with-curl"
 
-  [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
+  [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y || true
 else
   php83_with_openssl="--with-openssl=${openssl_install_dir} --with-openssl-dir=${openssl_install_dir}"
   php84_with_openssl="--with-openssl=${openssl_install_dir} --with-openssl-dir=${openssl_install_dir}"

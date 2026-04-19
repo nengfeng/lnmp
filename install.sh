@@ -5,7 +5,7 @@
 #
 
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-#set -e
+set -e
 set -o pipefail
 clear
 printf "
@@ -197,7 +197,9 @@ parse_args() {
         shift
         ;;
       *)
-        echo "${CWARNING}ERROR: unknown argument: $1 ${CEND}" && Show_Help && exit 1
+        echo "${CWARNING}ERROR: unknown argument: $1 ${CEND}"
+        Show_Help
+        exit 1
         ;;
     esac
   done
@@ -403,8 +405,8 @@ if [[ ${ARG_NUM} == 0 ]]; then
 fi
 
 if [[ ${nginx_option} =~ ^[1-3]$ ]]; then
-  [ ! -d "${wwwroot_dir}/default" ] && mkdir -p "${wwwroot_dir}/default"
-  [ ! -d "${wwwlogs_dir}" ] && mkdir -p "${wwwlogs_dir}"
+  mkdir -p "${wwwroot_dir}/default"
+  mkdir -p "${wwwlogs_dir}"
 fi
 # Create www user before setting permissions (nginx/php-fpm runs as www)
 [[ ${nginx_option} =~ ^[1-3]$ ]] && create_run_user
