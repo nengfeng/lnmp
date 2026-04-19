@@ -399,7 +399,7 @@ if [[ ${ARG_NUM} == 0 ]]; then
 
   # PHP opcode cache and extensions
   if [[ ${php_option} =~ ^[1-3]$ ]] || [ -e "${php_install_dir}/bin/phpize" ]; then
-    confirm "Do you want to install opcode cache of the PHP?" phpcache_flag n
+    confirm "Do you want to install opcode cache of the PHP?" phpcache_flag y
     if [[ "${phpcache_flag}" == y ]]; then
       echo 'Please select a opcode cache of the PHP:'
       printf "%b" "	${CMSG}1${CEND}. Install Zend OPcache\n"
