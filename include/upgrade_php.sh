@@ -103,7 +103,7 @@ ROLLBACK_EOF
       sed -i '/OPENSSL_SSLV23_PADDING/i#ifdef RSA_SSLV23_PADDING' ext/openssl/openssl.c
       sed -i '/OPENSSL_SSLV23_PADDING/a#endif' ext/openssl/openssl.c
     fi
-    make clean
+    [ -f Makefile ] && make clean || true
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
     # Get original configure command and fix iconv settings
     local configure_cmd=$(${php_install_dir}/bin/php -i | grep 'Configure Command' | awk -F'=>' '{print $2}')

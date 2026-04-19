@@ -34,7 +34,7 @@ Upgrade_Redis() {
     fi
     tar xzf redis-$NEW_redis_ver.tar.gz
     pushd redis-$NEW_redis_ver
-    make clean
+    [ -f Makefile ] && make clean || true
     compile_check
 
     if [ -f "src/redis-server" ]; then

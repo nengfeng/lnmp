@@ -56,7 +56,7 @@ Nginx_lua_waf() {
     tar xzf ngx_devel_kit.tar.gz
     tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
     pushd nginx-${nginx_ver}
-    make clean
+    [ -f Makefile ] && make clean || true
     sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' auto/cc/gcc # close debug
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
@@ -118,7 +118,7 @@ Tengine_lua_waf() {
     tar xzf ngx_devel_kit.tar.gz
     tar xzf lua-nginx-module.tar.gz
     pushd tengine-${tengine_ver}
-    make clean
+    [ -f Makefile ] && make clean || true
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
     ./configure ${tengine_configure_args} --with-ld-opt="-Wl,-rpath,/usr/local/lib" --add-module=../lua-nginx-module --add-module=../ngx_devel_kit

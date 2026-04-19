@@ -370,7 +370,7 @@ install_php_source() {
   
   tar xzf php-${php_ver}.tar.gz
   pushd php-${php_ver} > /dev/null
-  make clean
+  [ -f Makefile ] && make clean || true
   export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
   mkdir -p "${install_dir}"
   

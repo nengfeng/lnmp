@@ -36,7 +36,7 @@ Upgrade_Memcached() {
     fi
     tar xzf memcached-${NEW_memcached_ver}.tar.gz
     pushd memcached-${NEW_memcached_ver}
-    make clean
+    [ -f Makefile ] && make clean || true
     ./configure --prefix=${memcached_install_dir}
     compile_check
 

@@ -71,7 +71,7 @@ Upgrade_Nginx() {
 
     tar xzf nginx-${NEW_nginx_ver}.tar.gz
     pushd nginx-${NEW_nginx_ver}
-    make clean
+    [ -f Makefile ] && make clean || true
     sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' auto/cc/gcc # close debug
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
@@ -130,7 +130,7 @@ Upgrade_Tengine() {
     fi
     tar xzf tengine-${NEW_tengine_ver}.tar.gz
     pushd tengine-${NEW_tengine_ver}
-    make clean
+    [ -f Makefile ] && make clean || true
     ${tengine_install_dir}/sbin/nginx -V &> $$
     tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
     rm -rf $$
@@ -195,7 +195,7 @@ Upgrade_OpenResty() {
     fi
     tar xzf openresty-${NEW_openresty_ver}.tar.gz
     pushd openresty-${NEW_openresty_ver}
-    make clean
+    [ -f Makefile ] && make clean || true
     sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' bundle/nginx-${NEW_openresty_ver%.*}/auto/cc/gcc # close debug
     ${openresty_install_dir}/nginx/sbin/nginx -V &> $$
     ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-http_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-http_flv_module --with-http_mp4_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --with-ld-opt='-ltcmalloc -Wl,-u,pcre_version' ${nginx_modules_options}
