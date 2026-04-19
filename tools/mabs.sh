@@ -12,7 +12,8 @@ ignore_init() {
   # ignore password
   array_ignore_pwd_length=0
   if [ -f ./ignore_pwd ]; then
-    while IFS= read -r IGNORE_PWD || [[ -n "$IGNORE_PWD" ]]; do
+    while read IGNORE_PWD
+    do
       array_ignore_pwd[$array_ignore_pwd_length]=$IGNORE_PWD
       let array_ignore_pwd_length=$array_ignore_pwd_length+1
     done < ./ignore_pwd
@@ -21,7 +22,8 @@ ignore_init() {
   # ignore ip address
   array_ignore_ip_length=0
   if [ -f ./ignore_ip ]; then
-    while IFS= read -r IGNORE_IP || [[ -n "$IGNORE_IP" ]]; do
+    while read IGNORE_IP
+    do
       array_ignore_ip[$array_ignore_ip_length]=$IGNORE_IP
       let array_ignore_ip_length=$array_ignore_ip_length+1
     done < ./ignore_ip
@@ -110,15 +112,13 @@ do
 
   IPSEQ=0
 
-  while IFS= read -r IP PORT USER PASSWD PASSWD_2ND PASSWD_3RD PASSWD_4TH OTHERS || [[ -n "$IP" ]]; do
+  while read IP PORT USER PASSWD PASSWD_2ND PASSWD_3RD PASSWD_4TH OTHERS
   # while read Line
   do
     #[ -z "$(echo $IP | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|CNS')" ] && continue
     if [[ "$(conn_port --host ${IP} --port ${PORT})" == "false" ]]; then
       [ ! -e ipnologin.txt ] && > ipnologin.txt
-      if ! grep -q "$IP" ipnologin.txt || ! grep -q "$(date +%F)" ipnologin.txt; then
-        echo "$(date +%F_%H%M) $IP" >> ipnologin.txt
-      fi
+      [ -z "$(grep "$IP" ipnologin.txt | grep $(date +%F))" ] && echo "$(date +%F_%H%M) $IP" >> ipnologin.txt
       continue
     fi
 

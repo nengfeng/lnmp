@@ -18,11 +18,12 @@ Install_redis_server() {
     sed -i 's@daemonize no@daemonize yes@' ${redis_install_dir}/etc/redis.conf
     sed -i "s@^# bind 127.0.0.1@bind 127.0.0.1@" ${redis_install_dir}/etc/redis.conf
     redis_maxmemory=$(expr $Mem / 8)000000
-    grep -q ^maxmemory ${redis_install_dir}/etc/redis.conf || sed -i "s@maxmemory <bytes>@maxmemory <bytes>\nmaxmemory $(expr $Mem / 8)000000@" ${redis_install_dir}/etc/redis.conf
+    [ -z "$(grep ^maxmemory ${redis_install_dir}/etc/redis.conf)" ] && sed -i "s@maxmemory <bytes>@maxmemory <bytes>\nmaxmemory $(expr $Mem / 8)000000@" ${redis_install_dir}/etc/redis.conf
     success_msg "Redis-server"
     popd > /dev/null
     cleanup_src redis-${redis_ver}
-    id -u redis >/dev/null 2>&1 || useradd -M -s /sbin/nologin redis
+    id -u redis >/dev/null 2>&1
+    [ $? -ne 0 ] && useradd -M -s /sbin/nologin redis
     chown -R redis:redis ${redis_install_dir}/{var,etc}
 
     /bin/cp ../systemd/redis-server.service /lib/systemd/system/

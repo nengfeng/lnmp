@@ -9,11 +9,7 @@ php_ver_ge_84() {
   local ver=$1
   local major=$(echo "$ver" | cut -d. -f1)
   local minor=$(echo "$ver" | cut -d. -f2)
-  if [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]; then
-    return 0
-  else
-    return 1
-  fi
+  [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]
 }
 
 # Check if OpenSSL version is 3.2 or later
@@ -42,11 +38,7 @@ openssl_ver_ge_32() {
 # Requires: PHP 8.4+ AND OpenSSL 3.2+
 can_use_openssl_argon2() {
   local php_ver=$1
-  if php_ver_ge_84 "${php_ver}"; then
-    openssl_ver_ge_32
-  else
-    return 1
-  fi
+  php_ver_ge_84 "${php_ver}" && openssl_ver_ge_32
 }
 
 # Install PHP dependency libraries
@@ -61,8 +53,7 @@ install_php_deps() {
   if [ ! -e "${curl_install_dir}/lib/libcurl.la" ]; then
     tar xzf curl-${curl_ver}.tar.gz
     pushd curl-${curl_ver} > /dev/null
-    with_nghttp2=''
-    [ -e "/usr/local/lib/libnghttp2.so" ] && with_nghttp2='--with-nghttp2=/usr/local' || true
+    [ -e "/usr/local/lib/libnghttp2.so" ] && with_nghttp2='--with-nghttp2=/usr/local'
     ./configure --prefix=${curl_install_dir} ${php_with_ssl} ${with_nghttp2}
     compile_and_install
     popd > /dev/null
@@ -76,7 +67,7 @@ install_php_deps() {
     ./configure --prefix=${freetype_install_dir} --enable-freetype-config
     compile_and_install
     ln -sf ${freetype_install_dir}/include/freetype2/* /usr/include/
-    [ -d /usr/lib/pkgconfig ] && /bin/cp ${freetype_install_dir}/lib/pkgconfig/freetype2.pc /usr/lib/pkgconfig/ || true
+    [ -d /usr/lib/pkgconfig ] && /bin/cp ${freetype_install_dir}/lib/pkgconfig/freetype2.pc /usr/lib/pkgconfig/
     popd > /dev/null
     cleanup_src freetype-${freetype_ver}
   fi
@@ -91,7 +82,7 @@ install_php_deps() {
       popd > /dev/null
       cleanup_src phc-winner-argon2-${argon2_ver}
       # Create pkg-config file (argon2 source doesn't include one)
-      [ ! -d /usr/local/lib/pkgconfig ] && mkdir -p /usr/local/lib/pkgconfig || true
+      [ ! -d /usr/local/lib/pkgconfig ] && mkdir -p /usr/local/lib/pkgconfig
       cat > /usr/local/lib/pkgconfig/libargon2.pc << 'EOF'
 prefix=/usr/local
 exec_prefix=${prefix}
@@ -168,7 +159,7 @@ generate_php_ini() {
   sed -i 's@^max_execution_time.*@max_execution_time = 600@' ${php_dir}/etc/php.ini
   sed -i 's@^;realpath_cache_size.*@realpath_cache_size = 2M@' ${php_dir}/etc/php.ini
   sed -i 's@^disable_functions.*@disable_functions = passthru,exec,system,chroot,chgrp,chown,shell_exec,proc_open,proc_get_status,proc_close,proc_nice,proc_terminate,ini_alter,ini_restore,dl,readlink,symlink,popepassthru,stream_socket_server,fsocket,popen,pcntl_exec,pcntl_fork,pcntl_signal,pcntl_wait,assert,show_source,syslog@' ${php_dir}/etc/php.ini
-  [ -e /usr/sbin/sendmail ] && sed -i 's@^;sendmail_path.*@sendmail_path = /usr/sbin/sendmail -t -i@' ${php_dir}/etc/php.ini || true
+  [ -e /usr/sbin/sendmail ] && sed -i 's@^;sendmail_path.*@sendmail_path = /usr/sbin/sendmail -t -i@' ${php_dir}/etc/php.ini
   
   if [ "${with_old_openssl_flag}" = 'y' ]; then
     sed -i "s@^;curl.cainfo.*@curl.cainfo = \"${openssl_install_dir}/cert.pem\"@" ${php_dir}/etc/php.ini
@@ -372,16 +363,13 @@ install_php_source() {
   pushd php-${php_ver} > /dev/null
   make clean
   export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
-  mkdir -p "${install_dir}"
+  [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
   
   # Build opcache argument (PHP 8.5 has it built-in)
-  local phpcache_arg=''
   if [[ "${php_ver}" =~ ^8\.[0-4]\. ]]; then
-    if [[ "${phpcache_option}" == 1 ]]; then
-      phpcache_arg='--enable-opcache'
-    else
-      phpcache_arg='--disable-opcache'
-    fi
+    [[ "${phpcache_option}" == 1 ]] && local phpcache_arg='--enable-opcache' || local phpcache_arg='--disable-opcache'
+  else
+    local phpcache_arg=''
   fi
   
   # Build argon2 argument (PHP 8.4+ with OpenSSL 3.2+ uses built-in Argon2)
@@ -416,7 +404,7 @@ post_install_php() {
   local scenario=${4:-vps}
   
   if [ -e "${install_dir}/bin/phpize" ]; then
-    mkdir -p "${install_dir}/etc/php.d"
+    [ ! -e "${install_dir}/etc/php.d" ] && mkdir -p ${install_dir}/etc/php.d
     echo "${CSUCCESS}PHP installed successfully! ${CEND}"
   else
     rm -rf ${install_dir}

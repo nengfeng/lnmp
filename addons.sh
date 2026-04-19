@@ -13,7 +13,7 @@ printf "
 "
 # Check if user is root
 # shellcheck disable=SC2046
-{ [ "$(id -u)" != "0" ]; } && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+[ "$(id -u)" != "0" ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
 
 current_dir=$(dirname "$(readlink -f $0)")
 # shellcheck disable=SC2164
@@ -135,11 +135,11 @@ What Are You Doing?
           ACTION_FUN
           if [ "${install_flag}" = 'y' ]; then
             # shellcheck disable=SC2154
-            [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf || true
+            [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf
             # shellcheck disable=SC2154
-            [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf || true
+            [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf
             # shellcheck disable=SC2154
-            [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}" || true
+            [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}"
             enable_lua_waf
           elif [ "${uninstall_flag}" = 'y' ]; then
             disable_lua_waf
@@ -175,9 +175,9 @@ else
   fi
   if [[ "${ngx_lua_waf_flag}" == y ]]; then
     if [ "${install_flag}" = 'y' ]; then
-      [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf || true
-      [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf || true
-      [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}" || true
+      [ -e "${nginx_install_dir}/sbin/nginx" ] && Nginx_lua_waf
+      [ -e "${tengine_install_dir}/sbin/nginx" ] && Tengine_lua_waf
+      [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && echo "${CMSG}OpenResty has built-in Lua support${CEND}"
       enable_lua_waf
     elif [ "${uninstall_flag}" = 'y' ]; then
       disable_lua_waf

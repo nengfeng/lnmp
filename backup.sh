@@ -7,7 +7,7 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 # Check if user is root
-{ [ "$(id -u)" != "0" ]; } && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+[ "$(id -u)" != "0" ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
 
 current_dir=$(dirname "$(readlink -f "$0")")
 pushd "${current_dir}/tools" > /dev/null
@@ -28,7 +28,7 @@ get_items() {
 # Check if local backup is also configured
 # Usage: has_local_backup
 has_local_backup() {
-  echo "${backup_destination}" | grep -qw 'local'
+  [ -n "$(echo "${backup_destination}" | grep -ow 'local')" ]
 }
 
 # Get cloud storage command based on destination type
@@ -126,7 +126,7 @@ db_cloud_backup() {
   local upload_cmd
   upload_cmd=$(get_cloud_commands "${dest_type}")
   
-  [ -n "${upload_cmd}" ] || return 1
+  [ -z "${upload_cmd}" ] && return 1
   
   for D in $(get_items "${db_name}"); do
     ./db_bk.sh "${D}"
@@ -223,7 +223,7 @@ web_cloud_backup() {
     local PUSH_FILE
     PUSH_FILE=$(create_web_archive "${W}")
     
-    [ -n "${PUSH_FILE}" ] || continue
+    [ -z "${PUSH_FILE}" ] && continue
     
     local remote_path
     remote_path="/$(date +%F)/${PUSH_FILE##*/}"
@@ -268,38 +268,38 @@ run_backup() {
   
   case "${DEST}" in
     local)
-      echo "${backup_content}" | grep -owq 'db' && db_local_backup
-      echo "${backup_content}" | grep -owq 'web' && web_local_backup
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_local_backup
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_local_backup
       ;;
     remote)
       echo "com:::[ ! -e \"${backup_dir}\" ] && mkdir -p ${backup_dir}" > config_backup.txt
-      echo "${backup_content}" | grep -owq 'db' && db_remote_backup
-      echo "${backup_content}" | grep -owq 'web' && web_remote_backup
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_remote_backup
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_remote_backup
       ./mabs.sh -c config_backup.txt -T -1 | tee -a mabs.log
       ;;
     oss)
-      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup oss "${oss_bucket}"
-      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup oss "${oss_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup oss "${oss_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup oss "${oss_bucket}"
       ;;
     cos)
-      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup cos "${cos_bucket}"
-      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup cos "${cos_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup cos "${cos_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup cos "${cos_bucket}"
       ;;
     upyun)
-      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup upyun ""
-      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup upyun ""
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup upyun ""
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup upyun ""
       ;;
     qiniu)
-      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup qiniu "${qiniu_bucket}"
-      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup qiniu "${qiniu_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup qiniu "${qiniu_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup qiniu "${qiniu_bucket}"
       ;;
     s3)
-      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup s3 "${s3_bucket}"
-      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup s3 "${s3_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup s3 "${s3_bucket}"
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup s3 "${s3_bucket}"
       ;;
     dropbox)
-      echo "${backup_content}" | grep -owq 'db' && db_cloud_backup dropbox ""
-      echo "${backup_content}" | grep -owq 'web' && web_cloud_backup dropbox ""
+      [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup dropbox ""
+      [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_cloud_backup dropbox ""
       ;;
   esac
 }

@@ -56,7 +56,7 @@ wait_for_db_ready() {
   local mysql_cmd="${install_dir}/bin/mysql"
   
   # Detect mariadb command for MariaDB 11.x+
-  [ -x "${install_dir}/bin/mariadb" ] && mysql_cmd="${install_dir}/bin/mariadb" || true
+  [ -x "${install_dir}/bin/mariadb" ] && mysql_cmd="${install_dir}/bin/mariadb"
   
   local start_time=$(date +%s)
   local elapsed=0
@@ -221,7 +221,7 @@ install_mariadb_binary() {
   # Inject tcmalloc for better memory performance
   # Use mariadbd-safe for MariaDB 11.x+, mysqld_safe for older versions
   local safe_script="${install_dir}/bin/mariadbd-safe"
-  [ ! -f "${safe_script}" ] && safe_script="${install_dir}/bin/mysqld_safe" || true
+  [ ! -f "${safe_script}" ] && safe_script="${install_dir}/bin/mysqld_safe"
   if [ -f "${safe_script}" ]; then
     sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${safe_script}
     sed -i "s@/usr/local/mysql@${install_dir}@g" ${safe_script}
@@ -922,7 +922,7 @@ install_db_common() {
     return 1
   fi
 
-  mkdir -p "${install_dir}"
+  [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
   mkdir -p ${data_dir}
   chown mysql:mysql -R ${data_dir}
 
@@ -974,7 +974,7 @@ install_db_common() {
   eval "${init_cmd}"
 
   chown mysql:mysql -R ${data_dir}
-  [ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk} || true
+  [ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk}
   svc_start mysqld
   add_to_path ${install_dir}/bin
 

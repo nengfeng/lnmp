@@ -94,7 +94,7 @@ detect_location() {
     ip_info=$(curl -s --connect-timeout 5 https://ipinfo.io/json 2>/dev/null || true)
   fi
   
-  if [ -z "$ip_info" ] && (command -v wget >/dev/null 2>&1); then
+  if [ -z "$ip_info" ] && command -v wget >/dev/null 2>&1; then
     ip_info=$(wget -qO- --timeout=5 https://ipinfo.io/json 2>/dev/null || true)
   fi
   
@@ -142,10 +142,10 @@ load_versions() {
     exit 1
   fi
   
-  while IFS='=' read -r key value || [[ -n "$key" ]]; do
+  while IFS='=' read -r key value; do
     # 跳过注释和空行
-    [[ "$key" =~ ^#.*$ ]] && continue || true
-    [[ -z "$key" ]] && continue || true
+    [[ "$key" =~ ^#.*$ ]] && continue
+    [[ -z "$key" ]] && continue
     # 去除前后空格
     key=$(echo "$key" | tr -d '[:space:]')
     value=$(echo "$value" | tr -d '[:space:]')
@@ -482,11 +482,11 @@ download_component() {
   local mirror_mode=$2
   local found=0
   
-  while IFS= read -r line || [[ -n "$line" ]]; do
+  while IFS= read -r line; do
     # 跳过注释和空行
-    [[ "$line" =~ ^#.*$ ]] && continue || true
-    [[ -z "$line" ]] && continue || true
-    [[ ! "$line" =~ \| ]] && continue || true
+    [[ "$line" =~ ^#.*$ ]] && continue
+    [[ -z "$line" ]] && continue
+    [[ ! "$line" =~ \| ]] && continue
     
     # 新格式: 组件名|官方源|国内镜像|文件名|校验码URL|校验码类型|备用源|重命名目录
     local name=$(echo "$line" | cut -d'|' -f1)
@@ -617,10 +617,10 @@ list_components() {
   printf "%-20s %-12s %-15s %s\n" "Component" "Version" "Mirrors" "Checksum"
   printf "%-20s %-12s %-15s %s\n" "---------" "-------" "-------" "--------"
   
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" =~ ^#.*$ ]] && continue || true
-    [[ -z "$line" ]] && continue || true
-    [[ ! "$line" =~ \| ]] && continue || true
+  while IFS= read -r line; do
+    [[ "$line" =~ ^#.*$ ]] && continue
+    [[ -z "$line" ]] && continue
+    [[ ! "$line" =~ \| ]] && continue
     
     local name=$(echo "$line" | cut -d'|' -f1)
     local official_url=$(echo "$line" | cut -d'|' -f2 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
@@ -660,18 +660,18 @@ download_all() {
   
   log INFO "Starting download all components (mirror: $mirror_mode)..."
   
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" =~ ^#.*$ ]] && continue || true
-    [[ -z "$line" ]] && continue || true
-    [[ ! "$line" =~ \| ]] && continue || true
+  while IFS= read -r line; do
+    [[ "$line" =~ ^#.*$ ]] && continue
+    [[ -z "$line" ]] && continue
+    [[ ! "$line" =~ \| ]] && continue
     
     local name=$(echo "$line" | cut -d'|' -f1)
     
-    ((++total)) || true
+    ((++total))
     if download_component "$name" "$mirror_mode"; then
-      ((++success)) || true
+      ((++success))
     else
-      ((++failed)) || true
+      ((++failed))
     fi
     echo ""
   done < "${SOURCES_FILE}"
@@ -774,8 +774,8 @@ check_existing() {
       local size=$(stat -c%s "$f" 2>/dev/null || echo "0")
       local size_mb=$((size / 1024 / 1024))
       printf "%-40s %6d MB\n" "$filename" "$size_mb"
-      ((count++)) || true
-      ((total_size += size)) || true
+      ((count++))
+      ((total_size += size))
     fi
   done
   

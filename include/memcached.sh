@@ -5,7 +5,8 @@
 Install_memcached_server() {
   pushd ${current_dir}/src > /dev/null
   # memcached server
-  id -u memcached >/dev/null 2>&1 || useradd -M -s /sbin/nologin memcached
+  id -u memcached >/dev/null 2>&1
+  [ $? -ne 0 ] && useradd -M -s /sbin/nologin memcached
 
   tar xzf memcached-${memcached_ver}.tar.gz
   pushd memcached-${memcached_ver} > /dev/null

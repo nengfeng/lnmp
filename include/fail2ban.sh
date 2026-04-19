@@ -14,11 +14,7 @@ Install_fail2ban() {
   fi
   /bin/cp build/fail2ban.service /lib/systemd/system/
   svc_enable fail2ban
-  if grep -q "^Port" /etc/ssh/sshd_config; then
-    now_ssh_port=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}' | head -1)
-  else
-    now_ssh_port=22
-  fi
+  [ -z "$(grep ^Port /etc/ssh/sshd_config)" ] && now_ssh_port=22 || now_ssh_port=$(grep ^Port /etc/ssh/sshd_config | awk '{print $2}' | head -1)
   if ufw status | grep -wq inactive; then
     ufw default allow incoming
     ufw --force enable

@@ -41,7 +41,7 @@ config_nginx_conf() {
   
   # Add php-fpm status location if PHP is installed
   # Note: Main PHP uses 'php-cgi.sock', additional PHP versions use 'php{ver}-cgi.sock'
-  if [ -e "${php_install_dir}/sbin/php-fpm" ] && ! grep -q '/php-fpm_status' ${install_dir}/conf/nginx.conf; then
+  if [ -e "${php_install_dir}/sbin/php-fpm" ] && [ -z "$(grep '/php-fpm_status' ${install_dir}/conf/nginx.conf)" ]; then
     sed -i "s@index index.html index.php;@index index.html index.php;\n    location ~ /php-fpm_status {\n        #fastcgi_pass remote_php_ip:9000;\n        fastcgi_pass unix:/dev/shm/php-cgi.sock;\n        fastcgi_index index.php;\n        include fastcgi.conf;\n        allow 127.0.0.1;\n        deny all;\n        }@" ${install_dir}/conf/nginx.conf
   fi
 }

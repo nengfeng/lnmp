@@ -22,14 +22,14 @@ EOF
 sed -i 's@^"syntax on@syntax on@' /etc/vim/vimrc
 
 # PS1
-grep -q ^PS1 ~/.bashrc || echo "PS1='\${debian_chroot:+(\$debian_chroot)}\\[\\e[1;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ '" >> ~/.bashrc
+[ -z "$(grep ^PS1 ~/.bashrc)" ] && echo "PS1='\${debian_chroot:+(\$debian_chroot)}\\[\\e[1;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ '" >> ~/.bashrc
 
 # history
-grep -q history-timestamp ~/.bashrc || echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\$(pwd)/:\$msg ---- \$(who am i); } >> /tmp/\$(hostname).\$(whoami).history-timestamp'" >> ~/.bashrc
+[ -z "$(grep history-timestamp ~/.bashrc)" ] && echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\$(pwd)/:\$msg ---- \$(who am i); } >> /tmp/\$(hostname).\$(whoami).history-timestamp'" >> ~/.bashrc
 
 # /etc/security/limits.conf
-[ -e /etc/security/limits.d/*nproc.conf ] && rename nproc.conf nproc.conf_bk /etc/security/limits.d/*nproc.conf || true
-grep -q 'session required pam_limits.so' /etc/pam.d/common-session || echo "session required pam_limits.so" >> /etc/pam.d/common-session
+[ -e /etc/security/limits.d/*nproc.conf ] && rename nproc.conf nproc.conf_bk /etc/security/limits.d/*nproc.conf
+[ -z "$(grep 'session required pam_limits.so' /etc/pam.d/common-session)" ] && echo "session required pam_limits.so" >> /etc/pam.d/common-session
 sed -i '/^# End of file/,$d' /etc/security/limits.conf
 cat >> /etc/security/limits.conf <<EOF
 # End of file
@@ -51,7 +51,7 @@ rm -rf /etc/localtime
 ln -s /usr/share/zoneinfo/${timezone} /etc/localtime
 
 # /etc/sysctl.conf
-grep -q 'fs.file-max' /etc/sysctl.conf || cat >> /etc/sysctl.conf << EOF
+[ -z "$(grep 'fs.file-max' /etc/sysctl.conf)" ] && cat >> /etc/sysctl.conf << EOF
 fs.file-max = 1000000
 fs.inotify.max_user_instances = 16384
 net.ipv4.tcp_syncookies = 1

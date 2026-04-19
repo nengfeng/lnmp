@@ -4,8 +4,10 @@
 
 Install_PureFTPd() {
   pushd ${current_dir}/src > /dev/null
-  id -g ${run_group} >/dev/null 2>&1 || groupadd ${run_group}
-  id -u ${run_user} >/dev/null 2>&1 || useradd -g ${run_group} -M -s /sbin/nologin ${run_user}
+  id -g ${run_group} >/dev/null 2>&1
+  [ $? -ne 0 ] && groupadd ${run_group}
+  id -u ${run_user} >/dev/null 2>&1
+  [ $? -ne 0 ] && useradd -g ${run_group} -M -s /sbin/nologin ${run_user}
 
   tar xzf pure-ftpd-${pureftpd_ver}.tar.gz
   pushd pure-ftpd-${pureftpd_ver} > /dev/null
@@ -18,7 +20,7 @@ Install_PureFTPd() {
     sed -i "s@/usr/local/pureftpd@${pureftpd_install_dir}@g" /lib/systemd/system/pureftpd.service
     service_action enable pureftpd
 
-    mkdir -p "${pureftpd_install_dir}/etc"
+    [ ! -e "${pureftpd_install_dir}/etc" ] && mkdir ${pureftpd_install_dir}/etc
     /bin/cp ../config/pure-ftpd.conf ${pureftpd_install_dir}/etc
     sed -i "s@^PureDB.*@PureDB  ${pureftpd_install_dir}/etc/pureftpd.pdb@" ${pureftpd_install_dir}/etc/pure-ftpd.conf
     sed -i "s@^LimitRecursion.*@LimitRecursion  65535 8@" ${pureftpd_install_dir}/etc/pure-ftpd.conf

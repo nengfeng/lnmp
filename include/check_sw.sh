@@ -10,7 +10,7 @@ installDepsDebian() {
     for Package in ${pkgList};do
       apt-get -y purge ${Package}
     done
-    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P 2>/dev/null || true
+    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P
   fi
 
   echo "${CMSG}Installing dependencies packages...${CEND}"
@@ -57,7 +57,7 @@ installDepsUbuntu() {
     for Package in ${pkgList};do
       apt-get -y purge ${Package}
     done
-    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P 2>/dev/null || true
+    dpkg -l | grep ^rc | awk '{print $2}' | xargs dpkg -P
   fi
 
   echo "${CMSG}Installing dependencies packages...${CEND}"
@@ -94,7 +94,7 @@ installDepsUbuntu() {
 
 installDepsBySrc() {
   pushd ${current_dir}/src > /dev/null
-  if ! command -v icu-config > /dev/null 2>&1 || ! icu-config --version | grep -q '^3\.' || [[ "${Ubuntu_ver}" == "20" ]]; then
+  if ! command -v icu-config > /dev/null 2>&1 || icu-config --version | grep '^3.' || [[ "${Ubuntu_ver}" == "20" ]]; then
     tar xzf icu4c-${icu4c_ver}-src.tgz
     pushd icu/source > /dev/null
     ./configure --prefix=/usr/local

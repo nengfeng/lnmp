@@ -12,7 +12,7 @@ printf "
 #######################################################################
 "
 # Check if user is root
-{ [ "$(id -u)" != "0" ]; } && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
+[ "$(id -u)" != "0" ] && { echo "${CFAILURE}Error: You must be root to run this script${CEND}"; exit 1; }
 
 current_dir=$(dirname "$(readlink -f $0)")
 pushd ${current_dir} > /dev/null
@@ -26,7 +26,7 @@ FTP_tmp_passfile=${pureftpd_install_dir}/etc/pureftpd_psss.tmp
 Puredbfile=${pureftpd_install_dir}/etc/pureftpd.pdb
 Passwdfile=${pureftpd_install_dir}/etc/pureftpd.passwd
 FTP_bin=${pureftpd_install_dir}/bin/pure-pw
-grep -q "^PureDB" ${FTP_conf} || { echo "${CFAILURE}pure-ftpd is not own password database${CEND}" ; exit 1; }
+[ -z "$(grep ^PureDB ${FTP_conf})" ] && { echo "${CFAILURE}pure-ftpd is not own password database${CEND}" ; exit 1; }
 
 ARG_NUM=$#
 Show_Help() {
@@ -106,8 +106,8 @@ PASSWORD() {
       echo
       read -e -p "Please input the password: " Password
     fi
-    echo "${Password}" | grep -q '[+|&]' && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
-    if [ ${#Password} -ge 5 ]; then
+    [ -n "$(echo ${Password} | grep '[+|&]')" ] && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
+    if (( ${#Password} >= 5 )); then
       printf "%b" "${Password}\n${Password}\n" > ${FTP_tmp_passfile}
       break
     else
@@ -133,9 +133,7 @@ DIRECTORY() {
 
 UserAdd() {
   USER
-  if [ -e "${Passwdfile}" ] && grep -q "^${User}:" "${Passwdfile}"; then
-    echo "${CQUESTION}[${User}] is already existed! ${CEND}"; exit 1
-  fi
+  [ -e "${Passwdfile}" ] && [ -n "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] is already existed! ${CEND}"; exit 1; }
   PASSWORD;DIRECTORY
   ${FTP_bin} useradd ${User} -f ${Passwdfile} -u ${run_user} -g ${run_group} -d ${Directory} -m < ${FTP_tmp_passfile}
   ${FTP_bin} mkdb ${Puredbfile} -f ${Passwdfile} > /dev/null 2>&1
@@ -151,9 +149,7 @@ UserAdd() {
 
 UserMod() {
   USER
-  if [ ! -e "${Passwdfile}" ] || ! grep -q "^${User}:" "${Passwdfile}"; then
-    echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1
-  fi
+  [ -e "${Passwdfile}" ] && [ -z "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1; }
   DIRECTORY
   ${FTP_bin} usermod ${User} -f ${Passwdfile} -d ${Directory} -m
   ${FTP_bin} mkdb ${Puredbfile} -f ${Passwdfile} > /dev/null 2>&1
@@ -168,9 +164,7 @@ UserMod() {
 
 UserPasswd() {
   USER
-  if [ ! -e "${Passwdfile}" ] || ! grep -q "^${User}:" "${Passwdfile}"; then
-    echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1
-  fi
+  [ -e "${Passwdfile}" ] && [ -z "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1; }
   PASSWORD
   ${FTP_bin} passwd ${User} -f ${Passwdfile} -m < ${FTP_tmp_passfile}
   ${FTP_bin} mkdb ${Puredbfile} -f ${Passwdfile} > /dev/null 2>&1
@@ -191,9 +185,7 @@ UserDel() {
   fi
 
   USER
-  if [ ! -e "${Passwdfile}" ] || ! grep -q "^${User}:" "${Passwdfile}"; then
-    echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1
-  fi
+  [ -e "${Passwdfile}" ] && [ -z "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1; }
   ${FTP_bin} userdel ${User} -f ${Passwdfile} -m
   ${FTP_bin} mkdb ${Puredbfile} -f ${Passwdfile} > /dev/null 2>&1
   echo
@@ -210,9 +202,7 @@ ListAllUser() {
 
 ShowUser() {
   USER
-  if [ ! -e "${Passwdfile}" ] || ! grep -q "^${User}:" "${Passwdfile}"; then
-    echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1
-  fi
+  [ -e "${Passwdfile}" ] && [ -z "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1; }
   ${FTP_bin} show ${User}
 }
 

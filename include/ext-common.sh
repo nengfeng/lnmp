@@ -47,7 +47,7 @@ declare -A EXT_FLAGS=(
 install_php_ext() {
   local ext_name=$1
   local spec="${EXT_SCRIPTS[$ext_name]}"
-  [ -z "$spec" ] && return 0 || true
+  [ -z "$spec" ] && return
 
   local script=$(echo "$spec" | cut -d'|' -f1)
   local func1=$(echo "$spec" | cut -d'|' -f2)
@@ -56,7 +56,7 @@ install_php_ext() {
   . include/${script}
   ${func1} 2>&1 | tee -a ${current_dir}/install.log
   # Only call func2 if it's an install function (starts with Install_)
-  [[ -n "$func2" && "$func2" == Install_* ]] && ${func2} 2>&1 | tee -a ${current_dir}/install.log || true
+  [[ -n "$func2" && "$func2" == Install_* ]] && ${func2} 2>&1 | tee -a ${current_dir}/install.log
 }
 
 # Uninstall a single PHP extension
@@ -64,7 +64,7 @@ install_php_ext() {
 uninstall_php_ext() {
   local ext_name=$1
   local spec="${EXT_SCRIPTS[$ext_name]}"
-  [ -z "$spec" ] && return 0 || true
+  [ -z "$spec" ] && return
 
   local script=$(echo "$spec" | cut -d'|' -f1)
   local func_count=$(echo "$spec" | tr '|' '\n' | grep -c "^Uninstall_")
@@ -74,7 +74,7 @@ uninstall_php_ext() {
   local i=4
   while true; do
     local func=$(echo "$spec" | cut -d'|' -f${i})
-    [ -z "$func" ] && break 0 || true
+    [ -z "$func" ] && break
     ${func}
     i=$((i+1))
   done
@@ -85,9 +85,7 @@ uninstall_php_ext() {
 # Returns 0 if enabled, 1 if not
 ext_enabled() {
   local flag_name="${EXT_FLAGS[$1]}"
-  if [ -z "$flag_name" ]; then
-    return 1
-  fi
+  [ -z "$flag_name" ] && return 1
   [[ "${!flag_name}" == 1 ]]
 }
 
@@ -114,6 +112,6 @@ uninstall_enabled_exts() {
 # Reload PHP-FPM after extension changes
 # Usage: reload_php_fpm
 reload_php_fpm() {
-  [ -e "${php_install_dir}/sbin/php-fpm" ] && svc_reload php-fpm yes || true
-  [[ -n "${mphp_ver}" && -e "${php_install_dir}${mphp_ver}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes || true
+  [ -e "${php_install_dir}/sbin/php-fpm" ] && svc_reload php-fpm yes
+  [[ -n "${mphp_ver}" && -e "${php_install_dir}${mphp_ver}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes
 }

@@ -48,7 +48,7 @@ verify_sha256() {
   local file_name=$1
   local checksum_url=$2
   
-  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0 || true
+  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
   [ -z "$checksum_url" ] && return 0
   
   echo "Verifying SHA256 checksum for ${file_name}..."
@@ -79,7 +79,7 @@ verify_sha1() {
   local file_name=$1
   local checksum_url=$2
   
-  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0 || true
+  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
   [ -z "$checksum_url" ] && return 0
   
   echo "Verifying SHA1 checksum for ${file_name}..."
@@ -110,7 +110,7 @@ verify_php_sha256() {
   local file_name=$1
   local php_ver=$2
   
-  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0 || true
+  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
   
   echo "Verifying SHA256 checksum for ${file_name}..."
   
@@ -156,7 +156,7 @@ verify_md5_with_retry() {
   local md5_url=$2
   local download_url=$3
   
-  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0 || true
+  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
   
   # 下载 MD5 文件
   wget -q "$md5_url" -O "${file_name}.md5" 2>/dev/null || {
@@ -199,7 +199,7 @@ verify_pgp_signature() {
   local sig_url=$2
   local component=$3
   
-  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0 || true
+  [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
   ! command -v gpg >/dev/null 2>&1 && return 0
   
   echo "Downloading ${component} PGP signature..."
@@ -304,7 +304,7 @@ checkDownload() {
   # ============================================
   if [[ "${db_option}" =~ ^[1-6]$ ]]; then
     if [[ "${db_option}" =~ ^[2-5]$ ]] && [[ "${dbinstallmethod}" == "2" ]]; then
-      [[ "${db_option}" =~ ^[2-5]$ ]] && boost_ver=${boost_oldver} || true
+      [[ "${db_option}" =~ ^[2-5]$ ]] && boost_ver=${boost_oldver}
       echo "Download boost..."
       boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
       src_url="https://downloads.sourceforge.net/project/boost/boost/${boost_ver}/boost_${boostVersion2}.tar.gz"
