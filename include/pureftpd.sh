@@ -18,7 +18,7 @@ Install_PureFTPd() {
     sed -i "s@/usr/local/pureftpd@${pureftpd_install_dir}@g" /lib/systemd/system/pureftpd.service
     service_action enable pureftpd
 
-    [ ! -e "${pureftpd_install_dir}/etc" ] && mkdir ${pureftpd_install_dir}/etc
+    mkdir -p "${pureftpd_install_dir}/etc"
     /bin/cp ../config/pure-ftpd.conf ${pureftpd_install_dir}/etc
     sed -i "s@^PureDB.*@PureDB  ${pureftpd_install_dir}/etc/pureftpd.pdb@" ${pureftpd_install_dir}/etc/pure-ftpd.conf
     sed -i "s@^LimitRecursion.*@LimitRecursion  65535 8@" ${pureftpd_install_dir}/etc/pure-ftpd.conf

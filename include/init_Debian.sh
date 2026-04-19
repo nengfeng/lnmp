@@ -25,7 +25,7 @@ sed -i 's@^"syntax on@syntax on@' /etc/vim/vimrc
 # history
 grep -q history-timestamp ~/.bashrc || echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\$(pwd)/:\$msg ---- \$(who am i); } >> ~/.history-timestamp'" >> ~/.bashrc
 # Set secure permissions for history file
-[ -e ~/.history-timestamp ] && chmod 600 ~/.history-timestamp
+[ -e ~/.history-timestamp ] && chmod 600 ~/.history-timestamp || true
 
 # /etc/security/limits.conf
 [ -e /etc/security/limits.d/*nproc.conf ] && rename nproc.conf nproc.conf_bk /etc/security/limits.d/*nproc.conf || true
