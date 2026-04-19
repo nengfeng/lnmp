@@ -40,7 +40,7 @@ Upgrade_phpMyAdmin() {
     sed -i "s@UploadDir.*@UploadDir'\] = 'upload';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
     sed -i "s@SaveDir.*@SaveDir'\] = 'save';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
     sed -i "s@host'\].*@host'\] = '127.0.0.1';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
-    sed -i "s@blowfish_secret.*;@blowfish_secret\'\] = \'$(cat /dev/urandom | head -1 | base64 | head -c 45)\';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
+    sed -i "s@blowfish_secret.*;@blowfish_secret\'\] = \'$(head -c100 /dev/urandom | base64 | head -c 45)\';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
     # Set secure permissions for upgraded phpMyAdmin
     chmod 755 ${wwwroot_dir}/default/phpMyAdmin
     chown ${run_user}:${run_group} ${wwwroot_dir}/default/phpMyAdmin

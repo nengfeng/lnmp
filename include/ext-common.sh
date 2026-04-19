@@ -47,7 +47,7 @@ declare -A EXT_FLAGS=(
 install_php_ext() {
   local ext_name=$1
   local spec="${EXT_SCRIPTS[$ext_name]}"
-  [ -z "$spec" ] && return
+  [ -z "$spec" ] && return 0 || true
 
   local script=$(echo "$spec" | cut -d'|' -f1)
   local func1=$(echo "$spec" | cut -d'|' -f2)
@@ -64,7 +64,7 @@ install_php_ext() {
 uninstall_php_ext() {
   local ext_name=$1
   local spec="${EXT_SCRIPTS[$ext_name]}"
-  [ -z "$spec" ] && return
+  [ -z "$spec" ] && return 0 || true
 
   local script=$(echo "$spec" | cut -d'|' -f1)
   local func_count=$(echo "$spec" | tr '|' '\n' | grep -c "^Uninstall_")
@@ -74,7 +74,7 @@ uninstall_php_ext() {
   local i=4
   while true; do
     local func=$(echo "$spec" | cut -d'|' -f${i})
-    [ -z "$func" ] && break
+    [ -z "$func" ] && break 0 || true
     ${func}
     i=$((i+1))
   done
@@ -85,7 +85,9 @@ uninstall_php_ext() {
 # Returns 0 if enabled, 1 if not
 ext_enabled() {
   local flag_name="${EXT_FLAGS[$1]}"
-  [ -z "$flag_name" ] && return 1
+  if [ -z "$flag_name" ]; then
+    return 1
+  fi
   [[ "${!flag_name}" == 1 ]]
 }
 

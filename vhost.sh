@@ -158,7 +158,7 @@ If you enter '.', the field will be left blank.
           echo "${CWARNING}input error!${CEND}"
         fi
       done
-    if [ ! -e "${HOME}/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key ]; then
+    if [ ! -e "${HOME}/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key" ]; then
       while :; do echo
         read -e -p "Please enter your email: " EMAIL
         echo
