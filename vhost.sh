@@ -158,7 +158,7 @@ If you enter '.', the field will be left blank.
           echo "${CWARNING}input error!${CEND}"
         fi
       done
-    if [ ! -e "${HOME}/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key ]; then
+    if [ ! -e "${HOME}/.acme.sh/ca/acme.zerossl.com/v2/DV90/account.key" ]; then
       while :; do echo
         read -e -p "Please enter your email: " EMAIL
         echo
@@ -187,8 +187,8 @@ If you enter '.', the field will be left blank.
         read -e -p "Please enter your dnsapi parameters: " DNS_PAR
         echo
         # Security: Validate input to prevent command injection
-        # Block dangerous characters: | & $ ` ( ) { } < > \ newline
-        if [[ "${DNS_PAR}" =~ [\|\&\$\`\(\)\{\}\<\>\\] ]] || [[ "${DNS_PAR}" == *$'\n'* ]]; then
+        # Block dangerous characters: | and $ ( ) { } less than greater than backslash newline
+        if [[ "${DNS_PAR}" =~ [\|\&\$\(\)\{\}\<\>\\] ]] || [[ "${DNS_PAR}" == *$'\n'* ]]; then
           echo "${CWARNING}Invalid characters detected! Only alphanumeric, underscore, equals, and semicolons are allowed.${CEND}"
           continue
         fi
@@ -201,7 +201,10 @@ If you enter '.', the field will be left blank.
           pair=$(echo "$pair" | xargs)
           [ -z "$pair" ] && continue
           # Check format: export VAR_NAME=VALUE (value must not contain $ or backticks)
-          if ! [[ "$pair" =~ ^[[:space:]]*export[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^\$\`]*$ ]]; then
+          local pair_regex="^[[:space:]]*export[[:space:]]+[A-Za-z_][A-Za-z0-9_]*="
+          local backtick_char
+          backtick_char=$(printf '\140')
+          if ! [[ "$pair" =~ $pair_regex ]] || [[ "$pair" == *'$'* ]] || [[ "$pair" == *"$backtick_char"* ]]; then
             echo "${CWARNING}Invalid format: '$pair'. Expected: export VAR_NAME=VALUE${CEND}"
             valid_format=0
             break
@@ -259,7 +262,7 @@ If you enter '.', the field will be left blank.
     echo "You can purchase certificates from providers like DigiCert, Sectigo, TrustAsia, etc."
     echo
     while :; do
-      read -e -p "Please enter SSL Certificate file path (.crt/.pem): " CUSTOM_CERT_PATH
+      read -e -p "Please enter SSL Certificate file path: " CUSTOM_CERT_PATH
       if [ -z "${CUSTOM_CERT_PATH}" ]; then
         echo "${CWARNING}Path cannot be empty${CEND}"
         continue
@@ -276,7 +279,7 @@ If you enter '.', the field will be left blank.
       break
     done
     while :; do
-      read -e -p "Please enter SSL Private Key file path (.key): " CUSTOM_KEY_PATH
+      read -e -p "Please enter SSL Private Key file path: " CUSTOM_KEY_PATH
       if [ -z "${CUSTOM_KEY_PATH}" ]; then
         echo "${CWARNING}Path cannot be empty${CEND}"
         continue
@@ -838,10 +841,10 @@ Del_NGX_Vhost() {
                 fi
               done
               if [[ "${Del_Vhost_wwwroot_flag}" == y ]]; then
-		if [ "${quiet_flag}" != 'y' ]; then
+                if [ "${quiet_flag}" != 'y' ]; then
                   echo "Press Ctrl+c to cancel or Press any key to continue..."
                   char=$(get_char)
-		fi
+                fi
                 rm -rf ${Directory}
               fi
               echo
