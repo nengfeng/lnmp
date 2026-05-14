@@ -24,6 +24,13 @@ output_json="n"
 . ./include/color.sh 2>/dev/null || true
 . ./versions.txt
 
+# GitHub API authentication (optional, raises rate limit from 60 to 5000/hr)
+# Usage: GITHUB_TOKEN=ghp_xxx ./update_versions.sh
+GITHUB_AUTH=""
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  GITHUB_AUTH="Authorization: token ${GITHUB_TOKEN}"
+fi
+
 # Counters
 total=0
 up_to_date=0
@@ -70,7 +77,7 @@ check_latest() {
   total=$((total + 1))
 
   local latest
-  latest=$(curl -sL --connect-timeout 5 --max-time 10 "$url" 2>/dev/null | grep -oP "$regex" | eval "$sort_cmd")
+  latest=$(curl -sL --connect-timeout 5 --max-time 10 ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} "$url" 2>/dev/null | grep -oP "$regex" | eval "$sort_cmd")
 
   if [ -z "$latest" ]; then
     results="${results}⚠️  ${name}: 无法获取最新版本 (当前: ${current})\n"
@@ -200,6 +207,7 @@ fi
 
 # --- PHP (GitHub API for all active branches) ---
 php_tags=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/php/php-src/tags?per_page=100" 2>/dev/null)
 if [ -n "$php_tags" ] && [ "$php_tags" != "[]" ]; then
   for php_major in "8.3" "8.4" "8.5"; do
@@ -235,6 +243,144 @@ else
   check_failed=$((check_failed + 3))
 fi
 
+# --- OpenSSL LTS (match same major.minor, e.g. 3.5.x when current is 3.5.5) ---
+openssl_minor=$(echo "$openssl_ver" | cut -d. -f1,2)
+check_latest "OpenSSL" "$openssl_ver" \
+  "https://www.openssl.org/source/" \
+  "openssl-\K${openssl_minor}\.[0-9]+" "sort -V | tail -1"
+
+# --- PCRE2 (GitHub) ---
+pcre2_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/PCRE2Project/pcre2/releases/latest" 2>/dev/null | \
+  python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
+pcre2_latest="${pcre2_latest#v}"
+if [ -n "$pcre2_latest" ]; then
+  total=$((total + 1))
+  if [[ "$pcre_ver" == "$pcre2_latest" ]]; then
+    results="${results}✅ PCRE2: ${pcre_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$pcre_ver" "$pcre2_latest"; then
+    results="${results}🔄 PCRE2: ${pcre_ver} → ${pcre2_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^pcre_ver=.*/pcre_ver=${pcre2_latest}/" versions.txt
+  else
+    results="${results}✅ PCRE2: ${pcre_ver} (最新: ${pcre2_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  PCRE2: 无法获取版本信息\n"
+  check_failed=$((check_failed + 1))
+fi
+
+# --- LuaJIT (GitHub) ---
+luajit_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/openresty/luajit2/releases/latest" 2>/dev/null | \
+  python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
+luajit_latest="${luajit_latest#v}"
+if [ -n "$luajit_latest" ]; then
+  total=$((total + 1))
+  if [[ "$luajit2_ver" == "$luajit_latest" ]]; then
+    results="${results}✅ LuaJIT: ${luajit2_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$luajit2_ver" "$luajit_latest"; then
+    results="${results}🔄 LuaJIT: ${luajit2_ver} → ${luajit_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^luajit2_ver=.*/luajit2_ver=${luajit_latest}/" versions.txt
+  else
+    results="${results}✅ LuaJIT: ${luajit2_ver} (最新: ${luajit_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  LuaJIT: 无法获取版本信息\n"
+  check_failed=$((check_failed + 1))
+fi
+
+# --- lua-nginx-module (GitHub tags, no releases) ---
+lua_nginx_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/openresty/lua-nginx-module/tags?per_page=20" 2>/dev/null | \
+  python3 -c "
+import json,sys,re
+tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+print(tags[0] if tags else '')
+" 2>/dev/null)
+if [ -n "$lua_nginx_latest" ]; then
+  total=$((total + 1))
+  if [[ "$lua_nginx_module_ver" == "$lua_nginx_latest" ]]; then
+    results="${results}✅ lua-nginx-module: ${lua_nginx_module_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$lua_nginx_module_ver" "$lua_nginx_latest"; then
+    results="${results}🔄 lua-nginx-module: ${lua_nginx_module_ver} → ${lua_nginx_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_nginx_module_ver=.*/lua_nginx_module_ver=${lua_nginx_latest}/" versions.txt
+  else
+    results="${results}✅ lua-nginx-module: ${lua_nginx_module_ver} (最新: ${lua_nginx_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  lua-nginx-module: 无法获取版本信息\n"
+  check_failed=$((check_failed + 1))
+fi
+
+# --- lua-resty-core (GitHub tags, no releases) ---
+lua_core_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/openresty/lua-resty-core/tags?per_page=20" 2>/dev/null | \
+  python3 -c "
+import json,sys,re
+tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+print(tags[0] if tags else '')
+" 2>/dev/null)
+if [ -n "$lua_core_latest" ]; then
+  total=$((total + 1))
+  if [[ "$lua_resty_core_ver" == "$lua_core_latest" ]]; then
+    results="${results}✅ lua-resty-core: ${lua_resty_core_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$lua_resty_core_ver" "$lua_core_latest"; then
+    results="${results}🔄 lua-resty-core: ${lua_resty_core_ver} → ${lua_core_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_resty_core_ver=.*/lua_resty_core_ver=${lua_core_latest}/" versions.txt
+  else
+    results="${results}✅ lua-resty-core: ${lua_resty_core_ver} (最新: ${lua_core_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  lua-resty-core: 无法获取版本信息\n"
+  check_failed=$((check_failed + 1))
+fi
+
+# --- lua-resty-lrucache (GitHub tags, no releases) ---
+lua_lrucache_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/openresty/lua-resty-lrucache/tags?per_page=20" 2>/dev/null | \
+  python3 -c "
+import json,sys,re
+tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+print(tags[0] if tags else '')
+" 2>/dev/null)
+if [ -n "$lua_lrucache_latest" ]; then
+  total=$((total + 1))
+  if [[ "$lua_resty_lrucache_ver" == "$lua_lrucache_latest" ]]; then
+    results="${results}✅ lua-resty-lrucache: ${lua_resty_lrucache_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$lua_resty_lrucache_ver" "$lua_lrucache_latest"; then
+    results="${results}🔄 lua-resty-lrucache: ${lua_resty_lrucache_ver} → ${lua_lrucache_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_resty_lrucache_ver=.*/lua_resty_lrucache_ver=${lua_lrucache_latest}/" versions.txt
+  else
+    results="${results}✅ lua-resty-lrucache: ${lua_resty_lrucache_ver} (最新: ${lua_lrucache_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  lua-resty-lrucache: 无法获取版本信息\n"
+  check_failed=$((check_failed + 1))
+fi
+
 # --- Redis ---
 check_latest "Redis" "$redis_ver" \
   "https://download.redis.io/redis-stable/00-RELEASENOTES" \
@@ -263,12 +409,18 @@ for item in "${pecl_repos[@]}"; do
   repo="${repo%:*}"
   current="${item##*:}"
   current="${current#v}"
+  latest=""
   total=$((total + 1))
 
   latest=$(curl -sL --connect-timeout 5 --max-time 10 \
-    "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null | \
-    python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
-  latest="${latest#v}"
+    ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+    "https://api.github.com/repos/${repo}/tags?per_page=20" 2>/dev/null | \
+    python3 -c "
+import json,sys,re
+tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+print(tags[0] if tags else '')
+" 2>/dev/null)
 
   if [ -z "$latest" ]; then
     results="${results}⚠️  ${name}: 无法获取 (当前: ${current})\n"
@@ -303,6 +455,7 @@ check_latest "Pure-FTPd" "$pureftpd_ver" \
 
 # --- Fail2ban (GitHub) ---
 fail2ban_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/fail2ban/fail2ban/releases/latest" 2>/dev/null | \
   grep -oP '"tag_name":\s*"\K[^"]+')
 if [ -n "$fail2ban_latest" ] && [ "$fail2ban_ver" != "master" ]; then

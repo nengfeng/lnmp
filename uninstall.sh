@@ -170,6 +170,13 @@ Uninstall_Web() {
   [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${tengine_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Tengine uninstall completed! ${CEND}"; }
   [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${openresty_install_dir}/nginx/sbin:d" /etc/profile; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; }
   [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
+  # Clean up LuaJIT and lua libraries (no longer needed after web server removal)
+  if [ ! -d "${nginx_install_dir}" ] && [ ! -d "${tengine_install_dir}" ] && [ ! -d "${openresty_install_dir}" ]; then
+    rm -f /usr/local/lib/libluajit-5.1.so*
+    rm -rf /usr/local/lib/lua /usr/local/share/lua /usr/local/include/luajit-2.1
+    rm -f /etc/ld.so.conf.d/luajit.conf
+    ldconfig 2>/dev/null
+  fi
   if [ -e "${wwwroot_dir}" ]; then
     read -e -p "Move ${wwwroot_dir} to ${wwwroot_dir}_bak? (y/n): " move_www
     [[ "${move_www}" == "y" ]] && /bin/mv "${wwwroot_dir}" "${wwwroot_dir}_$(date +%Y%m%d%H)"
