@@ -7,6 +7,10 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 #set -e
 set -o pipefail
+
+# Record start time
+startTime=$(date +%s)
+
 clear
 printf "
 #######################################################################
@@ -642,9 +646,17 @@ fi
 [[ -n "${mphp_ver}" && -e "${php_install_dir}/sbin/php-fpm" ]] && svc_reload php${mphp_ver}-fpm yes
 
 endTime=$(date +%s)
-((installTime=($endTime-$startTime)/60))
+((installTimeSec=$endTime-$startTime))
+((installTimeMin=installTimeSec/60))
+((installTimeSec=installTimeSec%60))
 echo "####################Congratulations########################"
-echo "Total Install Time: ${CQUESTION}${installTime}${CEND} minutes"
+if [ $installTimeMin -ge 60 ]; then
+  ((installTimeHr=installTimeMin/60))
+  ((installTimeMin=installTimeMin%60))
+  echo "Total Install Time: ${CQUESTION}${installTimeHr}h ${installTimeMin}m ${installTimeSec}s${CEND}"
+else
+  echo "Total Install Time: ${CQUESTION}${installTimeMin}m ${installTimeSec}s${CEND}"
+fi
 [[ "${nginx_option}" =~ ^[1-3]$ ]] && printf "%b" "\n$(printf "%-32s" "Nginx install dir":)${CMSG}${web_install_dir}${CEND}\n"
 [[ "${db_option}" =~ ^[1-5]$ ]] && printf "%b" "\n$(printf "%-32s" "Database install dir:")${CMSG}${db_install_dir}${CEND}\n"
 [[ "${db_option}" =~ ^[1-5]$ ]] && echo "$(printf "%-32s" "Database data dir:")${CMSG}${db_data_dir}${CEND}"
