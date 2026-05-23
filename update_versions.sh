@@ -289,7 +289,7 @@ luajit_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   python3 -c "
 import json,sys,re
 try:
-    tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if isinstance(t, dict) and 'name' in t and re.match(r'2\.1-\d{8}$', t['name'])]
+    tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if isinstance(t, dict) and 'name' in t and re.match(r'2\.1-\d{8}$', t['name'].lstrip('v'))]
     tags.sort(reverse=True)
     print(tags[0] if tags else '')
 except (json.JSONDecodeError, KeyError, TypeError):
