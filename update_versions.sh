@@ -213,12 +213,12 @@ if [ -n "$php_tags" ] && [ "$php_tags" != "[]" ]; then
   for php_major in "8.3" "8.4" "8.5"; do
     total=$((total + 1))
     php_latest=$(echo "$php_tags" | python3 -c "
-import json, sys
+import json, sys, re
 tags = json.load(sys.stdin)
 major = '${php_major}'
 for t in tags:
     v = t['name'].replace('php-','')
-    if v.startswith(major + '.'):
+    if v.startswith(major + '.') and not re.search(r'(alpha|beta|RC|b\d)', v):
         print(v); break" 2>/dev/null)
     eval "php_current=\$php${php_major/./}_ver"
     if [ -n "$php_latest" ]; then
