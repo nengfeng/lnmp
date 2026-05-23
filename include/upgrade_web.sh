@@ -51,7 +51,7 @@ Upgrade_Nginx() {
     ${nginx_install_dir}/sbin/nginx -V &> $$
     nginx_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
     rm -rf $$
-    nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-\w.\w\+.\w\+ @lua-nginx-module-${lua_nginx_module_ver} @" | sed "s@lua-nginx-module @lua-nginx-module-${lua_nginx_module_ver} @" | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
+    nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-[0-9.]\+@lua-nginx-module-${lua_nginx_module_ver}@" | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Always ensure lua modules are present in configure args
     if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
@@ -155,7 +155,7 @@ Upgrade_Tengine() {
     ${tengine_install_dir}/sbin/nginx -V &> $$
     tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
     rm -rf $$
-    tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
+    tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Always ensure lua modules are present in configure args
     if [ -z "$(echo ${tengine_configure_args} | grep lua-nginx-module)" ]; then
