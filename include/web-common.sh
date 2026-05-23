@@ -222,7 +222,7 @@ install_web_server() {
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
 
   # Set Lua package paths for lua-nginx-module
-  export LUA_PATH="/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;;"
+  export LUA_PATH="/usr/local/lib/lua/5.1/?.lua;/usr/local/lib/lua/5.1/?/init.lua;/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;;"
   export LUA_CPATH="/usr/local/lib/lua/5.1/?.so;;"
 
   ./configure --prefix=${install_dir} --user=${run_user} --group=${run_group} \
