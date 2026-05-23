@@ -264,6 +264,7 @@ except (json.JSONDecodeError, KeyError, TypeError):
     print('')
 " 2>/dev/null)
 pcre2_latest="${pcre2_latest#v}"
+  pcre2_latest="${pcre2_latest#pcre2-}"
 if [ -n "$pcre2_latest" ]; then
   total=$((total + 1))
   if [[ "$pcre_ver" == "$pcre2_latest" ]]; then
