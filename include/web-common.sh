@@ -201,9 +201,11 @@ install_web_server() {
     pushd "lua-resty-core-${lua_resty_core_ver}" > /dev/null
     make install
     # Create init.lua so require("resty.core") works with lua-nginx-module
-    # The module searches resty/core.so first, then resty/core/init.lua
-    if [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
-      echo 'return require("resty.core")' > /usr/local/lib/lua/5.1/resty/core/init.lua
+    # Lua require("resty.core") searches resty/core.so then resty/core/init.lua
+    # (it does NOT search resty/core.lua directly)
+    if [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ] && [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ]; then
+      ln -sf "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua" 2>/dev/null || \
+      cp "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua"
     fi
     popd > /dev/null
     rm -rf "lua-resty-core-${lua_resty_core_ver}"
