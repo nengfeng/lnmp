@@ -146,14 +146,25 @@ _extract_tar() {
     return 0
   fi
 
-  # Try URL-derived filename (v{ver}.tar.gz)
+  # Try URL-derived filename: extract version from expected name
+  # Handle formats like:
+  #   "lua-nginx-module-0.10.29.tar.gz" -> "v0.10.29.tar.gz"
+  #   "luajit2-2.1-20260415.tar.gz"     -> "v2.1-20260415.tar.gz"
+  #   "pcre2-10.47.tar.gz"               -> "v10.47.tar.gz"
+  local base="${expected_name%.tar.*}"  # Remove .tar.gz
+  # Try to find version pattern: X.Y or X.Y-Z
   local ver=""
-  # Extract version from expected name (e.g. lua-nginx-module-0.10.29 -> 0.10.29)
-  ver=$(echo "$expected_name" | grep -oP '[0-9]+\.[0-9]+[.\-][0-9]+$')
-  if [ -n "$ver" ] && [ -f "v${ver}.tar.gz" ]; then
-    mv "v${ver}.tar.gz" "$expected_name"
-    tar xzf "$expected_name"
-    return 0
+  # Match patterns like 0.10.29, 2.1-20260415, 10.47, 1.30.2, 3.5.6
+  ver=$(echo "$base" | grep -oP '\d+\.\d+[\-.]\d+' | tail -1)
+  [ -z "$ver" ] && ver=$(echo "$base" | grep -oP '\d+\.\d+' | tail -1)
+  if [ -n "$ver" ]; then
+    for vf in "v${ver}.tar.gz" "v${ver}.tar.xz" "v${ver}.tgz"; do
+      if [ -f "$vf" ]; then
+        mv "$vf" "$expected_name"
+        tar xzf "$expected_name"
+        return 0
+      fi
+    done
   fi
 
   echo "${CERROR}Cannot find tarball for: ${expected_name}${CEND}"
