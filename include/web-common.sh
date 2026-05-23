@@ -199,25 +199,8 @@ install_web_server() {
   if [ ! -e "/usr/local/lib/lua/5.1/resty/core.lua" ]; then
     _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz"
     pushd "lua-resty-core-${lua_resty_core_ver}" > /dev/null
+    # Install to /usr/local/lib/lua/5.1/ (not share/) to match lua_package_path
     make install
-    # Create .so stubs for lua-nginx-module's require("resty.core")
-    # The module searches for resty/core.so or resty.so; provide minimal stubs
-    if command -v gcc >/dev/null 2>&1; then
-      local luajit_inc="${LUAJIT_INC:-/usr/local/include/luajit-2.1}"
-      local luajit_lib="${LUAJIT_LIB:-/usr/local/lib}"
-      # Create a minimal resty.so that loads the Lua modules
-      cat > /tmp/resty_core_stub.c << 'CEOF'
-#include <lua.h>
-#include <lualib.h>
-int luaopen_resty_core(lua_State *L) {
-    luaL_openlibs(L);
-    return 0;
-}
-CEOF
-      gcc -shared -fPIC -o /usr/local/lib/lua/5.1/resty/core.so \
-        /tmp/resty_core_stub.c -I"$luajit_inc" -L"$luajit_lib" -lluajit-5.1 2>/dev/null || true
-      rm -f /tmp/resty_core_stub.c
-    fi
     popd > /dev/null
     rm -rf "lua-resty-core-${lua_resty_core_ver}"
   fi
