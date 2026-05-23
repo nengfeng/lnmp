@@ -126,21 +126,26 @@ close_gcc_debug() {
   sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' ${src_dir}/auto/cc/gcc
 }
 
-# Extract tarball, handling both prefixed and URL-derived filenames
+# Extract tarball in src/ directory
 # Usage: _extract_tar <expected_name>
 _extract_tar() {
   local expected_name="$1"
-
-  # If already extracted, skip
+  local src_dir="${current_dir}/src"
   local expected_dir="${expected_name%.tar.*}"
   expected_dir="${expected_dir%.tgz}"
-  if [ -d "$expected_dir" ]; then
+
+  # If already extracted, skip
+  if [ -d "${src_dir}/${expected_dir}" ]; then
     return 0
   fi
+
+  # Change to src directory
+  pushd "$src_dir" > /dev/null
 
   # If expected file exists, extract it
   if [ -f "$expected_name" ]; then
     tar xzf "$expected_name"
+    popd > /dev/null
     return 0
   fi
 
@@ -152,9 +157,11 @@ _extract_tar() {
   if [ -f "$vf" ]; then
     mv "$vf" "$expected_name"
     tar xzf "$expected_name"
+    popd > /dev/null
     return 0
   fi
 
+  popd > /dev/null
   echo "${CERROR}Cannot find tarball for: ${expected_name}${CEND}"
   return 1
 }
@@ -171,14 +178,6 @@ install_web_server() {
   local src_name=${server_type}-${server_ver}
   local conf_dir=${install_dir}
 
-  # Switch to src directory for tar extraction and compilation
-  pushd "${current_dir}/src" > /dev/null
-  
-  # OpenResty has different directory structure
-  if [[ "${server_type}" == "openresty" ]]; then
-    conf_dir=${install_dir}/nginx
-  fi
-  
   # Build LuaJIT first (required by lua-nginx-module)
   if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
     _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}"
@@ -229,7 +228,6 @@ install_web_server() {
     rm -rf ${install_dir}
     fail_msg "${server_type}"
   fi
-  popd > /dev/null
 }
 
 # Post-install web server setup
