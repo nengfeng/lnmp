@@ -69,6 +69,7 @@ Upgrade_Nginx() {
       make && make install
       popd > /dev/null
       rm -rf "luajit2-${luajit2_ver}"
+      ldconfig
     fi
 
     # Install lua-resty-core and lua-resty-lrucache
@@ -173,6 +174,7 @@ Upgrade_Tengine() {
       make && make install
       popd > /dev/null
       rm -rf "luajit2-${luajit2_ver}"
+      ldconfig
     fi
 
     src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src
