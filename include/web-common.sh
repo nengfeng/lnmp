@@ -194,8 +194,22 @@ install_web_server() {
   _extract_tar "${src_name}.tar.gz"
   _extract_tar "openssl-${openssl_ver}.tar.gz"
   _extract_tar "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-  _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-  _extract_tar "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+
+  # Install lua-resty-core and lua-resty-lrucache (Lua libraries, not Nginx modules)
+  if [ ! -e "/usr/local/lib/lua/5.1/resty/core.so" ]; then
+    _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+    pushd "lua-resty-core-${lua_resty_core_ver}" > /dev/null
+    make install
+    popd > /dev/null
+    rm -rf "lua-resty-core-${lua_resty_core_ver}"
+  fi
+  if [ ! -e "/usr/local/lib/lua/5.1/resty/lrucache.so" ]; then
+    _extract_tar "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+    pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}" > /dev/null
+    make install
+    popd > /dev/null
+    rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
+  fi
   pushd ${src_name} > /dev/null
   
   # Close debug for nginx and openresty
@@ -206,6 +220,11 @@ install_web_server() {
   fi
   
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
+
+  # Set Lua package paths for lua-nginx-module
+  export LUA_PATH="/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;;"
+  export LUA_CPATH="/usr/local/lib/lua/5.1/?.so;;"
+
   ./configure --prefix=${install_dir} --user=${run_user} --group=${run_group} \
     --with-http_stub_status_module --with-http_v2_module \
     --with-http_v3_module --with-http_ssl_module --with-stream \
