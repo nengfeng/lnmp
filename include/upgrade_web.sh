@@ -25,8 +25,8 @@ Upgrade_Nginx() {
         src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
-        tar xzf ngx_devel_kit.tar.gz
-        tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
+        tar xzf v0.3.3.tar.gz
+        tar xzf "v${lua_nginx_module_ver}.tar.gz"
         echo "Download [${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -63,28 +63,28 @@ Upgrade_Nginx() {
     # Build LuaJIT if not present
     if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
       ${current_dir}/upgrade.sh --script > /dev/null
-      src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
-      tar xzf luajit2-${luajit2_ver}.tar.gz
-      pushd luajit2-${luajit2_ver}
+      src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src
+      tar xzf "${src_url##*/}"
+      pushd "luajit2-${luajit2_ver}"
       make && make install
       popd > /dev/null
-      rm -rf luajit2-${luajit2_ver}
+      rm -rf "luajit2-${luajit2_ver}"
     fi
 
     # Install lua-resty-core and lua-resty-lrucache
-    src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/${lua_resty_core_ver}.tar.gz" && Download_src
-    tar xzf lua-resty-core-${lua_resty_core_ver}.tar.gz
-    pushd lua-resty-core-${lua_resty_core_ver}
+    src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src
+    tar xzf "${src_url##*/}"
+    pushd "lua-resty-core-${lua_resty_core_ver}"
     make install
     popd > /dev/null
-    rm -rf lua-resty-core-${lua_resty_core_ver}
+    rm -rf "lua-resty-core-${lua_resty_core_ver}"
 
-    src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/${lua_resty_lrucache_ver}.tar.gz" && Download_src
-    tar xzf lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz
-    pushd lua-resty-lrucache-${lua_resty_lrucache_ver}
+    src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src
+    tar xzf "${src_url##*/}"
+    pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
     make install
     popd > /dev/null
-    rm -rf lua-resty-lrucache-${lua_resty_lrucache_ver}
+    rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
     tar xzf nginx-${NEW_nginx_ver}.tar.gz
     pushd nginx-${NEW_nginx_ver}
@@ -171,31 +171,31 @@ Upgrade_Tengine() {
     # Build LuaJIT and install lua deps if not present
     if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
       ${current_dir}/upgrade.sh --script > /dev/null
-      src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
-      tar xzf luajit2-${luajit2_ver}.tar.gz
-      pushd luajit2-${luajit2_ver}
+      src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src
+      tar xzf "${src_url##*/}"
+      pushd "luajit2-${luajit2_ver}"
       make && make install
       popd > /dev/null
-      rm -rf luajit2-${luajit2_ver}
+      rm -rf "luajit2-${luajit2_ver}"
     fi
 
-    src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/${lua_resty_core_ver}.tar.gz" && Download_src
-    tar xzf lua-resty-core-${lua_resty_core_ver}.tar.gz
-    pushd lua-resty-core-${lua_resty_core_ver}
+    src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src
+    tar xzf "${src_url##*/}"
+    pushd "lua-resty-core-${lua_resty_core_ver}"
     make install
     popd > /dev/null
-    rm -rf lua-resty-core-${lua_resty_core_ver}
+    rm -rf "lua-resty-core-${lua_resty_core_ver}"
 
-    src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/${lua_resty_lrucache_ver}.tar.gz" && Download_src
-    tar xzf lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz
-    pushd lua-resty-lrucache-${lua_resty_lrucache_ver}
+    src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src
+    tar xzf "${src_url##*/}"
+    pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
     make install
     popd > /dev/null
-    rm -rf lua-resty-lrucache-${lua_resty_lrucache_ver}
+    rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
     # Download lua-nginx-module for Tengine build
     src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src
-    tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
+    tar xzf "${src_url##*/}"
 
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
