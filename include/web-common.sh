@@ -199,7 +199,13 @@ install_web_server() {
   if [ ! -e "/usr/local/lib/lua/5.1/resty/core.lua" ]; then
     _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz"
     pushd "lua-resty-core-${lua_resty_core_ver}" > /dev/null
-    make install
+    # Install to /usr/local/lib/lua/5.1/ (not /usr/local/lib/lua/) to match lua_package_path
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
+    # Create init.lua so require("resty.core") works with lua-nginx-module
+    # Lua require("resty.core") searches resty/core.so then resty/core/init.lua
+    if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
+      cp "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua"
+    fi
     # Create init.lua so require("resty.core") works with lua-nginx-module
     # Lua require("resty.core") searches resty/core.so then resty/core/init.lua
     # (it does NOT search resty/core.lua directly)
@@ -214,7 +220,7 @@ install_web_server() {
   if [ ! -e "/usr/local/lib/lua/5.1/resty/lrucache.lua" ]; then
     _extract_tar "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
     pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}" > /dev/null
-    make install
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
   fi
