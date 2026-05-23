@@ -126,6 +126,40 @@ close_gcc_debug() {
   sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' ${src_dir}/auto/cc/gcc
 }
 
+# Extract tarball, handling both prefixed and URL-derived filenames
+# Usage: _extract_tar <expected_name> [expected_dir]
+_extract_tar() {
+  local expected_name="$1"
+  local expected_dir="${2%.tar.gz}"
+  # Remove .tar.gz suffix for directory check
+  expected_dir="${expected_dir%.tar.xz}"
+  expected_dir="${expected_dir%.tgz}"
+
+  # If already extracted, skip
+  if [ -d "$expected_dir" ]; then
+    return 0
+  fi
+
+  # If expected file exists, extract it
+  if [ -f "$expected_name" ]; then
+    tar xzf "$expected_name"
+    return 0
+  fi
+
+  # Try URL-derived filename (v{ver}.tar.gz)
+  local ver=""
+  # Extract version from expected name (e.g. lua-nginx-module-0.10.29 -> 0.10.29)
+  ver=$(echo "$expected_name" | grep -oP '[0-9]+\.[0-9]+[.\-][0-9]+$')
+  if [ -n "$ver" ] && [ -f "v${ver}.tar.gz" ]; then
+    mv "v${ver}.tar.gz" "$expected_name"
+    tar xzf "$expected_name"
+    return 0
+  fi
+
+  echo "${CERROR}Cannot find tarball for: ${expected_name}${CEND}"
+  return 1
+}
+
 # Install web server (Nginx/Tengine/OpenResty)
 # Usage: install_web_server type version install_dir [extra_ld_opt]
 # type: nginx, tengine, openresty
@@ -145,7 +179,7 @@ install_web_server() {
   
   # Build LuaJIT first (required by lua-nginx-module)
   if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-    tar xzf "luajit2-${luajit2_ver}.tar.gz"
+    _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}"
     pushd "luajit2-${luajit2_ver}" > /dev/null
     make -j$(nproc) && make install
     popd > /dev/null
@@ -155,12 +189,12 @@ install_web_server() {
     ldconfig
   fi
 
-  tar xzf "pcre2-${pcre_ver}.tar.gz"
-  tar xzf "${src_name}.tar.gz"
-  tar xzf "openssl-${openssl_ver}.tar.gz"
-  tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-  tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-  tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+  _extract_tar "pcre2-${pcre_ver}.tar.gz"
+  _extract_tar "${src_name}.tar.gz"
+  _extract_tar "openssl-${openssl_ver}.tar.gz"
+  _extract_tar "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+  _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+  _extract_tar "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
   pushd ${src_name} > /dev/null
   
   # Close debug for nginx and openresty
