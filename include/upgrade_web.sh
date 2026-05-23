@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
+. include/common.sh
+
 Upgrade_Nginx() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${nginx_install_dir}/sbin/nginx" ] && echo "${CWARNING}Nginx is not installed on your system! ${CEND}" && exit 1
@@ -27,6 +29,8 @@ Upgrade_Nginx() {
         tar xzf pcre2-${pcre_ver}.tar.gz
         tar xzf v0.3.3.tar.gz
         tar xzf "v${lua_nginx_module_ver}.tar.gz"
+        tar xzf "v${lua_resty_core_ver}.tar.gz"
+        tar xzf "v${lua_resty_lrucache_ver}.tar.gz"
         echo "Download [${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -53,12 +57,8 @@ Upgrade_Nginx() {
     if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
       nginx_configure_args="${nginx_configure_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
     fi
-    if [ -z "$(echo ${nginx_configure_args} | grep lua-resty-core)" ]; then
-      nginx_configure_args="${nginx_configure_args} --add-module=../lua-resty-core-${lua_resty_core_ver}"
-    fi
-    if [ -z "$(echo ${nginx_configure_args} | grep lua-resty-lrucache)" ]; then
-      nginx_configure_args="${nginx_configure_args} --add-module=../lua-resty-lrucache-${lua_resty_lrucache_ver}"
-    fi
+    # lua-resty-core and lua-resty-lrucache are Lua libraries, not Nginx modules
+    # They are installed separately below via make install
 
     # Build LuaJIT if not present
     if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
@@ -161,12 +161,8 @@ Upgrade_Tengine() {
     if [ -z "$(echo ${tengine_configure_args} | grep lua-nginx-module)" ]; then
       tengine_configure_args="${tengine_configure_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
     fi
-    if [ -z "$(echo ${tengine_configure_args} | grep lua-resty-core)" ]; then
-      tengine_configure_args="${tengine_configure_args} --add-module=../lua-resty-core-${lua_resty_core_ver}"
-    fi
-    if [ -z "$(echo ${tengine_configure_args} | grep lua-resty-lrucache)" ]; then
-      tengine_configure_args="${tengine_configure_args} --add-module=../lua-resty-lrucache-${lua_resty_lrucache_ver}"
-    fi
+    # lua-resty-core and lua-resty-lrucache are Lua libraries, not Nginx modules
+    # They are installed separately below via make install
 
     # Build LuaJIT and install lua deps if not present
     if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
