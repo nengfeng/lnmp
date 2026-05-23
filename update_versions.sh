@@ -447,16 +447,12 @@ for item in "${pecl_repos[@]}"; do
 
   latest=$(curl -sL --connect-timeout 5 --max-time 10 \
     ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-    "https://api.github.com/repos/${repo}/tags?per_page=20" 2>/dev/null | \
+    "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null | \
     python3 -c "
-import json,sys,re
+import json,sys
 try:
-    data = json.load(sys.stdin)
-    if not isinstance(data, list):
-        sys.exit(1)
-    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
-    print(tags[0] if tags else '')
+    tag = json.load(sys.stdin).get('tag_name','')
+    print(tag.lstrip('v'))
 except (json.JSONDecodeError, KeyError, TypeError):
     print('')
 " 2>/dev/null)
