@@ -282,18 +282,19 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- LuaJIT (GitHub) ---
+# --- LuaJIT (GitHub tags, sorted by date) ---
 luajit_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/openresty/luajit2/releases/latest" 2>/dev/null | \
+  "https://api.github.com/repos/openresty/luajit2/tags?per_page=20" 2>/dev/null | \
   python3 -c "
-import json,sys
+import json,sys,re
 try:
-    print(json.load(sys.stdin).get('tag_name',''))
+    tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if isinstance(t, dict) and 'name' in t and re.match(r'2\.1-\d{8}$', t['name'])]
+    tags.sort(reverse=True)
+    print(tags[0] if tags else '')
 except (json.JSONDecodeError, KeyError, TypeError):
     print('')
 " 2>/dev/null)
-luajit_latest="${luajit_latest#v}"
 if [ -n "$luajit_latest" ]; then
   total=$((total + 1))
   if [[ "$luajit2_ver" == "$luajit_latest" ]]; then
