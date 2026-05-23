@@ -143,9 +143,23 @@ install_web_server() {
     conf_dir=${install_dir}/nginx
   fi
   
+  # Build LuaJIT first (required by lua-nginx-module)
+  if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
+    tar xzf luajit2-${luajit2_ver}.tar.gz
+    pushd luajit2-${luajit2_ver} > /dev/null
+    make -j$(nproc) && make install
+    popd > /dev/null
+    rm -rf luajit2-${luajit2_ver}
+    export LUAJIT_LIB=/usr/local/lib
+    export LUAJIT_INC=/usr/local/include/luajit-2.1
+  fi
+
   tar xzf pcre2-${pcre_ver}.tar.gz
   tar xzf ${src_name}.tar.gz
   tar xzf openssl-${openssl_ver}.tar.gz
+  tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
+  tar xzf lua-resty-core-${lua_resty_core_ver}.tar.gz
+  tar xzf lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz
   pushd ${src_name} > /dev/null
   
   # Close debug for nginx and openresty
@@ -157,20 +171,25 @@ install_web_server() {
   
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
   ./configure --prefix=${install_dir} --user=${run_user} --group=${run_group} \
-    --with-http_stub_status_module --with-http_sub_module --with-http_v2_module \
+    --with-http_stub_status_module --with-http_v2_module \
     --with-http_v3_module --with-http_ssl_module --with-stream \
     --with-stream_ssl_preread_module --with-stream_ssl_module \
     --with-http_gzip_static_module --with-http_realip_module \
-    --with-http_flv_module --with-http_mp4_module \
     --with-openssl=../openssl-${openssl_ver} \
     --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit \
+    --add-module=../lua-nginx-module-${lua_nginx_module_ver} \
+    --add-module=../lua-resty-core-${lua_resty_core_ver} \
+    --add-module=../lua-resty-lrucache-${lua_resty_lrucache_ver} \
     --with-ld-opt="-ltcmalloc ${extra_ld_opt}" ${nginx_modules_options}
   
   compile_and_install
   
   if [ -e "${conf_dir}/conf/nginx.conf" ]; then
     popd > /dev/null
-    cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name}
+    cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name} \
+      lua-nginx-module-${lua_nginx_module_ver} \
+      lua-resty-core-${lua_resty_core_ver} \
+      lua-resty-lrucache-${lua_resty_lrucache_ver}
     success_msg "${server_type}"
   else
     rm -rf ${install_dir}

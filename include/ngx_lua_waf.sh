@@ -116,7 +116,7 @@ Tengine_lua_waf() {
     tar xzf openssl-${openssl_ver}.tar.gz
     tar xzf pcre2-${pcre_ver}.tar.gz
     tar xzf ngx_devel_kit.tar.gz
-    tar xzf lua-nginx-module.tar.gz
+    tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
     pushd tengine-${tengine_ver}
     make clean
     export LUAJIT_LIB=/usr/local/lib
