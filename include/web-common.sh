@@ -145,21 +145,22 @@ install_web_server() {
   
   # Build LuaJIT first (required by lua-nginx-module)
   if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-    tar xzf luajit2-${luajit2_ver}.tar.gz
-    pushd luajit2-${luajit2_ver} > /dev/null
+    tar xzf "v${luajit2_ver}.tar.gz"
+    pushd "luajit2-${luajit2_ver}" > /dev/null
     make -j$(nproc) && make install
     popd > /dev/null
-    rm -rf luajit2-${luajit2_ver}
+    rm -rf "luajit2-${luajit2_ver}"
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
+    ldconfig
   fi
 
-  tar xzf pcre2-${pcre_ver}.tar.gz
-  tar xzf ${src_name}.tar.gz
-  tar xzf openssl-${openssl_ver}.tar.gz
-  tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
-  tar xzf lua-resty-core-${lua_resty_core_ver}.tar.gz
-  tar xzf lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz
+  tar xzf "pcre2-${pcre_ver}.tar.gz"
+  tar xzf "${src_name}.tar.gz"
+  tar xzf "openssl-${openssl_ver}.tar.gz"
+  tar xzf "v${lua_nginx_module_ver}.tar.gz"
+  tar xzf "v${lua_resty_core_ver}.tar.gz"
+  tar xzf "v${lua_resty_lrucache_ver}.tar.gz"
   pushd ${src_name} > /dev/null
   
   # Close debug for nginx and openresty
