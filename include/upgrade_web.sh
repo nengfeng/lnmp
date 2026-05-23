@@ -27,10 +27,10 @@ Upgrade_Nginx() {
         src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
-        tar xzf v0.3.3.tar.gz
-        tar xzf "v${lua_nginx_module_ver}.tar.gz"
-        tar xzf "v${lua_resty_core_ver}.tar.gz"
-        tar xzf "v${lua_resty_lrucache_ver}.tar.gz"
+        tar xzf ngx_devel_kit-0.3.3.tar.gz
+        tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+        tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+        tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
         echo "Download [${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] successfully! "
         break
       else

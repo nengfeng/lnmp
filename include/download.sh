@@ -6,7 +6,12 @@
 # Usage: Download_src
 # Requires: src_url variable must be set before calling
 Download_src() {
-  local file_name="${1:-${src_url##*/}}"
+  # Usage: Download_src [output_filename]
+  # If output_filename is provided, download to that name; otherwise use URL basename
+  local file_name="${src_url##*/}"
+  if [ -n "$1" ]; then
+    file_name="$1"
+  fi
   
   # Check if file already exists and has content
   if [ -s "${file_name}" ]; then
