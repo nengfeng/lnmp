@@ -214,12 +214,15 @@ if [ -n "$php_tags" ] && [ "$php_tags" != "[]" ]; then
     total=$((total + 1))
     php_latest=$(echo "$php_tags" | python3 -c "
 import json, sys, re
-tags = json.load(sys.stdin)
-major = '${php_major}'
-for t in tags:
-    v = t['name'].replace('php-','')
-    if v.startswith(major + '.') and not re.search(r'(alpha|beta|RC|b\d)', v):
-        print(v); break" 2>/dev/null)
+try:
+    tags = json.load(sys.stdin)
+    major = '${php_major}'
+    for t in tags:
+        v = t['name'].replace('php-','')
+        if v.startswith(major + '.') and not re.search(r'(alpha|beta|RC|b\d)', v):
+            print(v); break
+except (json.JSONDecodeError, KeyError, TypeError):
+    pass" 2>/dev/null)
     eval "php_current=\$php${php_major/./}_ver"
     if [ -n "$php_latest" ]; then
       if [[ "$php_current" == "$php_latest" ]]; then
@@ -253,7 +256,13 @@ check_latest "OpenSSL" "$openssl_ver" \
 pcre2_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/PCRE2Project/pcre2/releases/latest" 2>/dev/null | \
-  python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
+  python3 -c "
+import json,sys
+try:
+    print(json.load(sys.stdin).get('tag_name',''))
+except (json.JSONDecodeError, KeyError, TypeError):
+    print('')
+" 2>/dev/null)
 pcre2_latest="${pcre2_latest#v}"
 if [ -n "$pcre2_latest" ]; then
   total=$((total + 1))
@@ -277,7 +286,13 @@ fi
 luajit_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/openresty/luajit2/releases/latest" 2>/dev/null | \
-  python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
+  python3 -c "
+import json,sys
+try:
+    print(json.load(sys.stdin).get('tag_name',''))
+except (json.JSONDecodeError, KeyError, TypeError):
+    print('')
+" 2>/dev/null)
 luajit_latest="${luajit_latest#v}"
 if [ -n "$luajit_latest" ]; then
   total=$((total + 1))
@@ -303,9 +318,15 @@ lua_nginx_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   "https://api.github.com/repos/openresty/lua-nginx-module/tags?per_page=20" 2>/dev/null | \
   python3 -c "
 import json,sys,re
-tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
-print(tags[0] if tags else '')
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list):
+        sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+    print(tags[0] if tags else '')
+except (json.JSONDecodeError, KeyError, TypeError):
+    print('')
 " 2>/dev/null)
 if [ -n "$lua_nginx_latest" ]; then
   total=$((total + 1))
@@ -331,9 +352,15 @@ lua_core_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   "https://api.github.com/repos/openresty/lua-resty-core/tags?per_page=20" 2>/dev/null | \
   python3 -c "
 import json,sys,re
-tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
-print(tags[0] if tags else '')
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list):
+        sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+    print(tags[0] if tags else '')
+except (json.JSONDecodeError, KeyError, TypeError):
+    print('')
 " 2>/dev/null)
 if [ -n "$lua_core_latest" ]; then
   total=$((total + 1))
@@ -359,9 +386,15 @@ lua_lrucache_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   "https://api.github.com/repos/openresty/lua-resty-lrucache/tags?per_page=20" 2>/dev/null | \
   python3 -c "
 import json,sys,re
-tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
-print(tags[0] if tags else '')
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list):
+        sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+    print(tags[0] if tags else '')
+except (json.JSONDecodeError, KeyError, TypeError):
+    print('')
 " 2>/dev/null)
 if [ -n "$lua_lrucache_latest" ]; then
   total=$((total + 1))
@@ -417,9 +450,15 @@ for item in "${pecl_repos[@]}"; do
     "https://api.github.com/repos/${repo}/tags?per_page=20" 2>/dev/null | \
     python3 -c "
 import json,sys,re
-tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
-print(tags[0] if tags else '')
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list):
+        sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+    print(tags[0] if tags else '')
+except (json.JSONDecodeError, KeyError, TypeError):
+    print('')
 " 2>/dev/null)
 
   if [ -z "$latest" ]; then
@@ -457,7 +496,7 @@ check_latest "Pure-FTPd" "$pureftpd_ver" \
 fail2ban_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/fail2ban/fail2ban/releases/latest" 2>/dev/null | \
-  grep -oP '"tag_name":\s*"\K[^"]+')
+  grep -oP '"tag_name":\s*"\K[0-9]+\.[0-9]+\.[0-9]+')
 if [ -n "$fail2ban_latest" ] && [ "$fail2ban_ver" != "master" ]; then
   check_latest "fail2ban" "$fail2ban_ver" \
     "https://api.github.com/repos/fail2ban/fail2ban/releases/latest" \
