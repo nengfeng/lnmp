@@ -545,6 +545,42 @@ if [[ "${mphp_flag}" == y ]]; then
   PHP_addons
 fi
 
+# Ensure web server source tarballs exist, download if missing
+if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
+  local _src_dir="${current_dir}/src"
+  pushd "$_src_dir" > /dev/null 2>&1 || { mkdir -p "$_src_dir" && pushd "$_src_dir" > /dev/null; }
+
+  _dl() {
+    local expected="$1" url="$2"
+    [ -f "$expected" ] && return 0
+    echo "${CWARNING}Missing: $expected, downloading...${CEND}"
+    local tmpfile="${expected##*/}"
+    tmpfile="tmp_${tmpfile}"
+    if wget -q -O "$tmpfile" "$url" 2>/dev/null && [ -s "$tmpfile" ]; then
+      mv "$tmpfile" "$expected"
+      echo "${CSUCCESS}Downloaded: $expected${CEND}"
+    else
+      rm -f "$tmpfile"
+      echo "${CERROR}Failed to download: $expected${CEND}"
+      return 1
+    fi
+  }
+
+  case "${nginx_option}" in
+    1) _dl "nginx-${nginx_ver}.tar.gz" "https://nginx.org/download/nginx-${nginx_ver}.tar.gz" ;;
+    2) _dl "tengine-${tengine_ver}.tar.gz" "https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz" ;;
+    3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" ;;
+  esac
+  _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz"
+  _dl "pcre2-${pcre_ver}.tar.gz" "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz"
+  _dl "luajit2-${luajit2_ver}.tar.gz" "https://github.com/openresty/luajit2/archive/v${luajit2_ver}.tar.gz"
+  _dl "lua-nginx-module-${lua_nginx_module_ver}.tar.gz" "https://github.com/openresty/lua-nginx-module/archive/v${lua_nginx_module_ver}.tar.gz"
+  _dl "lua-resty-core-${lua_resty_core_ver}.tar.gz" "https://github.com/openresty/lua-resty-core/archive/v${lua_resty_core_ver}.tar.gz"
+  _dl "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz" "https://github.com/openresty/lua-resty-lrucache/archive/v${lua_resty_lrucache_ver}.tar.gz"
+
+  popd > /dev/null
+fi
+
 # Nginx server
 case "${nginx_option}" in
   1)
