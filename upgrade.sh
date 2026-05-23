@@ -262,12 +262,14 @@ while [ $# -gt 0 ]; do
 done
 
 # Validate version formats
-[ -n "${NEW_nginx_ver}" ] && validate_version "${NEW_nginx_ver}" "Nginx" || exit 1
-[ -n "${NEW_tengine_ver}" ] && validate_version "${NEW_tengine_ver}" "Tengine" || exit 1
-[ -n "${NEW_openresty_ver}" ] && validate_version "${NEW_openresty_ver}" "OpenResty" || exit 1
-[ -n "${NEW_php_ver}" ] && validate_version "${NEW_php_ver}" "PHP" || exit 1
-[ -n "${NEW_redis_ver}" ] && validate_version "${NEW_redis_ver}" "Redis" || exit 1
-[ -n "${NEW_memcached_ver}" ] && validate_version "${NEW_memcached_ver}" "Memcached" || exit 1
+validate_failed=0
+[ -n "${NEW_nginx_ver}" ] && { validate_version "${NEW_nginx_ver}" "Nginx" || validate_failed=1; }
+[ -n "${NEW_tengine_ver}" ] && { validate_version "${NEW_tengine_ver}" "Tengine" || validate_failed=1; }
+[ -n "${NEW_openresty_ver}" ] && { validate_version "${NEW_openresty_ver}" "OpenResty" || validate_failed=1; }
+[ -n "${NEW_php_ver}" ] && { validate_version "${NEW_php_ver}" "PHP" || validate_failed=1; }
+[ -n "${NEW_redis_ver}" ] && { validate_version "${NEW_redis_ver}" "Redis" || validate_failed=1; }
+[ -n "${NEW_memcached_ver}" ] && { validate_version "${NEW_memcached_ver}" "Memcached" || validate_failed=1; }
+[ "${validate_failed}" -eq 1 ] && exit 1
 
 if [[ "${ARG_NUM}" == 0 ]]; then
   Menu
