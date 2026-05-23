@@ -127,15 +127,13 @@ close_gcc_debug() {
 }
 
 # Extract tarball, handling both prefixed and URL-derived filenames
-# Usage: _extract_tar <expected_name> [expected_dir]
+# Usage: _extract_tar <expected_name>
 _extract_tar() {
   local expected_name="$1"
-  local expected_dir="${2%.tar.gz}"
-  # Remove .tar.gz suffix for directory check
-  expected_dir="${expected_dir%.tar.xz}"
-  expected_dir="${expected_dir%.tgz}"
 
   # If already extracted, skip
+  local expected_dir="${expected_name%.tar.*}"
+  expected_dir="${expected_dir%.tgz}"
   if [ -d "$expected_dir" ]; then
     return 0
   fi
@@ -146,25 +144,15 @@ _extract_tar() {
     return 0
   fi
 
-  # Try URL-derived filename: extract version from expected name
-  # Handle formats like:
-  #   "lua-nginx-module-0.10.29.tar.gz" -> "v0.10.29.tar.gz"
-  #   "luajit2-2.1-20260415.tar.gz"     -> "v2.1-20260415.tar.gz"
-  #   "pcre2-10.47.tar.gz"               -> "v10.47.tar.gz"
-  local base="${expected_name%.tar.*}"  # Remove .tar.gz
-  # Try to find version pattern: X.Y or X.Y-Z
-  local ver=""
-  # Match patterns like 0.10.29, 2.1-20260415, 10.47, 1.30.2, 3.5.6
-  ver=$(echo "$base" | grep -oP '\d+\.\d+[\-.]\d+' | tail -1)
-  [ -z "$ver" ] && ver=$(echo "$base" | grep -oP '\d+\.\d+' | tail -1)
-  if [ -n "$ver" ]; then
-    for vf in "v${ver}.tar.gz" "v${ver}.tar.xz" "v${ver}.tgz"; do
-      if [ -f "$vf" ]; then
-        mv "$vf" "$expected_name"
-        tar xzf "$expected_name"
-        return 0
-      fi
-    done
+  # Try URL-derived filename: v{ver}.tar.gz
+  local ver="${expected_name%.tar.*}"
+  ver="${ver##*-}"
+  [ -z "$ver" ] && ver="${expected_name%.tar.*}"
+  local vf="v${ver}.tar.gz"
+  if [ -f "$vf" ]; then
+    mv "$vf" "$expected_name"
+    tar xzf "$expected_name"
+    return 0
   fi
 
   echo "${CERROR}Cannot find tarball for: ${expected_name}${CEND}"
@@ -179,9 +167,12 @@ install_web_server() {
   local server_ver=$2
   local install_dir=$3
   local extra_ld_opt=${4:-""}
-  
+
   local src_name=${server_type}-${server_ver}
   local conf_dir=${install_dir}
+
+  # Switch to src directory for tar extraction and compilation
+  pushd "${current_dir}/src" > /dev/null
   
   # OpenResty has different directory structure
   if [[ "${server_type}" == "openresty" ]]; then
@@ -229,7 +220,6 @@ install_web_server() {
   compile_and_install
   
   if [ -e "${conf_dir}/conf/nginx.conf" ]; then
-    popd > /dev/null
     cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name} \
       lua-nginx-module-${lua_nginx_module_ver} \
       lua-resty-core-${lua_resty_core_ver} \
@@ -239,6 +229,7 @@ install_web_server() {
     rm -rf ${install_dir}
     fail_msg "${server_type}"
   fi
+  popd > /dev/null
 }
 
 # Post-install web server setup
