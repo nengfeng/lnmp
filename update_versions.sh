@@ -251,10 +251,36 @@ check_latest "curl" "$curl_ver" \
   "https://curl.se/download.html" \
   '[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
 
-# --- libsodium ---
-check_latest "libsodium" "$libsodium_ver" \
-  "https://download.libsodium.org/libsodium/releases/" \
-  'libsodium-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+# --- libsodium (GitHub) ---
+libsodium_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/jedisct1/libsodium/releases/latest" 2>/dev/null | \
+  python3 -c "
+import json,sys
+try:
+    data = json.load(sys.stdin)
+    tag = data.get('tag_name','')
+    ver = tag.lstrip('v').lstrip('release-')
+    print(ver)
+except: print('')
+" 2>/dev/null)
+if [ -n "$libsodium_latest" ]; then
+  total=$((total + 1))
+  if [[ "$libsodium_ver" == "$libsodium_latest" ]]; then
+    results="${results}✅ libsodium: ${libsodium_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$libsodium_ver" "$libsodium_latest"; then
+    results="${results}🔄 libsodium: ${libsodium_ver} → ${libsodium_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^libsodium_ver=.*/libsodium_ver=${libsodium_latest}/" versions.txt
+  else
+    results="${results}✅ libsodium: ${libsodium_ver} (最新: ${libsodium_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  libsodium: 无法获取最新版本 (当前: ${libsodium_ver})\n"
+  check_failed=$((check_failed + 1))
+fi
 
 # --- libiconv ---
 check_latest "libiconv" "$libiconv_ver" \
