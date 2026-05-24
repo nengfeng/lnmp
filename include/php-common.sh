@@ -128,8 +128,8 @@ EOF
     cleanup_src mhash-${mhash_ver}
   fi
 
-  # binutils
-  if [ ! -e "/usr/local/include/bfd.h" ]; then
+  # binutils (usually provided by OS, skip if system version exists)
+  if [ ! -e "/usr/local/include/bfd.h" ] && [ ! -e "/usr/include/bfd.h" ]; then
     tar xzf binutils-${binutils_ver}.tar.gz
     pushd binutils-${binutils_ver} > /dev/null
     ./configure

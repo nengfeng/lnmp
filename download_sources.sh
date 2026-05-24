@@ -701,7 +701,6 @@ download_common() {
     "libzip"
     "argon2"
     "mhash"
-    "binutils"
     "redis"
     "memcached"
     "libmemcached"
