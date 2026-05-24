@@ -125,19 +125,49 @@ install_mysql_binary() {
     local mysql_minor="${mysql_ver#*.}"
     local mysql_dir="MySQL-${mysql_major}.${mysql_minor%%.*}"
     local url="https://cdn.mysql.com/Downloads/${mysql_dir}/${tarball}"
-    if ! wget -q -O "$tarball" "$url" 2>/dev/null; then
+    echo "${CMSG}Downloading: ${url}${CEND}"
+    if ! wget --timeout=60 --tries=3 -O "$tarball" "$url" 2>/dev/null; then
       # Try mirror
       url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mysql/downloads/${mysql_dir}/${tarball}"
-      wget -O "$tarball" "$url" || {
-        echo "${CERROR}Failed to download MySQL. Please run: ./download_sources.sh mysql${mysql_major}${mysql_minor%%.*}${CEND}"
+      echo "${CMSG}Trying mirror: ${url}${CEND}"
+      wget --timeout=60 --tries=3 -O "$tarball" "$url" || {
+        echo "${CERROR}Failed to download MySQL ${mysql_ver}.${CEND}"
+        echo "${CERROR}Please download manually from https://dev.mysql.com/downloads/mysql/${CEND}"
         return 1
       }
     fi
+    echo "${CSUCCESS}Downloaded: ${tarball}${CEND}"
   fi
 
-  tar xJf "$tarball"
-  mv mysql-${mysql_ver}-linux-glibc2.28-x86_64/* ${install_dir}
-  sed -i "s@/usr/local/mysql@${install_dir}@g" ${install_dir}/bin/mysqld_safe
+  echo "${CMSG}Extracting ${tarball}...${CEND}"
+  tar xJf "$tarball" || {
+    echo "${CERROR}Failed to extract ${tarball}${CEND}"
+    return 1
+  }
+
+  local src_dir="mysql-${mysql_ver}-linux-glibc2.28-x86_64"
+  if [ ! -d "$src_dir" ]; then
+    echo "${CERROR}Expected directory ${src_dir} not found after extraction${CEND}"
+    return 1
+  fi
+
+  echo "${CMSG}Installing MySQL ${mysql_ver} to ${install_dir}...${CEND}"
+  mv ${src_dir}/* ${install_dir} || {
+    echo "${CERROR}Failed to move files to ${install_dir}${CEND}"
+    return 1
+  }
+  rm -rf "$src_dir"
+
+  if [ -f "${install_dir}/bin/mysqld_safe" ]; then
+    sed -i "s@/usr/local/mysql@${install_dir}@g" ${install_dir}/bin/mysqld_safe
+  fi
+
+  if [ ! -x "${install_dir}/bin/mysqld" ]; then
+    echo "${CERROR}mysqld binary not found or not executable at ${install_dir}/bin/mysqld${CEND}"
+    return 1
+  fi
+
+  echo "${CSUCCESS}MySQL ${mysql_ver} installed successfully${CEND}"
 }
 
 # Install MySQL from source
@@ -238,30 +268,40 @@ install_mariadb_binary() {
   # Download if not present
   if [ ! -f "$tarball" ]; then
     echo "${CWARNING}MariaDB tarball not found, downloading...${CEND}"
-    local url="https://downloads.mariadb.org/rest-api/mariadb/${mariadb_ver}/"
-    # Try to get download URL from MariaDB API
-    local download_url=$(curl -sL "$url" 2>/dev/null | python3 -c "
-import json,sys
-try:
-    data = json.load(sys.stdin)
-    for f in data.get('files', []):
-        if 'linux-systemd-x86_64' in f.get('file_name',''):
-            print(f['file_download_url'])
-            break
-except: pass
-" 2>/dev/null)
-    if [ -z "$download_url" ]; then
-      # Fallback to direct URL
-      download_url="https://downloads.mariadb.com/MariaDB/mariadb-${mariadb_ver}/bintar-linux-systemd-x86_64/mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz"
+    # Try mirror first (faster in China)
+    local mirror_url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mariadb/mariadb-${mariadb_ver}/bintar-linux-systemd-x86_64/${tarball}"
+    echo "${CMSG}Downloading: ${mirror_url}${CEND}"
+    if ! wget --timeout=60 --tries=3 -O "$tarball" "$mirror_url" 2>/dev/null; then
+      # Try official CDN
+      local url="https://dlm.mariadb.org/MariaDB/mariadb-${mariadb_ver}/bintar-linux-systemd-x86_64/${tarball}"
+      echo "${CMSG}Trying official: ${url}${CEND}"
+      wget --timeout=60 --tries=3 -O "$tarball" "$url" || {
+        echo "${CERROR}Failed to download MariaDB ${mariadb_ver}.${CEND}"
+        echo "${CERROR}Please download manually from https://mariadb.org/download/${CEND}"
+        return 1
+      }
     fi
-    wget -O "$tarball" "$download_url" || {
-      echo "${CERROR}Failed to download MariaDB. Please run: ./download_sources.sh mariadb${mariadb_ver%%.*}${CEND}"
-      return 1
-    }
+    echo "${CSUCCESS}Downloaded: ${tarball}${CEND}"
   fi
 
-  tar zxf "$tarball"
-  mv mariadb-${mariadb_ver}-linux-systemd-x86_64/* ${install_dir}
+  echo "${CMSG}Extracting ${tarball}...${CEND}"
+  tar zxf "$tarball" || {
+    echo "${CERROR}Failed to extract ${tarball}${CEND}"
+    return 1
+  }
+
+  local src_dir="mariadb-${mariadb_ver}-linux-systemd-x86_64"
+  if [ ! -d "$src_dir" ]; then
+    echo "${CERROR}Expected directory ${src_dir} not found after extraction${CEND}"
+    return 1
+  fi
+
+  echo "${CMSG}Installing MariaDB ${mariadb_ver} to ${install_dir}...${CEND}"
+  mv ${src_dir}/* ${install_dir} || {
+    echo "${CERROR}Failed to move files to ${install_dir}${CEND}"
+    return 1
+  }
+  rm -rf "$src_dir"
   
   # Inject tcmalloc for better memory performance
   # Use mariadbd-safe for MariaDB 11.x+, mysqld_safe for older versions
