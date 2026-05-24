@@ -404,7 +404,7 @@ import json,sys,re
 try:
     data = json.load(sys.stdin)
     if not isinstance(data, list): sys.exit(1)
-    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^[0-9]+\.[0-9]+\.[0-9]+$', t['name'])]
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^v?[0-9]+\.[0-9]+\.[0-9]+$', t['name'])]
     tags.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
     print(tags[0] if tags else '')
 except: print('')
