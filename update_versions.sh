@@ -394,6 +394,38 @@ else
   check_failed=$((check_failed + 1))
 fi
 
+# --- ngx_devel_kit (GitHub tags) ---
+ngx_devel_kit_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/simpl/ngx_devel_kit/tags?per_page=10" 2>/dev/null | \
+  python3 -c "
+import json,sys,re
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list): sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^[0-9]+\.[0-9]+\.[0-9]+$', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
+    print(tags[0] if tags else '')
+except: print('')
+" 2>/dev/null)
+if [ -n "$ngx_devel_kit_latest" ]; then
+  total=$((total + 1))
+  if [[ "$ngx_devel_kit_ver" == "$ngx_devel_kit_latest" ]]; then
+    results="${results}✅ ngx_devel_kit: ${ngx_devel_kit_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$ngx_devel_kit_ver" "$ngx_devel_kit_latest"; then
+    results="${results}🔄 ngx_devel_kit: ${ngx_devel_kit_ver} → ${ngx_devel_kit_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^ngx_devel_kit_ver=.*/ngx_devel_kit_ver=${ngx_devel_kit_latest}/" versions.txt
+  else
+    results="${results}✅ ngx_devel_kit: ${ngx_devel_kit_ver} (最新: ${ngx_devel_kit_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  ngx_devel_kit: 无法获取版本信息 (当前: ${ngx_devel_kit_ver})\n"
+  check_failed=$((check_failed + 1))
+fi
+
 # --- lua-nginx-module (GitHub tags, no releases) ---
 lua_nginx_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
