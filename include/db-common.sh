@@ -115,8 +115,23 @@ wait_for_db_ready() {
 install_mysql_binary() {
   local mysql_ver=$1
   local install_dir=$2
-  
-  tar xJf mysql-${mysql_ver}-linux-glibc2.28-x86_64.tar.xz
+  local tarball="mysql-${mysql_ver}-linux-glibc2.28-x86_64.tar.xz"
+
+  # Download if not present
+  if [ ! -f "$tarball" ]; then
+    echo "${CWARNING}MySQL tarball not found, downloading...${CEND}"
+    local url="https://cdn.mysql.com/Downloads/MySQL-8.4/${tarball}"
+    if ! wget -q -O "$tarball" "$url" 2>/dev/null; then
+      # Try mirror
+      url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mysql/downloads/MySQL-8.4/${tarball}"
+      wget -O "$tarball" "$url" || {
+        echo "${CERROR}Failed to download MySQL. Please run: ./download_sources.sh mysql84${CEND}"
+        return 1
+      }
+    fi
+  fi
+
+  tar xJf "$tarball"
   mv mysql-${mysql_ver}-linux-glibc2.28-x86_64/* ${install_dir}
   sed -i "s@/usr/local/mysql@${install_dir}@g" ${install_dir}/bin/mysqld_safe
 }
@@ -214,8 +229,34 @@ setup_mysql_root() {
 install_mariadb_binary() {
   local mariadb_ver=$1
   local install_dir=$2
-  
-  tar zxf mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz
+  local tarball="mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz"
+
+  # Download if not present
+  if [ ! -f "$tarball" ]; then
+    echo "${CWARNING}MariaDB tarball not found, downloading...${CEND}"
+    local url="https://downloads.mariadb.org/rest-api/mariadb/${mariadb_ver}/"
+    # Try to get download URL from MariaDB API
+    local download_url=$(curl -sL "$url" 2>/dev/null | python3 -c "
+import json,sys
+try:
+    data = json.load(sys.stdin)
+    for f in data.get('files', []):
+        if 'linux-systemd-x86_64' in f.get('file_name',''):
+            print(f['file_download_url'])
+            break
+except: pass
+" 2>/dev/null)
+    if [ -z "$download_url" ]; then
+      # Fallback to direct URL
+      download_url="https://downloads.mariadb.com/MariaDB/mariadb-${mariadb_ver}/bintar-linux-systemd-x86_64/mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz"
+    fi
+    wget -O "$tarball" "$download_url" || {
+      echo "${CERROR}Failed to download MariaDB. Please run: ./download_sources.sh mariadb${mariadb_ver%%.*}${CEND}"
+      return 1
+    }
+  fi
+
+  tar zxf "$tarball"
   mv mariadb-${mariadb_ver}-linux-systemd-x86_64/* ${install_dir}
   
   # Inject tcmalloc for better memory performance
