@@ -77,7 +77,7 @@ check_latest() {
   total=$((total + 1))
 
   local latest
-  latest=$(curl -sL --connect-timeout 5 --max-time 10 ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} "$url" 2>/dev/null | grep -oP "$regex" | eval "$sort_cmd")
+  latest=$(curl -sL --connect-timeout 10 --max-time 20 ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} "$url" 2>/dev/null | grep -oP "$regex" | eval "$sort_cmd")
 
   if [ -z "$latest" ]; then
     results="${results}⚠️  ${name}: 无法获取最新版本 (当前: ${current})\n"
@@ -129,7 +129,7 @@ echo "${CCYAN}检查组件版本更新...${CEND}"
 echo ""
 
 # --- Nginx: stable only (even middle number) ---
-nginx_stable=$(curl -sL --connect-timeout 5 --max-time 10 \
+nginx_stable=$(curl -sL --connect-timeout 10 --max-time 20 \
   "https://nginx.org/en/download.html" 2>/dev/null | \
   grep -oP 'Stable version.*?nginx-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 if [ -n "$nginx_stable" ]; then
@@ -158,7 +158,7 @@ check_latest "OpenResty" "$openresty_ver" \
 
 # --- Databases ---
 # MySQL uses specific major versions
-mysql84_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+mysql84_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   "https://dev.mysql.com/downloads/mysql/8.0.html" 2>/dev/null | \
   grep -oP 'mysql-8\.\d+\.\d+' | head -1 | grep -oP '8\.\d+\.\d+')
 # Skip MySQL complex check - just note
@@ -173,7 +173,7 @@ check_latest "MariaDB 11.4" "$mariadb114_ver" \
   '11\.4\.[0-9]+'
 
 # PostgreSQL - use official versions.json API
-pgsql_json=$(curl -sL --connect-timeout 5 --max-time 10 \
+pgsql_json=$(curl -sL --connect-timeout 10 --max-time 20 \
   "https://www.postgresql.org/versions.json" 2>/dev/null)
 if [ -n "$pgsql_json" ]; then
   for pg_major in 16 17 18; do
@@ -206,7 +206,7 @@ else
 fi
 
 # --- PHP (GitHub API for all active branches) ---
-php_tags=$(curl -sL --connect-timeout 5 --max-time 10 \
+php_tags=$(curl -sL --connect-timeout 10 --max-time 20 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/php/php-src/tags?per_page=100" 2>/dev/null)
 if [ -n "$php_tags" ] && [ "$php_tags" != "[]" ]; then
@@ -252,7 +252,7 @@ check_latest "curl" "$curl_ver" \
   '[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
 
 # --- libsodium (GitHub) ---
-libsodium_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+libsodium_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/jedisct1/libsodium/releases/latest" 2>/dev/null | \
   python3 -c "
@@ -290,7 +290,7 @@ check_latest "libiconv" "$libiconv_ver" \
   'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1"
 
 # --- memcached (GitHub tags) ---
-memcached_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+memcached_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/memcached/memcached/tags?per_page=10" 2>/dev/null | \
   python3 -c "
@@ -333,7 +333,7 @@ check_latest "OpenSSL" "$openssl_ver" \
   "openssl-\K${openssl_minor}\.[0-9]+" "sort -V | tail -1"
 
 # --- PCRE2 (GitHub) ---
-pcre2_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+pcre2_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/PCRE2Project/pcre2/releases/latest" 2>/dev/null | \
   python3 -c "
@@ -364,7 +364,7 @@ else
 fi
 
 # --- LuaJIT (GitHub tags, sorted by date) ---
-luajit_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+luajit_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/openresty/luajit2/tags?per_page=20" 2>/dev/null | \
   python3 -c "
@@ -428,7 +428,7 @@ else
 fi
 
 # --- lua-nginx-module (GitHub tags, no releases) ---
-lua_nginx_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+lua_nginx_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/openresty/lua-nginx-module/tags?per_page=20" 2>/dev/null | \
   python3 -c "
@@ -549,7 +549,9 @@ for item in "${pecl_repos[@]}"; do
   latest=""
   total=$((total + 1))
 
-  latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  # Small delay to avoid GitHub API rate limiting
+  sleep 1
+  latest=$(curl -sL --connect-timeout 10 --max-time 20 \
     ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
     "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null | \
     python3 -c "
@@ -593,7 +595,7 @@ check_latest "Pure-FTPd" "$pureftpd_ver" \
   'pure-ftpd-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
 
 # --- Fail2ban (GitHub) ---
-fail2ban_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+fail2ban_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/fail2ban/fail2ban/releases/latest" 2>/dev/null | \
   grep -oP '"tag_name":\s*"\K[0-9]+\.[0-9]+\.[0-9]+')
