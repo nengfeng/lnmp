@@ -26,11 +26,12 @@ output_json="n"
 
 # Helper: fetch GitHub tags atom feed and extract version tags
 # Usage: gh_tags <owner/repo> [filter_regex]
-# Outputs: newest version tag (without v prefix)
+# Outputs: newest stable version tag (without v prefix, rc/alpha/beta excluded)
 gh_tags() {
   local repo="$1" filter="${2:-^[0-9]}"
   curl -sL --connect-timeout 10 --max-time 20 \
     "https://github.com/${repo}/tags.atom" 2>/dev/null | \
+    grep "<title>" | grep -vE "(alpha|beta|rc|RC|dev)" | \
     grep -oP "<title>v?\K[0-9][0-9.]*" | \
     grep -E "$filter" | \
     sort -V | tail -1
@@ -38,13 +39,13 @@ gh_tags() {
 
 # Helper: fetch GitHub releases atom feed and extract latest version
 # Usage: gh_release_latest <owner/repo>
-# Outputs: newest release tag (without v prefix)
+# Outputs: newest stable release tag (without v prefix, rc/alpha/beta excluded)
 gh_release_latest() {
   local repo="$1"
   curl -sL --connect-timeout 10 --max-time 20 \
     "https://github.com/${repo}/releases.atom" 2>/dev/null | \
+    grep "<title>" | grep -vE "(alpha|beta|rc|RC|dev)" | \
     grep -oP "<title>v?\K[0-9][0-9.]*" | \
-    grep -vE '(alpha|beta|rc|RC|dev)' | \
     sort -V | tail -1
 }
 
