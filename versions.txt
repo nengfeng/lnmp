@@ -35,7 +35,7 @@ mcrypt_ver=2.6.8
 mhash_ver=0.9.9.9
 freetype_ver=2.13.3
 icu4c_ver=63_1
-libsodium_ver=1.0.20
+libsodium_ver=1.0.22
 libzip_ver=1.11.4
 argon2_ver=20190702
 binutils_ver=2.46.0
@@ -76,7 +76,7 @@ boost_ver=1.77.0
 boost_oldver=1.59.0
 
 # Others
-lua_nginx_module_ver=0.10.29
+lua_nginx_module_ver=0.10.31rc2
 luajit2_ver=2.1-20260415
 lua_resty_core_ver=0.1.32
 lua_resty_lrucache_ver=0.15
