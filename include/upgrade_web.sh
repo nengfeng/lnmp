@@ -20,14 +20,14 @@ Upgrade_Nginx() {
       if [ -e "nginx-${NEW_nginx_ver}.tar.gz" ]; then
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
-        src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v0.3.3.tar.gz" && Download_src "ngx_devel_kit-0.3.3.tar.gz"
+        src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
         src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
-        tar xzf ngx_devel_kit-0.3.3.tar.gz
+        tar xzf "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
         tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
         tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
