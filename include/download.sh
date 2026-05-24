@@ -38,6 +38,7 @@ Download_src() {
       --limit-rate=100M \
       --progress=bar:force \
       -c \
+      -O "${file_name}" \
       ${src_url} 2>&1 | tee -a ${current_dir}/download.log; then
       
       # Verify download success
