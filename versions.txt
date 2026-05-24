@@ -28,7 +28,7 @@ php85_ver=8.5.6
 # Nodejs
 nodejs_ver=20.20.2
 
-libiconv_ver=1.18
+libiconv_ver=1.19
 curl_ver=8.20.0
 libmcrypt_ver=2.5.8
 mcrypt_ver=2.6.8
@@ -45,7 +45,7 @@ apcu_ver=5.1.28
 phalcon_ver=5.13.0
 yaf_ver=3.3.6
 yar_ver=2.3.4
-swoole_ver=6.2.0
+swoole_ver=6.2.1
 xdebug_ver=3.5.1
 
 # Ftp
@@ -56,13 +56,13 @@ redis_ver=8.6.3
 pecl_redis_ver=6.3.0
 
 # Memcached
-memcached_ver=1.6.41
+memcached_ver=1.6.42
 libmemcached_ver=1.0.18
 pecl_memcached_ver=3.4.0
 pecl_memcache_ver=8.2
 
 # MongoDB
-pecl_mongodb_ver=2.3.1
+pecl_mongodb_ver=2.3.3
 
 # phpMyadmin
 phpmyadmin_ver=5.2.3
