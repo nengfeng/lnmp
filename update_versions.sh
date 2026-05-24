@@ -16,13 +16,6 @@ export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 current_dir=$(dirname "$(readlink -f "$0")")
 cd "${current_dir}"
 
-# Check GitHub API rate limit status
-if [ -z "${GITHUB_TOKEN:-}" ]; then
-    echo "${CWARNING}Warning: GITHUB_TOKEN not set. GitHub API rate limit is 60 requests/hour.${CEND}"
-    echo "${CWARNING}Set GITHUB_TOKEN environment variable for higher limit (5000/hour).${CEND}"
-    echo ""
-fi
-
 apply_changes="n"
 output_json="n"
 [[ "$1" == "--apply" ]] && apply_changes="y"
@@ -31,12 +24,29 @@ output_json="n"
 . ./include/color.sh 2>/dev/null || true
 . ./versions.txt
 
-# GitHub API authentication (optional, raises rate limit from 60 to 5000/hr)
-# Usage: GITHUB_TOKEN=ghp_xxx ./update_versions.sh
-GITHUB_AUTH=""
-if [ -n "${GITHUB_TOKEN:-}" ]; then
-  GITHUB_AUTH="Authorization: token ${GITHUB_TOKEN}"
-fi
+# Helper: fetch GitHub tags atom feed and extract version tags
+# Usage: gh_tags <owner/repo> [filter_regex]
+# Outputs: newest version tag (without v prefix)
+gh_tags() {
+  local repo="$1" filter="${2:-^[0-9]}"
+  curl -sL --connect-timeout 10 --max-time 20 \
+    "https://github.com/${repo}/tags.atom" 2>/dev/null | \
+    grep -oP "<title>v?\K[0-9][0-9.]*" | \
+    grep -E "$filter" | \
+    sort -V | tail -1
+}
+
+# Helper: fetch GitHub releases atom feed and extract latest version
+# Usage: gh_release_latest <owner/repo>
+# Outputs: newest release tag (without v prefix)
+gh_release_latest() {
+  local repo="$1"
+  curl -sL --connect-timeout 10 --max-time 20 \
+    "https://github.com/${repo}/releases.atom" 2>/dev/null | \
+    grep -oP "<title>v?\K[0-9][0-9.]*" | \
+    grep -vE '(alpha|beta|rc|RC|dev)' | \
+    sort -V | tail -1
+}
 
 # Counters
 total=0
@@ -84,7 +94,7 @@ check_latest() {
   total=$((total + 1))
 
   local latest
-  latest=$(curl -sL --connect-timeout 10 --max-time 20 ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} "$url" 2>/dev/null | grep -oP "$regex" | eval "$sort_cmd")
+  latest=$(curl -sL --connect-timeout 10 --max-time 20 "$url" 2>/dev/null | grep -oP "$regex" | eval "$sort_cmd")
 
   if [ -z "$latest" ]; then
     results="${results}⚠️  ${name}: 无法获取最新版本 (当前: ${current})\n"
@@ -212,67 +222,43 @@ else
   check_failed=$((check_failed + 3))
 fi
 
-# --- PHP (GitHub API for all active branches) ---
-php_tags=$(curl -sL --connect-timeout 10 --max-time 20 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/php/php-src/tags?per_page=100" 2>/dev/null)
-if [ -n "$php_tags" ] && [ "$php_tags" != "[]" ]; then
-  for php_major in "8.3" "8.4" "8.5"; do
-    total=$((total + 1))
-    php_latest=$(echo "$php_tags" | python3 -c "
-import json, sys, re
-try:
-    tags = json.load(sys.stdin)
-    major = '${php_major}'
-    for t in tags:
-        v = t['name'].replace('php-','')
-        if v.startswith(major + '.') and not re.search(r'(alpha|beta|RC|b\d)', v):
-            print(v); break
-except (json.JSONDecodeError, KeyError, TypeError):
-    pass" 2>/dev/null)
-    eval "php_current=\$php${php_major/./}_ver"
-    if [ -n "$php_latest" ]; then
-      if [[ "$php_current" == "$php_latest" ]]; then
-        results="${results}✅ PHP ${php_major}: ${php_current} (最新)\n"
-        up_to_date=$((up_to_date + 1))
-      elif version_lt "$php_current" "$php_latest"; then
-        results="${results}🔄 PHP ${php_major}: ${php_current} → ${php_latest} (小版本更新)\n"
-        minor_updated=$((minor_updated + 1))
-        [[ "$apply_changes" == "y" ]] && sed -i "s/^php${php_major/./}_ver=.*/php${php_major/./}_ver=${php_latest}/" versions.txt
-      else
-        results="${results}✅ PHP ${php_major}: ${php_current} (最新: ${php_latest})\n"
-        up_to_date=$((up_to_date + 1))
-      fi
+# --- PHP (web scraping tags atom for all active branches) ---
+php_atom=$(curl -sL --connect-timeout 10 --max-time 20 \
+  "https://github.com/php/php-src/tags.atom" 2>/dev/null)
+for php_major in "8.3" "8.4" "8.5"; do
+  total=$((total + 1))
+  php_latest=$(echo "$php_atom" | grep -oP "<title>(php-|PHP )\K${php_major}\.[0-9]+" | \
+    grep -vE '(alpha|beta|RC|b[0-9])' | \
+    sort -V | tail -1)
+  eval "php_current=\$php${php_major/./}_ver"
+  if [ -n "$php_latest" ]; then
+    if [[ "$php_current" == "$php_latest" ]]; then
+      results="${results}✅ PHP ${php_major}: ${php_current} (最新)\n"
+      up_to_date=$((up_to_date + 1))
+    elif version_lt "$php_current" "$php_latest"; then
+      results="${results}🔄 PHP ${php_major}: ${php_current} → ${php_latest} (小版本更新)\n"
+      minor_updated=$((minor_updated + 1))
+      [[ "$apply_changes" == "y" ]] && sed -i "s/^php${php_major/./}_ver=.*/php${php_major/./}_ver=${php_latest}/" versions.txt
     else
-      results="${results}⚠️  PHP ${php_major}: 无法获取\n"
-      check_failed=$((check_failed + 1))
+      results="${results}✅ PHP ${php_major}: ${php_current} (最新: ${php_latest})\n"
+      up_to_date=$((up_to_date + 1))
     fi
-  done
-else
-  results="${results}⚠️  PHP: GitHub API 不可用\n"
-  check_failed=$((check_failed + 3))
-fi
+  else
+    results="${results}⚠️  PHP ${php_major}: 无法获取\n"
+    check_failed=$((check_failed + 1))
+  fi
+done
 
 # --- curl ---
 check_latest "curl" "$curl_ver" \
   "https://curl.se/download.html" \
   '[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
 
-# --- libsodium (GitHub) ---
+# --- libsodium (web scraping) ---
 libsodium_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/jedisct1/libsodium/releases/latest" 2>/dev/null | \
-  python3 -c "
-import json,sys,re
-try:
-    data = json.load(sys.stdin)
-    tag = data.get('tag_name','')
-    ver = tag.lstrip('v').lstrip('release-')
-    # Remove suffix like -RELEASE, -STABLE etc
-    ver = re.split(r'[-_]', ver)[0]
-    print(ver)
-except: print('')
-" 2>/dev/null)
+  "https://github.com/jedisct1/libsodium/releases" 2>/dev/null | \
+  grep -oP "/jedisct1/libsodium/releases/tag/\K[0-9][0-9.]*" | \
+  sort -V | tail -1)
 if [ -n "$libsodium_latest" ]; then
   total=$((total + 1))
   if [[ "$libsodium_ver" == "$libsodium_latest" ]]; then
@@ -296,20 +282,8 @@ check_latest "libiconv" "$libiconv_ver" \
   "https://ftp.gnu.org/pub/gnu/libiconv/" \
   'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1"
 
-# --- memcached (GitHub tags) ---
-memcached_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/memcached/memcached/tags?per_page=10" 2>/dev/null | \
-  python3 -c "
-import json,sys,re
-try:
-    data = json.load(sys.stdin)
-    if not isinstance(data, list): sys.exit(1)
-    tags = [t['name'] for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^[0-9]+\.[0-9]+\.[0-9]+$', t['name'])]
-    tags.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
-    print(tags[0] if tags else '')
-except: print('')
-" 2>/dev/null)
+# --- memcached (web scraping tags page) ---
+memcached_latest=$(gh_tags "memcached/memcached" "^[0-9]+\.[0-9]+\.[0-9]+$")
 if [ -n "$memcached_latest" ]; then
   total=$((total + 1))
   if [[ "$memcached_ver" == "$memcached_latest" ]]; then
@@ -339,19 +313,12 @@ check_latest "OpenSSL" "$openssl_ver" \
   "https://www.openssl.org/source/" \
   "openssl-\K${openssl_minor}\.[0-9]+" "sort -V | tail -1"
 
-# --- PCRE2 (GitHub) ---
+# --- PCRE2 (web scraping releases atom) ---
 pcre2_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/PCRE2Project/pcre2/releases/latest" 2>/dev/null | \
-  python3 -c "
-import json,sys
-try:
-    print(json.load(sys.stdin).get('tag_name',''))
-except (json.JSONDecodeError, KeyError, TypeError):
-    print('')
-" 2>/dev/null)
-pcre2_latest="${pcre2_latest#v}"
-  pcre2_latest="${pcre2_latest#pcre2-}"
+  "https://github.com/PCRE2Project/pcre2/releases.atom" 2>/dev/null | \
+  grep -oP "<title>PCRE2[ -]\K[0-9][0-9.]*" | \
+  grep -vE '(alpha|beta|RC|RC)' | \
+  sort -V | tail -1)
 if [ -n "$pcre2_latest" ]; then
   total=$((total + 1))
   if [[ "$pcre_ver" == "$pcre2_latest" ]]; then
@@ -370,19 +337,11 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- LuaJIT (GitHub tags, sorted by date) ---
+# --- LuaJIT (web scraping tags atom) ---
 luajit_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/openresty/luajit2/tags?per_page=20" 2>/dev/null | \
-  python3 -c "
-import json,sys,re
-try:
-    tags = [t['name'].lstrip('v') for t in json.load(sys.stdin) if isinstance(t, dict) and 'name' in t and re.match(r'2\.1-\d{8}$', t['name'].lstrip('v'))]
-    tags.sort(reverse=True)
-    print(tags[0] if tags else '')
-except (json.JSONDecodeError, KeyError, TypeError):
-    print('')
-" 2>/dev/null)
+  "https://github.com/openresty/luajit2/tags.atom" 2>/dev/null | \
+  grep -oP "<title>v\K2\.1-[0-9]+" | \
+  sort -V | tail -1)
 if [ -n "$luajit_latest" ]; then
   total=$((total + 1))
   if [[ "$luajit2_ver" == "$luajit_latest" ]]; then
@@ -401,21 +360,8 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- ngx_devel_kit (GitHub tags) ---
-# Note: This repo may have API rate limit issues, use longer timeout
-ngx_devel_kit_latest=$(curl -sL --connect-timeout 15 --max-time 30 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/simpl/ngx_devel_kit/tags?per_page=10" 2>/dev/null | \
-  python3 -c "
-import json,sys,re
-try:
-    data = json.load(sys.stdin)
-    if not isinstance(data, list): sys.exit(1)
-    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^v?[0-9]+\.[0-9]+\.[0-9]+$', t['name'])]
-    tags.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
-    print(tags[0] if tags else '')
-except: print('')
-" 2>/dev/null)
+# --- ngx_devel_kit (web scraping tags page) ---
+ngx_devel_kit_latest=$(gh_tags "simpl/ngx_devel_kit" "^[0-9]+\.[0-9]+\.[0-9]+$")
 if [ -n "$ngx_devel_kit_latest" ]; then
   total=$((total + 1))
   if [[ "$ngx_devel_kit_ver" == "$ngx_devel_kit_latest" ]]; then
@@ -434,22 +380,8 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- lua-nginx-module (GitHub tags, no releases) ---
-lua_nginx_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/openresty/lua-nginx-module/tags?per_page=20" 2>/dev/null | \
-  python3 -c "
-import json,sys,re
-try:
-    data = json.load(sys.stdin)
-    if not isinstance(data, list):
-        sys.exit(1)
-    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
-    print(tags[0] if tags else '')
-except (json.JSONDecodeError, KeyError, TypeError):
-    print('')
-" 2>/dev/null)
+# --- lua-nginx-module (web scraping tags atom) ---
+lua_nginx_latest=$(gh_tags "openresty/lua-nginx-module" "^[0-9]+\.[0-9]+\.[0-9]+$")
 if [ -n "$lua_nginx_latest" ]; then
   total=$((total + 1))
   if [[ "$lua_nginx_module_ver" == "$lua_nginx_latest" ]]; then
@@ -468,41 +400,14 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- lua-resty-core & lua-resty-lrucache (version-locked to lua-nginx-module) ---
-# These libraries must match the lua-nginx-module version exactly.
-# Use a single function to check both with minimal API calls.
+# --- lua-resty-core & lua-resty-lrucache (web scraping, version-locked) ---
 _check_lua_resty() {
-    local core_ver="$1" lrucache_ver="$2" core_name="$3" lrucache_name="$4"
+    local core_ver="$1" lrucache_ver="$2"
     local core_latest="" lrucache_latest=""
 
-    # Try to get both tags with a single API call each
-    core_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-      ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-      "https://api.github.com/repos/openresty/${core_name}/tags?per_page=20" 2>/dev/null | \
-      python3 -c "
-import json,sys,re
-try:
-    data = json.load(sys.stdin)
-    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^v?[0-9]+\.[0-9]+\.[0-9]+$', t['name']) and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-    tags.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
-    print(tags[0] if tags else '')
-except: print('')
-" 2>/dev/null)
+    core_latest=$(gh_tags "openresty/lua-resty-core" "^[0-9]+\.[0-9]+\.[0-9]+$")
+    lrucache_latest=$(gh_tags "openresty/lua-resty-lrucache" "^[0-9]+\.[0-9]+\.[0-9]+$")
 
-    lrucache_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-      ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-      "https://api.github.com/repos/openresty/${lrucache_name}/tags?per_page=20" 2>/dev/null | \
-      python3 -c "
-import json,sys,re
-try:
-    data = json.load(sys.stdin)
-    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^v?[0-9]+\.[0-9]+\.[0-9]+$', t['name']) and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-    tags.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
-    print(tags[0] if tags else '')
-except: print('')
-" 2>/dev/null)
-
-    # Report results
     local update_msg=""
     if [ -n "$core_latest" ] && version_lt "$core_ver" "$core_latest"; then
         update_msg="lua-resty-core: ${core_ver} → ${core_latest}"
@@ -523,7 +428,7 @@ except: print('')
     total=$((total + 2))
 }
 
-_check_lua_resty "$lua_resty_core_ver" "$lua_resty_lrucache_ver" "lua-resty-core" "lua-resty-lrucache"
+_check_lua_resty "$lua_resty_core_ver" "$lua_resty_lrucache_ver"
 
 # --- Redis ---
 check_latest "Redis" "$redis_ver" \
@@ -536,15 +441,15 @@ check_latest "Node.js" "$nodejs_ver" \
   "https://nodejs.org/dist/latest-v${node_major}.x/SHASUMS256.txt" \
   "node-v\\K[0-9]+\.[0-9]+\.[0-9]+"
 
-# --- PECL extensions (via GitHub API) ---
+# --- PECL extensions (web scraping releases atom feeds) ---
 pecl_repos=(
-  "pecl-redis:phpredis/phpredis:v${pecl_redis_ver}"
-  "pecl-mongodb:mongodb/mongo-php-driver:v${pecl_mongodb_ver}"
-  "pecl-swoole:swoole/swoole-src:v${swoole_ver}"
+  "pecl-redis:phpredis/phpredis:${pecl_redis_ver}"
+  "pecl-mongodb:mongodb/mongo-php-driver:${pecl_mongodb_ver}"
+  "pecl-swoole:swoole/swoole-src:${swoole_ver}"
   "pecl-xdebug:xdebug/xdebug:${xdebug_ver}"
   "pecl-imagick:Imagick/imagick:${imagick_ver}"
-  "pecl-apcu:krakjoe/apcu:v${apcu_ver}"
-  "pecl-phalcon:phalcon/cphalcon:v${phalcon_ver}"
+  "pecl-apcu:krakjoe/apcu:${apcu_ver}"
+  "pecl-phalcon:phalcon/cphalcon:${phalcon_ver}"
 )
 
 for item in "${pecl_repos[@]}"; do
@@ -552,23 +457,17 @@ for item in "${pecl_repos[@]}"; do
   repo="${item#*:}"
   repo="${repo%:*}"
   current="${item##*:}"
-  current="${current#v}"
-  latest=""
   total=$((total + 1))
 
-  # Small delay to avoid GitHub API rate limiting
-  sleep 1
-  latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-    ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-    "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null | \
-    python3 -c "
-import json,sys
-try:
-    tag = json.load(sys.stdin).get('tag_name','')
-    print(tag.lstrip('v'))
-except (json.JSONDecodeError, KeyError, TypeError):
-    print('')
-" 2>/dev/null)
+  # apcu uses "Version X.Y.Z" format in release titles
+  if [ "$name" = "pecl-apcu" ]; then
+    latest=$(curl -sL --connect-timeout 10 --max-time 20 \
+      "https://github.com/${repo}/releases.atom" 2>/dev/null | \
+      grep -oP "<title>Version \K[0-9][0-9.]*" | \
+      sort -V | tail -1)
+  else
+    latest=$(gh_release_latest "$repo")
+  fi
 
   if [ -z "$latest" ]; then
     results="${results}⚠️  ${name}: 无法获取 (当前: ${current})\n"
@@ -601,15 +500,30 @@ check_latest "Pure-FTPd" "$pureftpd_ver" \
   "https://download.pureftpd.org/pub/pure-ftpd/releases/" \
   'pure-ftpd-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
 
-# --- Fail2ban (GitHub) ---
-fail2ban_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/fail2ban/fail2ban/releases/latest" 2>/dev/null | \
-  grep -oP '"tag_name":\s*"\K[0-9]+\.[0-9]+\.[0-9]+')
-if [ -n "$fail2ban_latest" ] && [ "$fail2ban_ver" != "master" ]; then
-  check_latest "fail2ban" "$fail2ban_ver" \
-    "https://api.github.com/repos/fail2ban/fail2ban/releases/latest" \
-    '[0-9]+\.[0-9]+\.[0-9]+'
+# --- fail2ban (web scraping releases atom) ---
+if [ "$fail2ban_ver" != "master" ]; then
+  fail2ban_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
+    "https://github.com/fail2ban/fail2ban/releases.atom" 2>/dev/null | \
+    grep -oP "<title>\K[0-9]+\.[0-9]+\.[0-9]+" | \
+    grep -vE '(alpha|beta|rc)' | \
+    sort -V | tail -1)
+  if [ -n "$fail2ban_latest" ]; then
+    total=$((total + 1))
+    if [[ "$fail2ban_ver" == "$fail2ban_latest" ]]; then
+      results="${results}✅ fail2ban: ${fail2ban_ver} (最新)\n"
+      up_to_date=$((up_to_date + 1))
+    elif version_lt "$fail2ban_ver" "$fail2ban_latest"; then
+      results="${results}🔄 fail2ban: ${fail2ban_ver} → ${fail2ban_latest} (小版本更新)\n"
+      minor_updated=$((minor_updated + 1))
+      [[ "$apply_changes" == "y" ]] && sed -i "s/^fail2ban_ver=.*/fail2ban_ver=${fail2ban_latest}/" versions.txt
+    else
+      results="${results}✅ fail2ban: ${fail2ban_ver} (最新: ${fail2ban_latest})\n"
+      up_to_date=$((up_to_date + 1))
+    fi
+  else
+    results="${results}⚠️  fail2ban: 无法获取最新版本 (当前: ${fail2ban_ver})\n"
+    check_failed=$((check_failed + 1))
+  fi
 fi
 
 # ============================================
