@@ -261,6 +261,16 @@ check_latest "libiconv" "$libiconv_ver" \
   "https://ftp.gnu.org/pub/gnu/libiconv/" \
   'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1"
 
+# --- memcached ---
+check_latest "memcached" "$memcached_ver" \
+  "https://memcached.org/files/" \
+  'memcached-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+
+# --- libmemcached ---
+check_latest "libmemcached" "$libmemcached_ver" \
+  "https://launchpad.net/libmemcached/+download" \
+  'libmemcached-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+
 # --- OpenSSL LTS (match same major.minor, e.g. 3.5.x when current is 3.5.5) ---
 openssl_minor=$(echo "$openssl_ver" | cut -d. -f1,2)
 check_latest "OpenSSL" "$openssl_ver" \
