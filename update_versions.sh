@@ -261,10 +261,37 @@ check_latest "libiconv" "$libiconv_ver" \
   "https://ftp.gnu.org/pub/gnu/libiconv/" \
   'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1"
 
-# --- memcached ---
-check_latest "memcached" "$memcached_ver" \
-  "https://memcached.org/files/" \
-  'memcached-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+# --- memcached (GitHub) ---
+memcached_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+  "https://api.github.com/repos/memcached/memcached/releases/latest" 2>/dev/null | \
+  python3 -c "
+import json,sys
+try:
+    data = json.load(sys.stdin)
+    tag = data.get('tag_name','')
+    # tag format: release-1.6.42 or 1.6.42
+    ver = tag.lstrip('release-').lstrip('v')
+    print(ver)
+except: print('')
+" 2>/dev/null)
+if [ -n "$memcached_latest" ]; then
+  total=$((total + 1))
+  if [[ "$memcached_ver" == "$memcached_latest" ]]; then
+    results="${results}✅ memcached: ${memcached_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$memcached_ver" "$memcached_latest"; then
+    results="${results}🔄 memcached: ${memcached_ver} → ${memcached_latest} (小版本更新)\n"
+    minor_updated=$((minor_updated + 1))
+    [[ "$apply_changes" == "y" ]] && sed -i "s/^memcached_ver=.*/memcached_ver=${memcached_latest}/" versions.txt
+  else
+    results="${results}✅ memcached: ${memcached_ver} (最新: ${memcached_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  memcached: 无法获取最新版本 (当前: ${memcached_ver})\n"
+  check_failed=$((check_failed + 1))
+fi
 
 # --- libmemcached ---
 check_latest "libmemcached" "$libmemcached_ver" \
