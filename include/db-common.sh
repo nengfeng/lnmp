@@ -120,12 +120,16 @@ install_mysql_binary() {
   # Download if not present
   if [ ! -f "$tarball" ]; then
     echo "${CWARNING}MySQL tarball not found, downloading...${CEND}"
-    local url="https://cdn.mysql.com/Downloads/MySQL-8.4/${tarball}"
+    # Determine major version for download URL (e.g. 8.4.3 -> 8.4, 8.0.45 -> 8.0)
+    local mysql_major="${mysql_ver%%.*}"
+    local mysql_minor="${mysql_ver#*.}"
+    local mysql_dir="MySQL-${mysql_major}.${mysql_minor%%.*}"
+    local url="https://cdn.mysql.com/Downloads/${mysql_dir}/${tarball}"
     if ! wget -q -O "$tarball" "$url" 2>/dev/null; then
       # Try mirror
-      url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mysql/downloads/MySQL-8.4/${tarball}"
+      url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mysql/downloads/${mysql_dir}/${tarball}"
       wget -O "$tarball" "$url" || {
-        echo "${CERROR}Failed to download MySQL. Please run: ./download_sources.sh mysql84${CEND}"
+        echo "${CERROR}Failed to download MySQL. Please run: ./download_sources.sh mysql${mysql_major}${mysql_minor%%.*}${CEND}"
         return 1
       }
     fi
