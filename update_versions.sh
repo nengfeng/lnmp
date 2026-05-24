@@ -395,7 +395,8 @@ else
 fi
 
 # --- ngx_devel_kit (GitHub tags) ---
-ngx_devel_kit_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+# Note: This repo may have API rate limit issues, use longer timeout
+ngx_devel_kit_latest=$(curl -sL --connect-timeout 15 --max-time 30 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/simpl/ngx_devel_kit/tags?per_page=10" 2>/dev/null | \
   python3 -c "
