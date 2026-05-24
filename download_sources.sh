@@ -185,7 +185,7 @@ get_version() {
     freetype)       ver=${VERSIONS[freetype_ver]} ;;
     libsodium)      ver=${VERSIONS[libsodium_ver]} ;;
     libzip)         ver=${VERSIONS[libzip_ver]} ;;
-    binutils)       ver=${VERSIONS[binutils_ver]} ;;
+
     mhash)          ver=${VERSIONS[mhash_ver]} ;;
     argon2)         ver=${VERSIONS[argon2_ver]} ;;
     icu)            ver=${VERSIONS[icu4c_ver]} ;;
