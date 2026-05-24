@@ -1006,17 +1006,20 @@ install_db_common() {
   pushd ${current_dir}/src > /dev/null
   create_mysql_user
 
-  # Check if data directory is non-empty
+  # Check if data directory is non-empty, auto-backup if needed
   if [ -d "${data_dir}" ] && [ -n "$(ls -A ${data_dir} 2>/dev/null)" ]; then
-    echo "${CFAILURE}Data directory ${data_dir} is not empty!${CEND}"
-    echo "${CWARNING}Existing data may be overwritten. Please backup or remove existing data first.${CEND}"
-    popd
-    return 1
+    local backup_dir="${data_dir}_bak_$(date +%Y%m%d%H%M%S)"
+    echo "${CWARNING}Data directory ${data_dir} is not empty, moving to ${backup_dir}${CEND}"
+    mv "${data_dir}" "${backup_dir}" || {
+      echo "${CERROR}Failed to backup data directory. Please remove or rename ${data_dir} manually.${CEND}"
+      popd
+      return 1
+    }
+    mkdir -p "${data_dir}"
+    chown mysql:mysql -R "${data_dir}"
   fi
 
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
-  mkdir -p ${data_dir}
-  chown mysql:mysql -R ${data_dir}
 
   # Installation (binary or source)
   if [[ "${install_method}" == "1" ]]; then
