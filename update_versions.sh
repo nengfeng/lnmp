@@ -256,11 +256,13 @@ libsodium_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
   "https://api.github.com/repos/jedisct1/libsodium/releases/latest" 2>/dev/null | \
   python3 -c "
-import json,sys
+import json,sys,re
 try:
     data = json.load(sys.stdin)
     tag = data.get('tag_name','')
     ver = tag.lstrip('v').lstrip('release-')
+    # Remove suffix like -RELEASE, -STABLE etc
+    ver = re.split(r'[-_]', ver)[0]
     print(ver)
 except: print('')
 " 2>/dev/null)
