@@ -419,12 +419,7 @@ checkDownload() {
     src_url="https://libzip.org/download/libzip-${libzip_ver}.tar.gz"
     Download_src
 
-    # binutils - ✅ Confirmed on mirror
-    local official_url="https://ftp.gnu.org/gnu/binutils/binutils-${binutils_ver}.tar.gz"
-    local china_url="${MIRROR_BASE_URL}/gnu/binutils/binutils-${binutils_ver}.tar.gz"
-    src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
-    Download_src
-
+    # binutils - installed via apt, no longer downloaded
     # mhash (SourceForge)
     src_url="https://downloads.sourceforge.net/project/mhash/mhash/${mhash_ver}/mhash-${mhash_ver}.tar.gz"
     Download_src
