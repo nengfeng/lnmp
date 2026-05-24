@@ -289,18 +289,18 @@ check_latest "libiconv" "$libiconv_ver" \
   "https://ftp.gnu.org/pub/gnu/libiconv/" \
   'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1"
 
-# --- memcached (GitHub) ---
+# --- memcached (GitHub tags) ---
 memcached_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
   ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/memcached/memcached/releases/latest" 2>/dev/null | \
+  "https://api.github.com/repos/memcached/memcached/tags?per_page=10" 2>/dev/null | \
   python3 -c "
-import json,sys
+import json,sys,re
 try:
     data = json.load(sys.stdin)
-    tag = data.get('tag_name','')
-    # tag format: release-1.6.42 or 1.6.42
-    ver = tag.lstrip('release-').lstrip('v')
-    print(ver)
+    if not isinstance(data, list): sys.exit(1)
+    tags = [t['name'] for t in data if isinstance(t, dict) and 'name' in t and re.match(r'^[0-9]+\.[0-9]+\.[0-9]+$', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
+    print(tags[0] if tags else '')
 except: print('')
 " 2>/dev/null)
 if [ -n "$memcached_latest" ]; then
