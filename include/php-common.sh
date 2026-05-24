@@ -128,14 +128,17 @@ EOF
     cleanup_src mhash-${mhash_ver}
   fi
 
-  # binutils (usually provided by OS, skip if system version exists)
-  if [ ! -e "/usr/local/include/bfd.h" ] && [ ! -e "/usr/include/bfd.h" ]; then
-    tar xzf binutils-${binutils_ver}.tar.gz
-    pushd binutils-${binutils_ver} > /dev/null
-    ./configure
-    compile_and_install
-    popd > /dev/null
-    cleanup_src binutils-${binutils_ver}
+  # binutils (install via apt on Debian/Ubuntu)
+  if [ ! -e "/usr/include/bfd.h" ]; then
+    ${install_tool} -y install binutils-dev || {
+      echo "${CWARNING}Failed to install binutils-dev via apt, falling back to source${CEND}"
+      _extract_tar "binutils-${binutils_ver}.tar.gz"
+      pushd "binutils-${binutils_ver}" > /dev/null
+      ./configure
+      compile_and_install
+      popd > /dev/null
+      cleanup_src "binutils-${binutils_ver}"
+    }
   fi
 
   add_lib_path /usr/local/lib

@@ -38,7 +38,6 @@ icu4c_ver=63_1
 libsodium_ver=1.0.22
 libzip_ver=1.11.4
 argon2_ver=20190702
-binutils_ver=2.46.0
 imagemagick_ver=7.1.2-13
 imagick_ver=3.8.1
 zendopcache_ver=7.0.5
