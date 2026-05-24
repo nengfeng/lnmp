@@ -251,6 +251,11 @@ check_latest "curl" "$curl_ver" \
   "https://curl.se/download.html" \
   '[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
 
+# --- libsodium ---
+check_latest "libsodium" "$libsodium_ver" \
+  "https://download.libsodium.org/libsodium/releases/" \
+  'libsodium-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+
 # --- OpenSSL LTS (match same major.minor, e.g. 3.5.x when current is 3.5.5) ---
 openssl_minor=$(echo "$openssl_ver" | cut -d. -f1,2)
 check_latest "OpenSSL" "$openssl_ver" \
