@@ -426,72 +426,112 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- lua-resty-core (GitHub tags, no releases) ---
-lua_core_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/openresty/lua-resty-core/tags?per_page=20" 2>/dev/null | \
-  python3 -c "
+# --- lua-resty-core & lua-resty-lrucache (version-locked to lua-nginx-module) ---
+# These libraries must match the lua-nginx-module version exactly.
+# When lua-nginx-module is updated, these must be updated together.
+if [ -n "$lua_nginx_latest" ] && version_lt "$lua_nginx_module_ver" "$lua_nginx_latest"; then
+  # lua-nginx-module has an update - check compatible resty libraries
+  lua_core_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+    ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+    "https://api.github.com/repos/openresty/lua-resty-core/tags?per_page=20" 2>/dev/null | \
+    python3 -c "
 import json,sys,re
 try:
     data = json.load(sys.stdin)
-    if not isinstance(data, list):
-        sys.exit(1)
+    if not isinstance(data, list): sys.exit(1)
     tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
     tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
     print(tags[0] if tags else '')
-except (json.JSONDecodeError, KeyError, TypeError):
-    print('')
+except: print('')
 " 2>/dev/null)
-if [ -n "$lua_core_latest" ]; then
-  total=$((total + 1))
-  if [[ "$lua_resty_core_ver" == "$lua_core_latest" ]]; then
-    results="${results}✅ lua-resty-core: ${lua_resty_core_ver} (最新)\n"
-    up_to_date=$((up_to_date + 1))
-  elif version_lt "$lua_resty_core_ver" "$lua_core_latest"; then
-    results="${results}🔄 lua-resty-core: ${lua_resty_core_ver} → ${lua_core_latest} (小版本更新)\n"
+  lua_lrucache_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+    ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+    "https://api.github.com/repos/openresty/lua-resty-lrucache/tags?per_page=20" 2>/dev/null | \
+    python3 -c "
+import json,sys,re
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list): sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+    print(tags[0] if tags else '')
+except: print('')
+" 2>/dev/null)
+
+  total=$((total + 2))
+  if [ -n "$lua_core_latest" ] && version_lt "$lua_resty_core_ver" "$lua_core_latest"; then
+    results="${results}🔄 lua-resty-core: ${lua_resty_core_ver} → ${lua_core_latest} (同步 lua-nginx-module 升级)\n"
     minor_updated=$((minor_updated + 1))
     [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_resty_core_ver=.*/lua_resty_core_ver=${lua_core_latest}/" versions.txt
   else
-    results="${results}✅ lua-resty-core: ${lua_resty_core_ver} (最新: ${lua_core_latest})\n"
+    results="${results}✅ lua-resty-core: ${lua_resty_core_ver} (最新)\n"
     up_to_date=$((up_to_date + 1))
   fi
-else
-  results="${results}⚠️  lua-resty-core: 无法获取版本信息\n"
-  check_failed=$((check_failed + 1))
-fi
-
-# --- lua-resty-lrucache (GitHub tags, no releases) ---
-lua_lrucache_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
-  ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
-  "https://api.github.com/repos/openresty/lua-resty-lrucache/tags?per_page=20" 2>/dev/null | \
-  python3 -c "
-import json,sys,re
-try:
-    data = json.load(sys.stdin)
-    if not isinstance(data, list):
-        sys.exit(1)
-    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
-    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
-    print(tags[0] if tags else '')
-except (json.JSONDecodeError, KeyError, TypeError):
-    print('')
-" 2>/dev/null)
-if [ -n "$lua_lrucache_latest" ]; then
-  total=$((total + 1))
-  if [[ "$lua_resty_lrucache_ver" == "$lua_lrucache_latest" ]]; then
-    results="${results}✅ lua-resty-lrucache: ${lua_resty_lrucache_ver} (最新)\n"
-    up_to_date=$((up_to_date + 1))
-  elif version_lt "$lua_resty_lrucache_ver" "$lua_lrucache_latest"; then
-    results="${results}🔄 lua-resty-lrucache: ${lua_resty_lrucache_ver} → ${lua_lrucache_latest} (小版本更新)\n"
+  if [ -n "$lua_lrucache_latest" ] && version_lt "$lua_resty_lrucache_ver" "$lua_lrucache_latest"; then
+    results="${results}🔄 lua-resty-lrucache: ${lua_resty_lrucache_ver} → ${lua_lrucache_latest} (同步 lua-nginx-module 升级)\n"
     minor_updated=$((minor_updated + 1))
     [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_resty_lrucache_ver=.*/lua_resty_lrucache_ver=${lua_lrucache_latest}/" versions.txt
   else
-    results="${results}✅ lua-resty-lrucache: ${lua_resty_lrucache_ver} (最新: ${lua_lrucache_latest})\n"
+    results="${results}✅ lua-resty-lrucache: ${lua_resty_lrucache_ver} (最新)\n"
     up_to_date=$((up_to_date + 1))
   fi
 else
-  results="${results}⚠️  lua-resty-lrucache: 无法获取版本信息\n"
-  check_failed=$((check_failed + 1))
+  # lua-nginx-module is up-to-date, check resty libraries independently
+  lua_core_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+    ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+    "https://api.github.com/repos/openresty/lua-resty-core/tags?per_page=20" 2>/dev/null | \
+    python3 -c "
+import json,sys,re
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list): sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+    print(tags[0] if tags else '')
+except: print('')
+" 2>/dev/null)
+  lua_lrucache_latest=$(curl -sL --connect-timeout 5 --max-time 10 \
+    ${GITHUB_AUTH:+-H "$GITHUB_AUTH"} \
+    "https://api.github.com/repos/openresty/lua-resty-lrucache/tags?per_page=20" 2>/dev/null | \
+    python3 -c "
+import json,sys,re
+try:
+    data = json.load(sys.stdin)
+    if not isinstance(data, list): sys.exit(1)
+    tags = [t['name'].lstrip('v') for t in data if isinstance(t, dict) and 'name' in t and not re.search(r'(alpha|beta|rc|RC|dev)', t['name'])]
+    tags.sort(key=lambda v: [int(x) for x in re.split(r'[.\-]', v) if x.isdigit()], reverse=True)
+    print(tags[0] if tags else '')
+except: print('')
+" 2>/dev/null)
+  total=$((total + 2))
+  if [ -n "$lua_core_latest" ]; then
+    if [[ "$lua_resty_core_ver" == "$lua_core_latest" ]]; then
+      results="${results}✅ lua-resty-core: ${lua_resty_core_ver} (最新)\n"
+      up_to_date=$((up_to_date + 1))
+    elif version_lt "$lua_resty_core_ver" "$lua_core_latest"; then
+      results="${results}⚠️  lua-resty-core: ${lua_resty_core_ver} → ${lua_core_latest} 可用 (需同步升级 lua-nginx-module)\n"
+    else
+      results="${results}✅ lua-resty-core: ${lua_resty_core_ver} (最新: ${lua_core_latest})\n"
+      up_to_date=$((up_to_date + 1))
+    fi
+  else
+    results="${results}⚠️  lua-resty-core: 无法获取版本信息\n"
+    check_failed=$((check_failed + 1))
+  fi
+  if [ -n "$lua_lrucache_latest" ]; then
+    if [[ "$lua_resty_lrucache_ver" == "$lua_lrucache_latest" ]]; then
+      results="${results}✅ lua-resty-lrucache: ${lua_resty_lrucache_ver} (最新)\n"
+      up_to_date=$((up_to_date + 1))
+    elif version_lt "$lua_resty_lrucache_ver" "$lua_lrucache_latest"; then
+      results="${results}⚠️  lua-resty-lrucache: ${lua_resty_lrucache_ver} → ${lua_lrucache_latest} 可用 (需同步升级 lua-nginx-module)\n"
+    else
+      results="${results}✅ lua-resty-lrucache: ${lua_resty_lrucache_ver} (最新: ${lua_lrucache_latest})\n"
+      up_to_date=$((up_to_date + 1))
+    fi
+  else
+    results="${results}⚠️  lua-resty-lrucache: 无法获取版本信息\n"
+    check_failed=$((check_failed + 1))
+  fi
 fi
 
 # --- Redis ---
