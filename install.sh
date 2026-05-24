@@ -351,10 +351,8 @@ if [[ ${ARG_NUM} == 0 ]]; then
       printf "%b" "	${CMSG}3${CEND}. Install php-8.5\n"
       select_number "Please input a number" php_option 1 3 2
     fi
-  fi
 
-  # PHP opcode cache and extensions
-  if [[ ${php_option} =~ ^[1-3]$ ]] || [ -e "${php_install_dir}/bin/phpize" ]; then
+    # PHP opcode cache
     confirm "Do you want to install opcode cache of the PHP?" phpcache_flag y
     if [[ "${phpcache_flag}" == y ]]; then
       echo 'Please select a opcode cache of the PHP:'
