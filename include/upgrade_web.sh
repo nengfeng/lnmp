@@ -28,9 +28,9 @@ Upgrade_Nginx() {
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
         tar xzf ngx_devel_kit-0.3.3.tar.gz
-        tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-        tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-        tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+        tar xzf "v${lua_nginx_module_ver}.tar.gz"
+        tar xzf "v${lua_resty_core_ver}.tar.gz"
+        tar xzf "v${lua_resty_lrucache_ver}.tar.gz"
         echo "Download [${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -72,18 +72,22 @@ Upgrade_Nginx() {
       ldconfig
     fi
 
-    # Install lua-resty-core and lua-resty-lrucache
+    # Install lua-resty-core and lua-resty-lrucache (Lua libraries, not Nginx modules)
     src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src
-    tar xzf "${src_url##*/}"
+    tar xzf "v${lua_resty_core_ver}.tar.gz"
     pushd "lua-resty-core-${lua_resty_core_ver}"
-    make install
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
     popd > /dev/null
+    # Create resty/core/init.lua so require("resty.core") works
+    if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
+        cp "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua"
+    fi
     rm -rf "lua-resty-core-${lua_resty_core_ver}"
 
     src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src
-    tar xzf "${src_url##*/}"
+    tar xzf "v${lua_resty_lrucache_ver}.tar.gz"
     pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
-    make install
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
@@ -178,22 +182,25 @@ Upgrade_Tengine() {
     fi
 
     src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src
-    tar xzf "${src_url##*/}"
+    tar xzf "v${lua_resty_core_ver}.tar.gz"
     pushd "lua-resty-core-${lua_resty_core_ver}"
-    make install
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
     popd > /dev/null
+    if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
+        cp "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua"
+    fi
     rm -rf "lua-resty-core-${lua_resty_core_ver}"
 
     src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src
-    tar xzf "${src_url##*/}"
+    tar xzf "v${lua_resty_lrucache_ver}.tar.gz"
     pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
-    make install
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
     # Download lua-nginx-module for Tengine build
     src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src
-    tar xzf "${src_url##*/}"
+    tar xzf "v${lua_nginx_module_ver}.tar.gz"
 
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
