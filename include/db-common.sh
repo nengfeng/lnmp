@@ -117,26 +117,29 @@ install_mysql_binary() {
   local install_dir=$2
   local tarball="mysql-${mysql_ver}-linux-glibc2.28-x86_64.tar.xz"
 
+  echo "${CMSG}[install_mysql_binary] Starting MySQL ${mysql_ver} installation...${CEND}"
+  echo "${CMSG}[install_mysql_binary] Current dir: $(pwd)${CEND}"
+  echo "${CMSG}[install_mysql_binary] Install dir: ${install_dir}${CEND}"
+
   # Download if not present
   if [ ! -f "$tarball" ]; then
     echo "${CWARNING}MySQL tarball not found, downloading...${CEND}"
-    # Determine major version for download URL (e.g. 8.4.3 -> 8.4, 8.0.45 -> 8.0)
     local mysql_major="${mysql_ver%%.*}"
     local mysql_minor="${mysql_ver#*.}"
     local mysql_dir="MySQL-${mysql_major}.${mysql_minor%%.*}"
     local url="https://cdn.mysql.com/Downloads/${mysql_dir}/${tarball}"
     echo "${CMSG}Downloading: ${url}${CEND}"
     if ! wget --timeout=60 --tries=3 -O "$tarball" "$url" 2>/dev/null; then
-      # Try mirror
       url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mysql/downloads/${mysql_dir}/${tarball}"
       echo "${CMSG}Trying mirror: ${url}${CEND}"
       wget --timeout=60 --tries=3 -O "$tarball" "$url" || {
         echo "${CERROR}Failed to download MySQL ${mysql_ver}.${CEND}"
-        echo "${CERROR}Please download manually from https://dev.mysql.com/downloads/mysql/${CEND}"
         return 1
       }
     fi
     echo "${CSUCCESS}Downloaded: ${tarball}${CEND}"
+  else
+    echo "${CMSG}[install_mysql_binary] Tarball already exists: ${tarball}${CEND}"
   fi
 
   echo "${CMSG}Extracting ${tarball}...${CEND}"
@@ -148,12 +151,14 @@ install_mysql_binary() {
   local src_dir="mysql-${mysql_ver}-linux-glibc2.28-x86_64"
   if [ ! -d "$src_dir" ]; then
     echo "${CERROR}Expected directory ${src_dir} not found after extraction${CEND}"
+    echo "${CERROR}Contents of current dir: $(ls -la)${CEND}"
     return 1
   fi
 
   echo "${CMSG}Installing MySQL ${mysql_ver} to ${install_dir}...${CEND}"
-  mv ${src_dir}/* ${install_dir} || {
-    echo "${CERROR}Failed to move files to ${install_dir}${CEND}"
+  mkdir -p "$install_dir"
+  cp -a ${src_dir}/* ${install_dir}/ || {
+    echo "${CERROR}Failed to copy files to ${install_dir}${CEND}"
     return 1
   }
   rm -rf "$src_dir"
@@ -167,7 +172,7 @@ install_mysql_binary() {
     return 1
   fi
 
-  echo "${CSUCCESS}MySQL ${mysql_ver} installed successfully${CEND}"
+  echo "${CSUCCESS}MySQL ${mysql_ver} installed successfully to ${install_dir}${CEND}"
 }
 
 # Install MySQL from source
@@ -297,11 +302,13 @@ install_mariadb_binary() {
   fi
 
   echo "${CMSG}Installing MariaDB ${mariadb_ver} to ${install_dir}...${CEND}"
-  mv ${src_dir}/* ${install_dir} || {
-    echo "${CERROR}Failed to move files to ${install_dir}${CEND}"
+  mkdir -p "$install_dir"
+  cp -a ${src_dir}/* ${install_dir}/ || {
+    echo "${CERROR}Failed to copy files to ${install_dir}${CEND}"
     return 1
   }
   rm -rf "$src_dir"
+  echo "${CSUCCESS}MariaDB ${mariadb_ver} installed successfully to ${install_dir}${CEND}"
   
   # Inject tcmalloc for better memory performance
   # Use mariadbd-safe for MariaDB 11.x+, mysqld_safe for older versions
