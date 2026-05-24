@@ -16,6 +16,13 @@ export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 current_dir=$(dirname "$(readlink -f "$0")")
 cd "${current_dir}"
 
+# Check GitHub API rate limit status
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "${CWARNING}Warning: GITHUB_TOKEN not set. GitHub API rate limit is 60 requests/hour.${CEND}"
+    echo "${CWARNING}Set GITHUB_TOKEN environment variable for higher limit (5000/hour).${CEND}"
+    echo ""
+fi
+
 apply_changes="n"
 output_json="n"
 [[ "$1" == "--apply" ]] && apply_changes="y"
