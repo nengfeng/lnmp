@@ -2,7 +2,7 @@
 # Web
 nginx_ver=1.30.2
 tengine_ver=3.1.0
-openresty_ver=1.29.2.4
+openresty_ver=1.29.2.5
 openssl_ver=3.5.6
 
 pcre_ver=10.47
@@ -12,8 +12,8 @@ nghttp2_ver=1.59.0
 mysql84_ver=8.4.8
 mysql80_ver=8.0.45
 
-mariadb118_ver=11.8.7
-mariadb114_ver=11.4.11
+mariadb118_ver=11.8.8
+mariadb114_ver=11.4.12
 mariadb1011_ver=10.11.15
 
 pgsql18_ver=18.4
@@ -52,7 +52,7 @@ xdebug_ver=3.5.1
 pureftpd_ver=1.0.54
 
 # Redis
-redis_ver=8.6.3
+redis_ver=8.8.0
 pecl_redis_ver=6.3.0
 
 # Memcached
