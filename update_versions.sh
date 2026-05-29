@@ -228,8 +228,8 @@ php_atom=$(curl -sL --connect-timeout 10 --max-time 20 \
   "https://github.com/php/php-src/tags.atom" 2>/dev/null)
 for php_major in "8.3" "8.4" "8.5"; do
   total=$((total + 1))
-  php_latest=$(echo "$php_atom" | grep -oP "<title>(php-|PHP )\K${php_major}\.[0-9]+" | \
-    grep -vE '(alpha|beta|RC|b[0-9])' | \
+  php_latest=$(echo "$php_atom" | grep "<title>" | grep -vE "(alpha|beta|RC|rc|dev)" | \
+    grep -oP "<title>(php-|PHP )\K${php_major}\.[0-9]+" | \
     sort -V | tail -1)
   eval "php_current=\$php${php_major/./}_ver"
   if [ -n "$php_latest" ]; then
