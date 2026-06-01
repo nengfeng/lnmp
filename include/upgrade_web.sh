@@ -12,6 +12,18 @@ Upgrade_Nginx() {
   Latest_nginx_ver=$(curl --connect-timeout 2 -m 3 -s https://nginx.org/en/download.html | grep -oP 'Stable version.*?nginx-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
   echo
   echo "Current Nginx Version: ${CMSG}${OLD_nginx_ver}${CEND}"
+
+  # Check if existing Nginx was compiled with Lua module
+  if ! ${nginx_install_dir}/sbin/nginx -V 2>&1 | grep -q "lua-nginx-module"; then
+    echo
+    echo "${CWARNING}警告: 当前 Nginx 未编译 Lua 模块！${CEND}"
+    echo "${CWARNING}升级后将自动添加 Lua 模块（lua-nginx-module + LuaJIT）。${CEND}"
+    if [ "${nginx_flag}" != 'y' ]; then
+      read -e -p "是否继续? [y/N]: " confirm
+      [[ "${confirm}" != [yY] ]] && echo "已取消升级。" && popd > /dev/null && return 1
+    fi
+  fi
+
   while :; do echo
     [ "${nginx_flag}" != 'y' ] && read -e -p "Please input upgrade Nginx Version(default: ${Latest_nginx_ver}): " NEW_nginx_ver
     NEW_nginx_ver=${NEW_nginx_ver:-${Latest_nginx_ver}}
@@ -122,6 +134,18 @@ Upgrade_Tengine() {
   Latest_tengine_ver=$(curl --connect-timeout 2 -m 3 -s https://tengine.taobao.org/changelog.html | grep -v generator | grep -oE "[0-9]\.[0-9]\.[0-9]+" | head -1)
   echo
   echo "Current Tengine Version: ${CMSG}${OLD_tengine_ver}${CEND}"
+
+  # Check if existing Tengine was compiled with Lua module
+  if ! ${tengine_install_dir}/sbin/nginx -V 2>&1 | grep -q "lua-nginx-module"; then
+    echo
+    echo "${CWARNING}警告: 当前 Tengine 未编译 Lua 模块！${CEND}"
+    echo "${CWARNING}升级后将自动添加 Lua 模块（lua-nginx-module + LuaJIT）。${CEND}"
+    if [ "${tengine_flag}" != 'y' ]; then
+      read -e -p "是否继续? [y/N]: " confirm
+      [[ "${confirm}" != [yY] ]] && echo "已取消升级。" && popd > /dev/null && return 1
+    fi
+  fi
+
   while :; do echo
     [ "${tengine_flag}" != 'y' ] && read -e -p "Please input upgrade Tengine Version(default: ${Latest_tengine_ver}): " NEW_tengine_ver
     NEW_tengine_ver=${NEW_tengine_ver:-${Latest_tengine_ver}}
