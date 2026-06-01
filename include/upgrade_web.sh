@@ -4,6 +4,106 @@
 
 . include/common.sh
 
+# ============================================
+# Auto-detect and adapt configure args from existing build
+# ============================================
+
+# Detect the actual version of a dependency from the build directory
+# Usage: _detect_dep_version <pattern> <default>
+_detect_dep_version() {
+  local pattern="$1" default="$2"
+  local ver
+  ver=$(ls -d ${current_dir}/src/${pattern} 2>/dev/null | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+  echo "${ver:-$default}"
+}
+
+# Adapt configure args from existing Nginx/Tengine build
+# Detects: openssl, pcre2, lua modules, and other third-party modules
+# Usage: _adapt_configure_args <original_args> <nginx_ver>
+_adapt_configure_args() {
+  local orig_args="$1" nginx_ver="$2"
+  local new_args="$orig_args"
+
+  # --- OpenSSL ---
+  # Detect from build dir first, then from installed binary
+  local openssl_build_ver
+  openssl_build_ver=$(_detect_dep_version "openssl-*" "${openssl_ver}")
+  local openssl_actual_ver
+  openssl_actual_ver=$(strings ${nginx_install_dir}/sbin/nginx 2>/dev/null | grep -oP 'OpenSSL \K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  local openssl_use_ver="${openssl_build_ver}"
+  if [ -n "$openssl_actual_ver" ] && [ "$openssl_actual_ver" != "$openssl_use_ver" ]; then
+    echo "${CMSG}[适配] OpenSSL: 二进制中是 ${openssl_actual_ver}，将使用 ${openssl_use_ver}${CEND}"
+  fi
+  new_args=$(echo "$new_args" | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_use_ver}@")
+  new_args=$(echo "$new_args" | sed "s@--with-openssl=../openssl-[0-9.]\+-[0-9.]\+@--with-openssl=../openssl-${openssl_use_ver}@")
+
+  # --- PCRE2 ---
+  local pcre2_build_ver
+  pcre2_build_ver=$(_detect_dep_version "pcre2-*" "${pcre_ver}")
+  new_args=$(echo "$new_args" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre2_build_ver}@")
+
+  # --- Lua modules ---
+  local has_lua=0
+  if echo "$orig_args" | grep -q "lua-nginx-module"; then
+    has_lua=1
+  fi
+
+  if [ "$has_lua" -eq 1 ]; then
+    # Update lua-nginx-module version in path
+    new_args=$(echo "$new_args" | sed "s@lua-nginx-module-[0-9.]\+@lua-nginx-module-${lua_nginx_module_ver}@")
+    # Update LuaJIT version if present in args
+    new_args=$(echo "$new_args" | sed "s@luajit2-[0-9.]\+@luajit2-${luajit2_ver}@")
+  else
+    # Original build has no Lua module - add them
+    echo "${CMSG}[适配] 原编译无 Lua 模块，将自动添加${CEND}"
+    new_args="${new_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
+  fi
+
+  # --- Preserve other third-party modules ---
+  # Extract all --add-module= paths that are NOT lua/openssl/pcre/ngx_devel_kit
+  local other_modules
+  other_modules=$(echo "$orig_args" | grep -oP '(--add-module=../[a-zA-Z0-9_-]+)' | \
+    grep -vE "(lua-nginx-module|pcre|openssl|ngx_devel_kit|luajit)" | sort -u)
+  if [ -n "$other_modules" ]; then
+    while IFS= read -r mod; do
+      local mod_name
+      mod_name=$(echo "$mod" | sed 's|.*/||')
+      if ! echo "$new_args" | grep -q "$mod_name"; then
+        new_args="${new_args} ${mod}"
+        echo "${CMSG}[适配] 保留第三方模块: ${mod_name}${CEND}"
+      fi
+    done <<< "$other_modules"
+  fi
+
+  echo "$new_args"
+}
+
+# Check and install missing dependencies for upgrade
+# Usage: _ensure_deps <nginx_ver>
+_ensure_deps() {
+  local nginx_ver="$1"
+
+  # OpenSSL
+  if [ ! -e "${current_dir}/src/openssl-${openssl_ver}.tar.gz" ]; then
+    src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
+  fi
+
+  # PCRE2
+  if [ ! -e "${current_dir}/src/pcre2-${pcre_ver}.tar.gz" ]; then
+    src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
+  fi
+
+  # Lua modules (only if needed)
+  if echo "$orig_args" | grep -q "lua-nginx-module"; then
+    if [ ! -e "${current_dir}/src/ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz" ]; then
+      src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
+    fi
+    if [ ! -e "${current_dir}/src/lua-nginx-module-${lua_nginx_module_ver}.tar.gz" ]; then
+      src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+    fi
+  fi
+}
+
 Upgrade_Nginx() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${nginx_install_dir}/sbin/nginx" ] && echo "${CWARNING}Nginx is not installed on your system! ${CEND}" && exit 1
@@ -30,19 +130,11 @@ Upgrade_Nginx() {
     if [ "${NEW_nginx_ver}" != "${OLD_nginx_ver}" ]; then
       [ ! -e "nginx-${NEW_nginx_ver}.tar.gz" ] && wget -c https://nginx.org/download/nginx-${NEW_nginx_ver}.tar.gz > /dev/null 2>&1
       if [ -e "nginx-${NEW_nginx_ver}.tar.gz" ]; then
+        # Download base dependencies
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
-        src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
-        src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-        src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
-        src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-        src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
-        tar xzf "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
-        tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-        tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-        tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
         echo "Download [${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -60,54 +152,62 @@ Upgrade_Nginx() {
       echo "Press Ctrl+c to cancel or Press any key to continue..."
       char=$(get_char)
     fi
+
+    # Get original configure args
     ${nginx_install_dir}/sbin/nginx -V &> $$
     nginx_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
     rm -rf $$
-    nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-[0-9.]\+@lua-nginx-module-${lua_nginx_module_ver}@" | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
 
-    # Always ensure lua modules are present in configure args
-    if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
-      nginx_configure_args="${nginx_configure_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
-    fi
-    # lua-resty-core and lua-resty-lrucache are Lua libraries, not Nginx modules
-    # They are installed separately below via make install
+    # Auto-detect and adapt configure args
+    echo ""
+    echo "${CCYAN}=== 自动适配编译参数 ===${CEND}"
+    nginx_configure_args=$(_adapt_configure_args "$nginx_configure_args_tmp" "$NEW_nginx_ver")
+    echo "${CCYAN}================================${CEND}"
+    echo ""
 
-    # Build LuaJIT if not present
-    if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-      ${current_dir}/upgrade.sh --script > /dev/null
-      src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
-      tar xzf "luajit2-${luajit2_ver}.tar.gz"
-      pushd "luajit2-${luajit2_ver}"
-      make && make install
+    # Build LuaJIT if needed (when Lua module is present)
+    if echo "$nginx_configure_args" | grep -q "lua-nginx-module"; then
+      if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
+        echo "${CMSG}[适配] 编译安装 LuaJIT...${CEND}"
+        src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
+        tar xzf "luajit2-${luajit2_ver}.tar.gz"
+        pushd "luajit2-${luajit2_ver}"
+        make && make install
+        popd > /dev/null
+        rm -rf "luajit2-${luajit2_ver}"
+        ldconfig
+      fi
+
+      # Install lua-resty-core
+      src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+      tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+      pushd "lua-resty-core-${lua_resty_core_ver}"
+      make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
       popd > /dev/null
-      rm -rf "luajit2-${luajit2_ver}"
-      ldconfig
-    fi
-
-    # Install lua-resty-core and lua-resty-lrucache (Lua libraries, not Nginx modules)
-    src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-    tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-    pushd "lua-resty-core-${lua_resty_core_ver}"
-    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
-    popd > /dev/null
-    if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
+      if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
         cp "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua"
+      fi
+      rm -rf "lua-resty-core-${lua_resty_core_ver}"
+
+      # Install lua-resty-lrucache
+      src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+      tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+      pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
+      make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
+      popd > /dev/null
+      rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
     fi
-    rm -rf "lua-resty-core-${lua_resty_core_ver}"
 
-    src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
-    tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
-    pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
-    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
-    popd > /dev/null
-    rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
-
+    # Extract and compile Nginx
     tar xzf nginx-${NEW_nginx_ver}.tar.gz
     pushd nginx-${NEW_nginx_ver}
     make clean
-    sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' auto/cc/gcc # close debug
+    sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' auto/cc/gcc
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
+    echo ""
+    echo "${CMSG}Configure: ${nginx_configure_args}${CEND}"
+    echo ""
     ./configure ${nginx_configure_args}
     compile_check
     if [ -f "objs/nginx" ]; then
@@ -152,12 +252,9 @@ Upgrade_Tengine() {
     if [ "${NEW_tengine_ver}" != "${OLD_tengine_ver}" ]; then
       [ ! -e "tengine-${NEW_tengine_ver}.tar.gz" ] && wget -c https://tengine.taobao.org/download/tengine-${NEW_tengine_ver}.tar.gz > /dev/null 2>&1
       if [ -e "tengine-${NEW_tengine_ver}.tar.gz" ]; then
+        # Download base dependencies
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
-        src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-        src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
-        src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-        src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
         echo "Download [${CMSG}tengine-${NEW_tengine_ver}.tar.gz${CEND}] successfully! "
@@ -180,53 +277,57 @@ Upgrade_Tengine() {
     tar xzf tengine-${NEW_tengine_ver}.tar.gz
     pushd tengine-${NEW_tengine_ver}
     make clean
+
+    # Get original configure args
     ${tengine_install_dir}/sbin/nginx -V &> $$
     tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
     rm -rf $$
-    tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
 
-    # Always ensure lua modules are present in configure args
-    if [ -z "$(echo ${tengine_configure_args} | grep lua-nginx-module)" ]; then
-      tengine_configure_args="${tengine_configure_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
-    fi
-    # lua-resty-core and lua-resty-lrucache are Lua libraries, not Nginx modules
-    # They are installed separately below via make install
+    # Auto-detect and adapt configure args
+    echo ""
+    echo "${CCYAN}=== 自动适配编译参数 ===${CEND}"
+    tengine_configure_args=$(_adapt_configure_args "$tengine_configure_args_tmp" "$NEW_tengine_ver")
+    echo "${CCYAN}================================${CEND}"
+    echo ""
 
-    # Build LuaJIT and install lua deps if not present
-    if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
-      ${current_dir}/upgrade.sh --script > /dev/null
-      src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
-      tar xzf "luajit2-${luajit2_ver}.tar.gz"
-      pushd "luajit2-${luajit2_ver}"
-      make && make install
+    # Build LuaJIT if needed (when Lua module is present)
+    if echo "$tengine_configure_args" | grep -q "lua-nginx-module"; then
+      if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
+        echo "${CMSG}[适配] 编译安装 LuaJIT...${CEND}"
+        src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
+        tar xzf "luajit2-${luajit2_ver}.tar.gz"
+        pushd "luajit2-${luajit2_ver}"
+        make && make install
+        popd > /dev/null
+        rm -rf "luajit2-${luajit2_ver}"
+        ldconfig
+      fi
+
+      # Install lua-resty-core
+      src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+      tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+      pushd "lua-resty-core-${lua_resty_core_ver}"
+      make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
       popd > /dev/null
-      rm -rf "luajit2-${luajit2_ver}"
-      ldconfig
-    fi
-
-    src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-    tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-    pushd "lua-resty-core-${lua_resty_core_ver}"
-    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
-    popd > /dev/null
-    if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
+      if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
         cp "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua"
+      fi
+      rm -rf "lua-resty-core-${lua_resty_core_ver}"
+
+      # Install lua-resty-lrucache
+      src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+      tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+      pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
+      make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
+      popd > /dev/null
+      rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
     fi
-    rm -rf "lua-resty-core-${lua_resty_core_ver}"
-
-    src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
-    tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
-    pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
-    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
-    popd > /dev/null
-    rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
-
-    # Download lua-nginx-module for Tengine build
-    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-    tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
 
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
+    echo ""
+    echo "${CMSG}Configure: ${tengine_configure_args}${CEND}"
+    echo ""
     ./configure ${tengine_configure_args}
     make
     if [ -f "objs/nginx" ]; then
