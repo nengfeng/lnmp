@@ -259,11 +259,20 @@ checkDownload() {
     download_openssl
   fi
 
-  # tcmalloc (GitHub releases)
+  # Memory allocator (tcmalloc / jemalloc)
   if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-6]$ ]]; then
-    echo "Download tcmalloc (gperftools)..."
-    src_url="https://github.com/gperftools/gperftools/releases/download/gperftools-${tcmalloc_ver}/gperftools-${tcmalloc_ver}.tar.gz"
-    Download_src
+    case "${allocator_option:-2}" in
+      2)
+        echo "Download tcmalloc (gperftools)..."
+        src_url="https://github.com/gperftools/gperftools/releases/download/gperftools-${tcmalloc_ver}/gperftools-${tcmalloc_ver}.tar.gz"
+        Download_src
+        ;;
+      3)
+        echo "Download jemalloc..."
+        src_url="https://github.com/jemalloc/jemalloc/releases/download/${jemalloc_ver}/jemalloc-${jemalloc_ver}.tar.bz2"
+        Download_src
+        ;;
+    esac
   fi
 
   # Nginx/Tengine/OpenResty

@@ -197,6 +197,7 @@ get_version() {
     nodejs)         ver=${VERSIONS[nodejs_ver]} ;;
     phpmyadmin)     ver=${VERSIONS[phpmyadmin_ver]} ;;
     tcmalloc)       ver=${VERSIONS[tcmalloc_ver]} ;;
+    jemalloc)       ver=${VERSIONS[jemalloc_ver]} ;;
     boost)          ver=${VERSIONS[boost_ver]} ;;
     lua-nginx-module) ver=${VERSIONS[lua_nginx_module_ver]} ;;
     ngx-devel-kit)  ver="0.3.3" ;;

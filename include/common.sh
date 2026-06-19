@@ -50,6 +50,39 @@ get_mirror_url() {
 }
 
 # ============================================
+# Memory Allocator Initialization
+# ============================================
+# Set allocator_ldflag, allocator_so, allocator_name based on allocator_option
+# Must be called after options.conf is sourced
+# Usage: init_allocator
+init_allocator() {
+  allocator_option=${allocator_option:-2}
+  case "${allocator_option}" in
+    1)
+      allocator_ldflag=""
+      allocator_so=""
+      allocator_name="none"
+      ;;
+    2)
+      allocator_ldflag="-ltcmalloc"
+      allocator_so="libtcmalloc.so"
+      allocator_name="tcmalloc"
+      ;;
+    3)
+      allocator_ldflag="-ljemalloc"
+      allocator_so="libjemalloc.so"
+      allocator_name="jemalloc"
+      ;;
+    *)
+      allocator_ldflag="-ltcmalloc"
+      allocator_so="libtcmalloc.so"
+      allocator_name="tcmalloc"
+      allocator_option=2
+      ;;
+  esac
+}
+
+# ============================================
 # Error Handling Functions
 # ============================================
 

@@ -239,7 +239,7 @@ install_web_server() {
     --with-openssl=../openssl-${openssl_ver} \
     --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit \
     --add-module=../lua-nginx-module-${lua_nginx_module_ver} \
-    --with-ld-opt="-ltcmalloc ${extra_ld_opt}" ${nginx_modules_options}
+    --with-ld-opt="${allocator_ldflag:--ltcmalloc} ${extra_ld_opt}" ${nginx_modules_options}
   
   compile_and_install
   

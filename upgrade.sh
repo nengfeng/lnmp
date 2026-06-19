@@ -17,6 +17,8 @@ current_dir=$(dirname "$(readlink -f "$0")")
 pushd "${current_dir}" > /dev/null
 . ./versions.txt
 . ./options.conf
+. ./include/common.sh
+init_allocator
 . ./include/ip_detect.sh
 . ./include/color.sh
 . ./include/check_os.sh

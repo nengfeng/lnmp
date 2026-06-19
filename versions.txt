@@ -71,7 +71,7 @@ phpmyadmin_ver=5.2.3
 tcmalloc_ver=2.18
 
 # jemalloc
-jemalloc_ver=5.3.0
+jemalloc_ver=5.3.1
 
 # boost
 boost_ver=1.77.0
