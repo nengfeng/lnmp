@@ -381,55 +381,168 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- lua-nginx-module (web scraping tags atom) ---
-lua_nginx_latest=$(gh_tags "openresty/lua-nginx-module" "^[0-9]+\.[0-9]+\.[0-9]+$")
-if [ -n "$lua_nginx_latest" ]; then
-  total=$((total + 1))
-  if [[ "$lua_nginx_module_ver" == "$lua_nginx_latest" ]]; then
-    results="${results}✅ lua-nginx-module: ${lua_nginx_module_ver} (最新)\n"
-    up_to_date=$((up_to_date + 1))
-  elif version_lt "$lua_nginx_module_ver" "$lua_nginx_latest"; then
-    results="${results}🔄 lua-nginx-module: ${lua_nginx_module_ver} → ${lua_nginx_latest} (小版本更新)\n"
-    minor_updated=$((minor_updated + 1))
-    [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_nginx_module_ver=.*/lua_nginx_module_ver=${lua_nginx_latest}/" versions.txt
-  else
-    results="${results}✅ lua-nginx-module: ${lua_nginx_module_ver} (最新: ${lua_nginx_latest})\n"
-    up_to_date=$((up_to_date + 1))
-  fi
-else
-  results="${results}⚠️  lua-nginx-module: 无法获取版本信息\n"
-  check_failed=$((check_failed + 1))
-fi
+# --- lua-nginx-module / lua-resty-core / lua-resty-lrucache (组合检查) ---
+# 这三个组件有版本依赖关系，不能独立更新。
+# lua-nginx-module 和 lua-resty-core 的版本必须配对使用。
+#
+# 已知兼容版本映射 (lua-nginx-module → lua-resty-core):
+declare -A LUA_NGINX_RESTY_CORE_MAP
+LUA_NGINX_RESTY_CORE_MAP=(
+    ["0.10.16"]="0.1.17"
+    ["0.10.17"]="0.1.17"
+    ["0.10.18"]="0.1.18"
+    ["0.10.19"]="0.1.19"
+    ["0.10.20"]="0.1.20"
+    ["0.10.21"]="0.1.21"
+    ["0.10.22"]="0.1.22"
+    ["0.10.23"]="0.1.23"
+    ["0.10.24"]="0.1.24"
+    ["0.10.25"]="0.1.25"
+    ["0.10.26"]="0.1.27"
+    ["0.10.27"]="0.1.28"
+    ["0.10.28"]="0.1.29"
+    ["0.10.29"]="0.1.32"
+    ["0.10.30"]="0.1.33"
+    ["0.10.31"]="0.1.34rc3"
+)
 
-# --- lua-resty-core & lua-resty-lrucache (web scraping, version-locked) ---
-_check_lua_resty() {
-    local core_ver="$1" lrucache_ver="$2"
-    local core_latest="" lrucache_latest=""
+_check_nginx_lua_group() {
+    local cur_ngx="$lua_nginx_module_ver"
+    local cur_core="$lua_resty_core_ver"
+    local cur_lru="$lua_resty_lrucache_ver"
+    local tgt_ngx="$cur_ngx"   # target after updates
+    local tgt_core="$cur_core"
+    local tgt_lru="$cur_lru"
+    total=$((total + 3))
 
-    core_latest=$(gh_tags "openresty/lua-resty-core" "^[0-9]+\.[0-9]+\.[0-9]+$")
-    lrucache_latest=$(gh_tags "openresty/lua-resty-lrucache" "^[0-9]+\.[0-9]+\.[0-9]+$")
-
-    local update_msg=""
-    if [ -n "$core_latest" ] && version_lt "$core_ver" "$core_latest"; then
-        update_msg="lua-resty-core: ${core_ver} → ${core_latest}"
-        [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_resty_core_ver=.*/lua_resty_core_ver=${core_latest}/" versions.txt
+    # Fetch latest versions
+    local latest_lua_ngx
+    latest_lua_ngx=$(gh_tags "openresty/lua-nginx-module" "^[0-9]+\.[0-9]+\.[0-9]+$")
+    local latest_core
+    latest_core=$(gh_tags "openresty/lua-resty-core" "^[0-9]+\.[0-9]+\.[0-9]+$")
+    # Also check rc tags for lua-resty-core (compatibility map may reference rc versions)
+    local latest_core_rc
+    latest_core_rc=$(curl -sL --connect-timeout 10 --max-time 20 \
+        "https://github.com/openresty/lua-resty-core/tags.atom" 2>/dev/null | \
+        grep "<title>" | grep -vE "(alpha|beta|dev)" | \
+        grep -oP "<title>v?\K[0-9][0-9.]*[a-z0-9]*" | \
+        grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | \
+        sort -V | tail -1)
+    if [ -n "$latest_core_rc" ] && version_lt "$latest_core" "$latest_core_rc"; then
+        latest_core="$latest_core_rc"
     fi
-    if [ -n "$lrucache_latest" ] && version_lt "$lrucache_ver" "$lrucache_latest"; then
-        update_msg="${update_msg} lua-resty-lrucache: ${lrucache_ver} → ${lrucache_latest}"
-        [[ "$apply_changes" == "y" ]] && sed -i "s/^lua_resty_lrucache_ver=.*/lua_resty_lrucache_ver=${lrucache_latest}/" versions.txt
-    fi
-    if [ -n "$update_msg" ]; then
-        results="${results}🔄 ${update_msg} (同步升级)\n"
-        minor_updated=$((minor_updated + 1))
+    local latest_lru
+    latest_lru=$(gh_tags "openresty/lua-resty-lrucache" "^[0-9]+\.[0-9]+(\.[0-9]+)?$")
+
+    # --- lua-nginx-module ---
+    local ngx_updated="n"
+    if [ -z "$latest_lua_ngx" ]; then
+        results="${results}⚠️  lua-nginx-module: 无法获取版本信息\n"
+        check_failed=$((check_failed + 1))
+    elif [[ "$cur_ngx" == "$latest_lua_ngx" ]]; then
+        results="${results}✅ lua-nginx-module: ${cur_ngx} (最新)\n"
+        up_to_date=$((up_to_date + 1))
+    elif version_lt "$cur_ngx" "$latest_lua_ngx"; then
+        local matched_core="${LUA_NGINX_RESTY_CORE_MAP[$latest_lua_ngx]}"
+        if [ -n "$matched_core" ]; then
+            results="${results}🔄 lua-nginx-module: ${cur_ngx} → ${latest_lua_ngx} (有已知兼容 lua-resty-core ${matched_core})\n"
+            minor_updated=$((minor_updated + 1))
+            ngx_updated="y"
+            tgt_ngx="$latest_lua_ngx"
+            if version_lt "$tgt_core" "$matched_core"; then
+                tgt_core="$matched_core"
+            fi
+        else
+            results="${results}🆕 lua-nginx-module: ${cur_ngx} → ${latest_lua_ngx} (缺少兼容的 lua-resty-core 版本映射，请手动确认)\n"
+            major_available=$((major_available + 1))
+        fi
     else
-        results="${results}✅ lua-resty-core: ${core_ver} (最新)\n"
-        results="${results}✅ lua-resty-lrucache: ${lrucache_ver} (最新)\n"
-        up_to_date=$((up_to_date + 2))
+        results="${results}✅ lua-nginx-module: ${cur_ngx} (最新: ${latest_lua_ngx})\n"
+        up_to_date=$((up_to_date + 1))
     fi
-    total=$((total + 2))
+
+    # --- lua-resty-core ---
+    # use cur_core (original) for display, tgt_core for final target
+    if [ -z "$latest_core" ]; then
+        results="${results}⚠️  lua-resty-core: 无法获取版本信息\n"
+        check_failed=$((check_failed + 1))
+    elif [[ "$tgt_core" == "$latest_core" && ( "$ngx_updated" == "y" || "$cur_core" == "$latest_core" ) ]]; then
+        # already up to date (either originally, or via group update)
+        local display="$tgt_core"
+        if [[ "$ngx_updated" == "y" ]] && version_lt "$cur_core" "$tgt_core"; then
+            results="${results}🔄 lua-resty-core: ${cur_core} → ${tgt_core} (随 lua-nginx-module 同步更新)\n"
+            minor_updated=$((minor_updated + 1))
+        else
+            results="${results}✅ lua-resty-core: ${tgt_core} (最新)\n"
+            up_to_date=$((up_to_date + 1))
+        fi
+    elif version_lt "$tgt_core" "$latest_core"; then
+        # core has a newer version available
+        if [[ "$ngx_updated" == "n" ]]; then
+            local expected="${LUA_NGINX_RESTY_CORE_MAP[$cur_ngx]}"
+            if [ -n "$expected" ] && version_lt "$cur_core" "$latest_core"; then
+                if version_lt "$latest_core" "$expected"; then
+                    results="${results}🔄 lua-resty-core: ${cur_core} → ${latest_core} (在兼容范围内)\n"
+                    minor_updated=$((minor_updated + 1))
+                    tgt_core="$latest_core"
+                elif [[ "$latest_core" == "$expected" ]]; then
+                    results="${results}✅ lua-resty-core: ${cur_core} (最新)\n"
+                    up_to_date=$((up_to_date + 1))
+                else
+                    results="${results}🆕 lua-resty-core: ${cur_core} → ${latest_core} (可能不兼容 lua-nginx-module ${cur_ngx}，请手动确认)\n"
+                    major_available=$((major_available + 1))
+                fi
+            else
+                results="${results}🔄 lua-resty-core: ${cur_core} → ${latest_core}\n"
+                minor_updated=$((minor_updated + 1))
+                tgt_core="$latest_core"
+            fi
+        else
+            # ngx was updated but core target still lags behind latest
+            if version_lt "$tgt_core" "$latest_core"; then
+                results="${results}🔄 lua-resty-core: ${cur_core} → ${tgt_core} (随 lua-nginx-module 同步更新，最新可用: ${latest_core})\n"
+                minor_updated=$((minor_updated + 1))
+            fi
+        fi
+    else
+        results="${results}✅ lua-resty-core: ${cur_core} (最新: ${latest_core})\n"
+        up_to_date=$((up_to_date + 1))
+    fi
+
+    # --- lua-resty-lrucache ---
+    if [ -z "$latest_lru" ]; then
+        results="${results}⚠️  lua-resty-lrucache: 无法获取版本信息\n"
+        check_failed=$((check_failed + 1))
+    elif [[ "$cur_lru" == "$latest_lru" ]]; then
+        results="${results}✅ lua-resty-lrucache: ${cur_lru} (最新)\n"
+        up_to_date=$((up_to_date + 1))
+    elif version_lt "$cur_lru" "$latest_lru"; then
+        results="${results}🔄 lua-resty-lrucache: ${cur_lru} → ${latest_lru}\n"
+        minor_updated=$((minor_updated + 1))
+        tgt_lru="$latest_lru"
+    else
+        results="${results}✅ lua-resty-lrucache: ${cur_lru} (最新: ${latest_lru})\n"
+        up_to_date=$((up_to_date + 1))
+    fi
+
+    # --- 应用更改 ---
+    if [[ "$apply_changes" == "y" ]]; then
+        if [[ "$tgt_ngx" != "$cur_ngx" ]]; then
+            sed -i "s/^lua_nginx_module_ver=.*/lua_nginx_module_ver=${tgt_ngx}/" versions.txt
+            results="${results}   ✏️  已更新 lua_nginx_module_ver=${tgt_ngx}\n"
+        fi
+        if [[ "$tgt_core" != "$cur_core" ]]; then
+            sed -i "s/^lua_resty_core_ver=.*/lua_resty_core_ver=${tgt_core}/" versions.txt
+            results="${results}   ✏️  已更新 lua_resty_core_ver=${tgt_core}\n"
+        fi
+        if [[ "$tgt_lru" != "$cur_lru" ]]; then
+            sed -i "s/^lua_resty_lrucache_ver=.*/lua_resty_lrucache_ver=${tgt_lru}/" versions.txt
+            results="${results}   ✏️  已更新 lua_resty_lrucache_ver=${tgt_lru}\n"
+        fi
+    fi
 }
 
-_check_lua_resty "$lua_resty_core_ver" "$lua_resty_lrucache_ver"
+_check_nginx_lua_group
 
 # --- Redis ---
 check_latest "Redis" "$redis_ver" \
