@@ -90,7 +90,7 @@ Upgrade_DB() {
       # Inject tcmalloc for MariaDB (use mariadbd-safe for 11.x+, mysqld_safe for older)
       local safe_script="${mariadb_install_dir}/bin/mariadbd-safe"
       [ ! -f "${safe_script}" ] && safe_script="${mariadb_install_dir}/bin/mysqld_safe"
-      [ -f "${safe_script}" ] && sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${safe_script}
+      [ -f "${safe_script}" ] && sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so:-libtcmalloc.so}"'@' ${safe_script}
       ${mariadb_install_dir}/scripts/mysql_install_db --user=mysql --basedir=${mariadb_install_dir} --datadir=${mariadb_data_dir}
       chown mysql:mysql -R ${mariadb_data_dir}
       svc_start mysqld
@@ -113,7 +113,7 @@ Upgrade_DB() {
       [ ! -d "${mysql_install_dir}" ] && mkdir -p ${mysql_install_dir}
       mkdir -p ${mysql_data_dir};chown mysql:mysql -R ${mysql_data_dir}
       mv ${DB_filename}/* ${mysql_install_dir}/
-      sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/libtcmalloc.so@' ${mysql_install_dir}/bin/mysqld_safe
+      sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so:-libtcmalloc.so}"'@' ${mysql_install_dir}/bin/mysqld_safe
       sed -i "s@/usr/local/mysql@${mysql_install_dir}@g" ${mysql_install_dir}/bin/mysqld_safe
       ${mysql_install_dir}/bin/mysqld --initialize-insecure --user=mysql --basedir=${mysql_install_dir} --datadir=${mysql_data_dir}
 

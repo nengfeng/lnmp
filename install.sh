@@ -26,6 +26,7 @@ pushd "${current_dir}" > /dev/null
 . ./options.conf
 . ./include/color.sh
 . ./include/common.sh
+init_allocator
 . ./include/ip_detect.sh
 . ./include/check_os.sh
 . ./include/check_dir.sh
@@ -466,10 +467,18 @@ startTime=$(date +%s)
 # openSSL
 Install_openSSL | tee -a ${current_dir}/install.log
 
-# tcmalloc (gperftools)
+# Memory allocator (tcmalloc / jemalloc / none)
 if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-6]$ ]]; then
-  . include/tcmalloc.sh
-  Install_Tcmalloc | tee -a ${current_dir}/install.log
+  case "${allocator_option}" in
+    2)
+      . include/tcmalloc.sh
+      Install_Tcmalloc | tee -a ${current_dir}/install.log
+      ;;
+    3)
+      . include/jemalloc.sh
+      Install_Jemalloc | tee -a ${current_dir}/install.log
+      ;;
+  esac
 fi
 
 # Database

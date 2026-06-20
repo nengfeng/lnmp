@@ -70,6 +70,9 @@ phpmyadmin_ver=5.2.3
 # tcmalloc (gperftools)
 tcmalloc_ver=2.18
 
+# jemalloc
+jemalloc_ver=5.3.1
+
 # boost
 boost_ver=1.77.0
 boost_oldver=1.59.0
