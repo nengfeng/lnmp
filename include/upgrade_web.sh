@@ -145,6 +145,7 @@ Upgrade_Nginx() {
       sleep 1
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
+      sed -i 's/^#brotli/brotli/' ${nginx_install_dir}/conf/nginx.conf 2>/dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_nginx_ver}${CEND} to ${CWARNING}${NEW_nginx_ver}${CEND}"
       cleanup_src nginx-${NEW_nginx_ver} ngx_brotli
     else
@@ -295,6 +296,7 @@ Upgrade_Tengine() {
       sleep 1
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
+      sed -i 's/^#brotli/brotli/' ${tengine_install_dir}/conf/nginx.conf 2>/dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}$OLD_tengine_ver${CEND} to ${CWARNING}${NEW_tengine_ver}${CEND}"
       rm -rf tengine-${NEW_tengine_ver} ngx_brotli
     else
@@ -379,6 +381,7 @@ Upgrade_OpenResty() {
       sleep 1
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
+      sed -i 's/^#brotli/brotli/' ${openresty_install_dir}/nginx/conf/nginx.conf 2>/dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_openresty_ver}${CEND} to ${CWARNING}${NEW_openresty_ver}${CEND}"
       cleanup_src openresty-${NEW_openresty_ver} ngx_brotli
     else
