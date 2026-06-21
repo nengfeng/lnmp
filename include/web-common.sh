@@ -181,7 +181,7 @@ install_web_server() {
   local conf_dir=${install_dir}
 
   # Build LuaJIT first (required by lua-nginx-module)
-  if [ ! -e "/usr/local/lib/libluajit-5.1.so.2.1.0" ]; then
+  if [ ! -e "/usr/local/lib/libluajit-5.1.so" ]; then
     _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}"
     pushd "luajit2-${luajit2_ver}" > /dev/null
     make -j$(nproc) && make install
