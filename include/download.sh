@@ -30,8 +30,8 @@ Download_src() {
   while [ $attempt -le $max_retries ]; do
     echo "Attempt $attempt of $max_retries..."
     
-    # Use wget with enhanced settings
-    if wget \
+    # Use wget with enhanced settings (check wget exit code, not tee's via PIPESTATUS)
+    wget \
       --timeout=60 \
       --tries=3 \
       --waitretry=${retry_delay} \
@@ -39,7 +39,9 @@ Download_src() {
       --progress=bar:force \
       -c \
       -O "${file_name}" \
-      ${src_url} 2>&1 | tee -a ${current_dir}/download.log; then
+      ${src_url} 2>&1 | tee -a ${current_dir}/download.log
+    local wget_exit_code=${PIPESTATUS[0]}
+    if [ ${wget_exit_code} -eq 0 ]; then
       
       # Verify download success
       if [ -f "${file_name}" ] && [ -s "${file_name}" ]; then
