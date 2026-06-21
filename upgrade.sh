@@ -223,13 +223,28 @@ while [ $# -gt 0 ]; do
       show_versions; exit 0
       ;;
     --nginx)
-      nginx_flag=y; NEW_nginx_ver=$2; shift 2
+      nginx_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && ! [[ "$2" =~ ^-- ]]; then
+        NEW_nginx_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --tengine)
-      tengine_flag=y; NEW_tengine_ver=$2; shift 2
+      tengine_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && ! [[ "$2" =~ ^-- ]]; then
+        NEW_tengine_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --openresty)
-      openresty_flag=y; NEW_openresty_ver=$2; shift 2
+      openresty_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && ! [[ "$2" =~ ^-- ]]; then
+        NEW_openresty_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --db)
       db_flag=y; NEW_db_ver=$2; shift 2
