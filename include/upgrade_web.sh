@@ -360,11 +360,13 @@ Upgrade_OpenResty() {
 
     pushd openresty-${NEW_openresty_ver}
     make clean
-    sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' bundle/nginx-${NEW_openresty_ver%.*}/auto/cc/gcc # close debug
+    local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
+    [ -n "$nginx_bundle_dir" ] && sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' "${nginx_bundle_dir}/auto/cc/gcc"
     ${openresty_install_dir}/nginx/sbin/nginx -V &> $$
     ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_v2_module --with-http_v3_module --with-http_ssl_module --with-stream --with-stream_ssl_preread_module --with-stream_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --add-module=../ngx_brotli --with-ld-opt="${allocator_ldflag:--ltcmalloc} -Wl,-u,pcre_version" ${nginx_modules_options}
     compile_check
-    if [ -f "build/nginx-${NEW_openresty_ver%.*}/objs/nginx" ]; then
+    local nginx_build_dir=$(ls -d build/nginx-* 2>/dev/null | head -1)
+    if [ -n "$nginx_build_dir" ] && [ -f "${nginx_build_dir}/objs/nginx" ]; then
       /bin/mv ${openresty_install_dir}/nginx/sbin/nginx{,$(date +%m%d)}
       make install
       kill -USR2 $(cat /var/run/nginx.pid)

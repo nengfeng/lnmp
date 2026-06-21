@@ -123,7 +123,9 @@ cleanup_web_deps() {
 # Usage: close_gcc_debug source_dir
 close_gcc_debug() {
   local src_dir=$1
-  sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' ${src_dir}/auto/cc/gcc
+  if [ -f "${src_dir}/auto/cc/gcc" ]; then
+    sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' "${src_dir}/auto/cc/gcc"
+  fi
 }
 
 # Extract tarball in src/ directory
@@ -247,7 +249,8 @@ install_web_server() {
   if [[ "${server_type}" == "nginx" ]]; then
     close_gcc_debug $(pwd)
   elif [[ "${server_type}" == "openresty" ]]; then
-    close_gcc_debug bundle/nginx-${server_ver%.*}
+    local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
+    [ -n "$nginx_bundle_dir" ] && close_gcc_debug "$nginx_bundle_dir"
   fi
   
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
