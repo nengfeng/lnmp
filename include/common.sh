@@ -288,7 +288,7 @@ ${logdir}/*nginx.log {
   notifempty
   sharedscripts
   postrotate
-    [ -e /var/run/nginx.pid ] && kill -USR1 \$(cat /var/run/nginx.pid\)
+    [ -e /run/nginx.pid ] && kill -USR1 \$(cat /run/nginx.pid\)
   endscript
 }
 EOF
