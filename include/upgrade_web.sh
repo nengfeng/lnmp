@@ -74,6 +74,16 @@ Upgrade_Nginx() {
     rm -rf $$
     nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-[0-9.]\+@lua-nginx-module-${lua_nginx_module_ver}@" | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
 
+    # Apply allocator from options.conf
+    if [ -n "${allocator_ldflag}" ]; then
+      nginx_configure_args=$(echo ${nginx_configure_args} | sed "s@--with-ld-opt=[^ ]*@--with-ld-opt=${allocator_ldflag}@")
+      if [ -z "$(echo ${nginx_configure_args} | grep -- '--with-ld-opt')" ]; then
+        nginx_configure_args="${nginx_configure_args} --with-ld-opt=${allocator_ldflag}"
+      fi
+    else
+      nginx_configure_args=$(echo ${nginx_configure_args} | sed 's@--with-ld-opt=[^ ]*@@')
+    fi
+
     # Always ensure lua modules are present in configure args
     if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
       nginx_configure_args="${nginx_configure_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
@@ -222,6 +232,16 @@ Upgrade_Tengine() {
     tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
     rm -rf $$
     tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
+
+    # Apply allocator from options.conf
+    if [ -n "${allocator_ldflag}" ]; then
+      tengine_configure_args=$(echo ${tengine_configure_args} | sed "s@--with-ld-opt=[^ ]*@--with-ld-opt=${allocator_ldflag}@")
+      if [ -z "$(echo ${tengine_configure_args} | grep -- '--with-ld-opt')" ]; then
+        tengine_configure_args="${tengine_configure_args} --with-ld-opt=${allocator_ldflag}"
+      fi
+    else
+      tengine_configure_args=$(echo ${tengine_configure_args} | sed 's@--with-ld-opt=[^ ]*@@')
+    fi
 
     # Always ensure lua modules are present in configure args
     if [ -z "$(echo ${tengine_configure_args} | grep lua-nginx-module)" ]; then

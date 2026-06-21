@@ -138,6 +138,7 @@ Show_Help() {
   --redis        [version]    Upgrade Redis
   --memcached    [version]    Upgrade Memcached
   --phpmyadmin   [version]    Upgrade phpMyAdmin
+  --allocator    [1|2|3]      Set memory allocator (1=none, 2=tcmalloc, 3=jemalloc)
   --script                    Upgrade scripts latest
   --acme.sh                   Upgrade acme.sh latest
   --cacert                    Update CA root certificates
@@ -241,6 +242,9 @@ while [ $# -gt 0 ]; do
       ;;
     --memcached)
       memcached_flag=y; NEW_memcached_ver=$2; shift 2
+      ;;
+    --allocator)
+      allocator_option=$2; init_allocator; shift 2
       ;;
     --phpmyadmin)
       phpmyadmin_flag=y; NEW_phpmyadmin_ver=$2; shift 2
