@@ -46,8 +46,10 @@ Upgrade_Nginx() {
         tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
         tar xzf "ngx_brotli-master.tar.gz"
+        rm -rf ngx_brotli
         mv ngx_brotli-master ngx_brotli
         tar xzf "brotli-${brotli_ver}.tar.gz"
+        rm -rf ngx_brotli/deps/brotli
         mkdir -p ngx_brotli/deps
         mv brotli-${brotli_ver} ngx_brotli/deps/brotli
         echo "Download [${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] successfully! "
@@ -189,8 +191,10 @@ Upgrade_Tengine() {
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
         tar xzf "ngx_brotli-master.tar.gz"
+        rm -rf ngx_brotli
         mv ngx_brotli-master ngx_brotli
         tar xzf "brotli-${brotli_ver}.tar.gz"
+        rm -rf ngx_brotli/deps/brotli
         mkdir -p ngx_brotli/deps
         mv brotli-${brotli_ver} ngx_brotli/deps/brotli
         echo "Download [${CMSG}tengine-${NEW_tengine_ver}.tar.gz${CEND}] successfully! "
@@ -321,8 +325,10 @@ Upgrade_OpenResty() {
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
         tar xzf "ngx_brotli-master.tar.gz"
+        rm -rf ngx_brotli
         mv ngx_brotli-master ngx_brotli
         tar xzf "brotli-${brotli_ver}.tar.gz"
+        rm -rf ngx_brotli/deps/brotli
         mkdir -p ngx_brotli/deps
         mv brotli-${brotli_ver} ngx_brotli/deps/brotli
         echo "Download [${CMSG}openresty-${NEW_openresty_ver}.tar.gz${CEND}] successfully! "

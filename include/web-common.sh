@@ -222,10 +222,12 @@ install_web_server() {
   if [ ! -d "ngx_brotli" ]; then
     if [ -f "ngx_brotli-master.tar.gz" ]; then
       tar xzf ngx_brotli-master.tar.gz
+      rm -rf ngx_brotli
       mv ngx_brotli-master ngx_brotli
     fi
     if [ -f "brotli-${brotli_ver}.tar.gz" ]; then
       tar xzf brotli-${brotli_ver}.tar.gz
+      rm -rf ngx_brotli/deps/brotli
       mkdir -p ngx_brotli/deps
       mv brotli-${brotli_ver} ngx_brotli/deps/brotli
     fi
