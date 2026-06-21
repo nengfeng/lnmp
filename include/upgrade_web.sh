@@ -27,7 +27,7 @@ Upgrade_Nginx() {
   while :; do echo
     [ "${nginx_flag}" != 'y' ] && read -e -p "Please input upgrade Nginx Version(default: ${Latest_nginx_ver}): " NEW_nginx_ver
     NEW_nginx_ver=${NEW_nginx_ver:-${Latest_nginx_ver}}
-    if [ "${NEW_nginx_ver}" != "${OLD_nginx_ver}" ]; then
+    if [ "${NEW_nginx_ver}" != "${OLD_nginx_ver}" ] || [ "${nginx_flag}" = 'y' ]; then
       [ ! -e "nginx-${NEW_nginx_ver}.tar.gz" ] && wget -c https://nginx.org/download/nginx-${NEW_nginx_ver}.tar.gz > /dev/null 2>&1
       if [ -e "nginx-${NEW_nginx_ver}.tar.gz" ]; then
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
@@ -188,7 +188,7 @@ Upgrade_Tengine() {
   while :; do echo
     [ "${tengine_flag}" != 'y' ] && read -e -p "Please input upgrade Tengine Version(default: ${Latest_tengine_ver}): " NEW_tengine_ver
     NEW_tengine_ver=${NEW_tengine_ver:-${Latest_tengine_ver}}
-    if [ "${NEW_tengine_ver}" != "${OLD_tengine_ver}" ]; then
+    if [ "${NEW_tengine_ver}" != "${OLD_tengine_ver}" ] || [ "${tengine_flag}" = 'y' ]; then
       [ ! -e "tengine-${NEW_tengine_ver}.tar.gz" ] && wget -c https://tengine.taobao.org/download/tengine-${NEW_tengine_ver}.tar.gz > /dev/null 2>&1
       if [ -e "tengine-${NEW_tengine_ver}.tar.gz" ]; then
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
@@ -337,7 +337,7 @@ Upgrade_OpenResty() {
   while :; do echo
     [ "${openresty_flag}" != 'y' ] && read -e -p "Please input upgrade OpenResty Version(default: ${Latest_openresty_ver}): " NEW_openresty_ver
     NEW_openresty_ver=${NEW_openresty_ver:-${Latest_openresty_ver}}
-    if [ "${NEW_openresty_ver}" != "${OLD_openresty_ver}" ]; then
+    if [ "${NEW_openresty_ver}" != "${OLD_openresty_ver}" ] || [ "${openresty_flag}" = 'y' ]; then
       [ ! -e "openresty-${NEW_openresty_ver}.tar.gz" ] && wget -c https://openresty.org/download/openresty-${NEW_openresty_ver}.tar.gz > /dev/null 2>&1
       if [ -e "openresty-${NEW_openresty_ver}.tar.gz" ]; then
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
