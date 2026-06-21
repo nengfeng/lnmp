@@ -216,6 +216,31 @@ install_web_server() {
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
   fi
+  # ngx_brotli: download, extract, build brotli static library
+  if [ ! -d "ngx_brotli" ]; then
+    if [ -f "ngx_brotli-master.tar.gz" ]; then
+      tar xzf ngx_brotli-master.tar.gz
+      mv ngx_brotli-master ngx_brotli
+    fi
+    if [ -f "brotli-${brotli_ver}.tar.gz" ]; then
+      tar xzf brotli-${brotli_ver}.tar.gz
+      mkdir -p ngx_brotli/deps
+      mv brotli-${brotli_ver} ngx_brotli/deps/brotli
+    fi
+    if [ -d "ngx_brotli/deps/brotli" ]; then
+      pushd ngx_brotli/deps/brotli > /dev/null
+      mkdir -p out
+      pushd out > /dev/null
+      cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_INSTALL_PREFIX=./installed ..
+      cmake --build . --config Release --target brotlienc
+      popd > /dev/null
+      popd > /dev/null
+    fi
+  fi
+
   pushd ${src_name} > /dev/null
   
   # Close debug for nginx and openresty
@@ -239,12 +264,13 @@ install_web_server() {
     --with-openssl=../openssl-${openssl_ver} \
     --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit \
     --add-module=../lua-nginx-module-${lua_nginx_module_ver} \
+    --add-module=../ngx_brotli \
     --with-ld-opt="${allocator_ldflag:--ltcmalloc} ${extra_ld_opt}" ${nginx_modules_options}
   
   compile_and_install
   
   if [ -e "${conf_dir}/conf/nginx.conf" ]; then
-    cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name} \
+    cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name} ngx_brotli \
       lua-nginx-module-${lua_nginx_module_ver} \
       lua-resty-core-${lua_resty_core_ver} \
       lua-resty-lrucache-${lua_resty_lrucache_ver}

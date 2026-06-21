@@ -308,6 +308,14 @@ checkDownload() {
     Download_src
   fi
 
+  # ngx_brotli + brotli (for nginx/tengine/openresty)
+  if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
+    echo "Download ngx_brotli..."
+    src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
+    echo "Download brotli..."
+    src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
+  fi
+
   # ============================================
   # Database downloads
   # ============================================

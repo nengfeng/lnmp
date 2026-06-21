@@ -85,3 +85,7 @@ lua_resty_core_ver=0.1.34rc3
 lua_resty_lrucache_ver=0.15
 lua_cjson_ver=2.1.0.15
 fail2ban_ver=master
+
+# ngx_brotli
+ngx_brotli_ver=master
+brotli_ver=1.2.0

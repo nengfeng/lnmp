@@ -37,12 +37,19 @@ Upgrade_Nginx() {
         src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+        src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
+        src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
         tar xzf "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
         tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
         tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+        tar xzf "ngx_brotli-master.tar.gz"
+        mv ngx_brotli-master ngx_brotli
+        tar xzf "brotli-${brotli_ver}.tar.gz"
+        mkdir -p ngx_brotli/deps
+        mv brotli-${brotli_ver} ngx_brotli/deps/brotli
         echo "Download [${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -68,6 +75,10 @@ Upgrade_Nginx() {
     # Always ensure lua modules are present in configure args
     if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
       nginx_configure_args="${nginx_configure_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
+    fi
+    # Always ensure ngx_brotli is present in configure args
+    if [ -z "$(echo ${nginx_configure_args} | grep ngx_brotli)" ]; then
+      nginx_configure_args="${nginx_configure_args} --add-module=../ngx_brotli"
     fi
     # lua-resty-core and lua-resty-lrucache are Lua libraries, not Nginx modules
     # They are installed separately below via make install
@@ -103,6 +114,21 @@ Upgrade_Nginx() {
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
     tar xzf nginx-${NEW_nginx_ver}.tar.gz
+
+    # Build brotli static library for ngx_brotli
+    if [ -d "ngx_brotli/deps/brotli" ]; then
+      pushd ngx_brotli/deps/brotli > /dev/null
+      mkdir -p out
+      pushd out > /dev/null
+      cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_INSTALL_PREFIX=./installed ..
+      cmake --build . --config Release --target brotlienc
+      popd > /dev/null
+      popd > /dev/null
+    fi
+
     pushd nginx-${NEW_nginx_ver}
     make clean
     sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' auto/cc/gcc # close debug
@@ -118,7 +144,7 @@ Upgrade_Nginx() {
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_nginx_ver}${CEND} to ${CWARNING}${NEW_nginx_ver}${CEND}"
-      cleanup_src nginx-${NEW_nginx_ver}
+      cleanup_src nginx-${NEW_nginx_ver} ngx_brotli
     else
       fail_msg "Nginx upgrade"
     fi
@@ -158,8 +184,15 @@ Upgrade_Tengine() {
         src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+        src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
+        src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
+        tar xzf "ngx_brotli-master.tar.gz"
+        mv ngx_brotli-master ngx_brotli
+        tar xzf "brotli-${brotli_ver}.tar.gz"
+        mkdir -p ngx_brotli/deps
+        mv brotli-${brotli_ver} ngx_brotli/deps/brotli
         echo "Download [${CMSG}tengine-${NEW_tengine_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -188,6 +221,10 @@ Upgrade_Tengine() {
     # Always ensure lua modules are present in configure args
     if [ -z "$(echo ${tengine_configure_args} | grep lua-nginx-module)" ]; then
       tengine_configure_args="${tengine_configure_args} --add-module=../lua-nginx-module-${lua_nginx_module_ver}"
+    fi
+    # Always ensure ngx_brotli is present in configure args
+    if [ -z "$(echo ${tengine_configure_args} | grep ngx_brotli)" ]; then
+      tengine_configure_args="${tengine_configure_args} --add-module=../ngx_brotli"
     fi
     # lua-resty-core and lua-resty-lrucache are Lua libraries, not Nginx modules
     # They are installed separately below via make install
@@ -227,6 +264,21 @@ Upgrade_Tengine() {
 
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
+
+    # Build brotli static library for ngx_brotli
+    if [ -d "ngx_brotli/deps/brotli" ]; then
+      pushd ngx_brotli/deps/brotli > /dev/null
+      mkdir -p out
+      pushd out > /dev/null
+      cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_INSTALL_PREFIX=./installed ..
+      cmake --build . --config Release --target brotlienc
+      popd > /dev/null
+      popd > /dev/null
+    fi
+
     ./configure ${tengine_configure_args}
     make
     if [ -f "objs/nginx" ]; then
@@ -240,7 +292,7 @@ Upgrade_Tengine() {
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}$OLD_tengine_ver${CEND} to ${CWARNING}${NEW_tengine_ver}${CEND}"
-      rm -rf tengine-${NEW_tengine_ver}
+      rm -rf tengine-${NEW_tengine_ver} ngx_brotli
     else
       echo "${CFAILURE}Upgrade Tengine failed! ${CEND}"
     fi
@@ -264,8 +316,15 @@ Upgrade_OpenResty() {
       if [ -e "openresty-${NEW_openresty_ver}.tar.gz" ]; then
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
+        src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
+        src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
+        tar xzf "ngx_brotli-master.tar.gz"
+        mv ngx_brotli-master ngx_brotli
+        tar xzf "brotli-${brotli_ver}.tar.gz"
+        mkdir -p ngx_brotli/deps
+        mv brotli-${brotli_ver} ngx_brotli/deps/brotli
         echo "Download [${CMSG}openresty-${NEW_openresty_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -284,11 +343,26 @@ Upgrade_OpenResty() {
       char=$(get_char)
     fi
     tar xzf openresty-${NEW_openresty_ver}.tar.gz
+
+    # Build brotli static library for ngx_brotli
+    if [ -d "ngx_brotli/deps/brotli" ]; then
+      pushd ngx_brotli/deps/brotli > /dev/null
+      mkdir -p out
+      pushd out > /dev/null
+      cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_INSTALL_PREFIX=./installed ..
+      cmake --build . --config Release --target brotlienc
+      popd > /dev/null
+      popd > /dev/null
+    fi
+
     pushd openresty-${NEW_openresty_ver}
     make clean
     sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' bundle/nginx-${NEW_openresty_ver%.*}/auto/cc/gcc # close debug
     ${openresty_install_dir}/nginx/sbin/nginx -V &> $$
-    ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_v2_module --with-http_v3_module --with-http_ssl_module --with-stream --with-stream_ssl_preread_module --with-stream_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --with-ld-opt="${allocator_ldflag:--ltcmalloc} -Wl,-u,pcre_version" ${nginx_modules_options}
+    ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_v2_module --with-http_v3_module --with-http_ssl_module --with-stream --with-stream_ssl_preread_module --with-stream_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --add-module=../ngx_brotli --with-ld-opt="${allocator_ldflag:--ltcmalloc} -Wl,-u,pcre_version" ${nginx_modules_options}
     compile_check
     if [ -f "build/nginx-${NEW_openresty_ver%.*}/objs/nginx" ]; then
       /bin/mv ${openresty_install_dir}/nginx/sbin/nginx{,$(date +%m%d)}
@@ -298,7 +372,7 @@ Upgrade_OpenResty() {
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_openresty_ver}${CEND} to ${CWARNING}${NEW_openresty_ver}${CEND}"
-      cleanup_src openresty-${NEW_openresty_ver}
+      cleanup_src openresty-${NEW_openresty_ver} ngx_brotli
     else
       fail_msg "OpenResty upgrade"
     fi
