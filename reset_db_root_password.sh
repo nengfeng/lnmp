@@ -101,7 +101,7 @@ Reset_force_dbrootpwd() {
   sed -i '/\[mysqld\]/a\skip-grant-tables' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
   timeout=60
-  while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
+  while [ -z "$(pidof mysqld)" ]; do
     [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
@@ -116,7 +116,7 @@ Reset_force_dbrootpwd() {
   sed -i '/^skip-grant-tables/d' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
   timeout=60
-  while [ -z "$(ps -ef | grep 'mysqld ' | grep -v grep | awk '{print $2}')" ]; do
+  while [ -z "$(pidof mysqld)" ]; do
     [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
     sleep 1
   done
