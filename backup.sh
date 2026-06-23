@@ -112,7 +112,7 @@ db_remote_backup() {
     ./db_bk.sh "${D}"
     local DB_GREP DB_FILE
     DB_GREP="DB_${D}_$(date +%Y%m%d)"
-    DB_FILE=$(ls -lrt "${backup_dir}" | grep "${DB_GREP}" | tail -1 | awk '{print $NF}')
+    DB_FILE=$(command ls -t "${backup_dir}/${DB_GREP}"* 2>/dev/null | head -1)
     echo "file:::${backup_dir}/${DB_FILE} ${backup_dir} push" >> config_backup.txt
     echo "com:::[ -e \"${backup_dir}/${DB_FILE}\" ] && rm -rf ${backup_dir}/DB_${D}_$(date +%Y%m%d --date="${expired_days} days ago")_*.tgz" >> config_backup.txt
   done
@@ -133,7 +133,7 @@ db_cloud_backup() {
     
     local DB_GREP DB_FILE remote_path
     DB_GREP="DB_${D}_$(date +%Y%m%d)"
-    DB_FILE=$(ls -lrt "${backup_dir}" | grep "${DB_GREP}" | tail -1 | awk '{print $NF}')
+    DB_FILE=$(command ls -t "${backup_dir}/${DB_GREP}"* 2>/dev/null | head -1)
     remote_path="/$(date +%F)/${DB_FILE}"
     
     # Upload based on cloud type
@@ -185,7 +185,7 @@ web_remote_backup() {
       ./website_bk.sh "${W}"
       local Web_GREP Web_FILE
       Web_GREP="Web_${W}_$(date +%Y%m%d)"
-      Web_FILE=$(ls -lrt "${backup_dir}" | grep "${Web_GREP}" | tail -1 | awk '{print $NF}')
+      Web_FILE=$(command ls -t "${backup_dir}/${Web_GREP}"* 2>/dev/null | head -1)
       echo "file:::${backup_dir}/${Web_FILE} ${backup_dir} push" >> config_backup.txt
       echo "com:::[ -e \"${backup_dir}/${Web_FILE}\" ] && rm -rf ${backup_dir}/Web_${W}_$(date +%Y%m%d --date="${expired_days} days ago")_*.tgz" >> config_backup.txt
     else

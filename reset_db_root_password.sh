@@ -93,7 +93,7 @@ Reset_force_dbrootpwd() {
   echo "${CMSG}Stopping MySQL...${CEND}"
   svc_stop mysqld > /dev/null 2>&1
   local timeout=60
-  while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
+  while [ -n "$(pidof mysqld)" ]; do
     [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
@@ -109,7 +109,7 @@ Reset_force_dbrootpwd() {
   echo "${CMSG}Removing skip-grant-tables and restarting MySQL...${CEND}"
   svc_stop mysqld > /dev/null 2>&1
   timeout=60
-  while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
+  while [ -n "$(pidof mysqld)" ]; do
     [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
@@ -148,11 +148,11 @@ EOF
   if [ $? -eq 0 ]; then
     killall mysqld
     timeout=60
-    while [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ]; do
-      [ $((timeout--)) -le 0 ] && { ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1; break; }
+    while [ -n "$(pidof mysqld)" ]; do
+      [ $((timeout--)) -le 0 ] && { pidof mysqld | xargs kill -9 > /dev/null 2>&1; break; }
       sleep 1
     done
-    [ -n "$(ps -ef | grep mysqld | grep -v grep | awk '{print $2}')" ] && ps -ef | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 > /dev/null 2>&1
+    [ -n "$(pidof mysqld)" ] && pidof mysqld | xargs kill -9 > /dev/null 2>&1
     svc_start mysqld > /dev/null 2>&1
     sed -i "s+^dbrootpwd.*+dbrootpwd='${escaped_pwd}'+" ./options.conf
     chmod 600 ./options.conf

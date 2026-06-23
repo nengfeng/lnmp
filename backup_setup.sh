@@ -42,7 +42,7 @@ while :; do echo
   do
     [ -z "$(echo ${array_all[@]} | grep -w ${v})" ] && desc_flag=1
   done
-  if [[ "${desc_bk}" != 1 ]]; then
+  if [[ "${desc_flag}" == 1 ]]; then
     unset desc_flag
     echo; echo "${CWARNING}input error! Please only input number 1~8${CEND}"; echo
     continue
