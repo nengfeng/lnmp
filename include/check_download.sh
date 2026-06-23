@@ -200,18 +200,21 @@ verify_pgp_signature() {
   local component=$3
   
   [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
-  ! command -v gpg >/dev/null 2>&1 && return 0
+  ! command -v gpg >/dev/null 2>&1 && return 1
   
   echo "Downloading ${component} PGP signature..."
   
-  if wget -q "$sig_url" -O "${file_name}.asc" 2>/dev/null; then
-    if gpg --verify "${file_name}.asc" "$file_name" 2>/dev/null; then
-      echo "${CGREEN}${component} PGP signature verified${CEND}"
-    else
-      echo "${CYELLOW}${component} PGP signature verification skipped (key may not be imported)${CEND}"
-    fi
+  wget -q "$sig_url" -O "${file_name}.asc" 2>/dev/null || {
+    echo "${CFAILURE}Could not download ${component} PGP signature${CEND}"
+    return 1
+  }
+  
+  if gpg --verify "${file_name}.asc" "$file_name" 2>/dev/null; then
+    echo "${CGREEN}${component} PGP signature verified${CEND}"
+    return 0
   else
-    echo "${CYELLOW}Could not download ${component} PGP signature${CEND}"
+    echo "${CFAILURE}${component} PGP signature verification failed${CEND}"
+    return 1
   fi
 }
 
@@ -282,7 +285,7 @@ checkDownload() {
       src_url="https://nginx.org/download/nginx-${nginx_ver}.tar.gz"
       local file_name="nginx-${nginx_ver}.tar.gz"
       Download_src
-      verify_pgp_signature "$file_name" "https://nginx.org/download/nginx-${nginx_ver}.tar.gz.asc" "Nginx"
+      verify_pgp_signature "$file_name" "https://nginx.org/download/nginx-${nginx_ver}.tar.gz.asc" "Nginx" || die_hard "PGP signature verification failed for ${file_name}"
       ;;
     2)
       echo "Download tengine..."
@@ -297,7 +300,7 @@ checkDownload() {
       local file_name="openresty-${openresty_ver}.tar.gz"
       src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
       Download_src
-      verify_pgp_signature "$file_name" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz.asc" "OpenResty"
+      verify_pgp_signature "$file_name" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz.asc" "OpenResty" || die_hard "PGP signature verification failed for ${file_name}"
       ;;
   esac
 
@@ -403,7 +406,7 @@ checkDownload() {
     # curl (official only)
     src_url="https://curl.se/download/curl-${curl_ver}.tar.gz"
     Download_src
-    verify_pgp_signature "curl-${curl_ver}.tar.gz" "https://curl.se/download/curl-${curl_ver}.tar.gz.asc" "Curl"
+    verify_pgp_signature "curl-${curl_ver}.tar.gz" "https://curl.se/download/curl-${curl_ver}.tar.gz.asc" "Curl" || die_hard "PGP signature verification failed for curl-${curl_ver}.tar.gz"
 
     # freetype (official only)
     src_url="https://download.savannah.gnu.org/releases/freetype/freetype-${freetype_ver}.tar.gz"
@@ -430,7 +433,7 @@ checkDownload() {
     # libsodium (official only)
     src_url="https://download.libsodium.org/libsodium/releases/libsodium-${libsodium_ver}.tar.gz"
     Download_src
-    verify_pgp_signature "libsodium-${libsodium_ver}.tar.gz" "https://download.libsodium.org/libsodium/releases/libsodium-${libsodium_ver}.tar.gz.sig" "libsodium"
+    verify_pgp_signature "libsodium-${libsodium_ver}.tar.gz" "https://download.libsodium.org/libsodium/releases/libsodium-${libsodium_ver}.tar.gz.sig" "libsodium" || die_hard "PGP signature verification failed for libsodium-${libsodium_ver}.tar.gz"
 
     # libzip (official only)
     src_url="https://libzip.org/download/libzip-${libzip_ver}.tar.gz"
