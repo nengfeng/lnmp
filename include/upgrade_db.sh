@@ -60,9 +60,16 @@ Upgrade_DB() {
         DB_filename=mysql-${NEW_db_ver}-linux-glibc2.28-x86_64
         DB_URL=${DOWN_ADDR}/MySQL-$(echo ${NEW_db_ver} | awk -F. '{print $1"."$2}')/${DB_filename}.tar.xz
       fi
-      [ ! -e "$(ls ${DB_filename}.tar.?z 2>/dev/null)" ] && wget -c ${DB_URL} > /dev/null 2>&1
-      if [ -e "$(ls ${DB_filename}.tar.?z 2>/dev/null)" ]; then
-        echo "Download [${CMSG}$(ls ${DB_filename}.tar.?z 2>/dev/null)${CEND}] successfully! "
+      local db_archive_file=""
+      for _f in ${DB_filename}.tar.?z; do
+        [ -f "$_f" ] && db_archive_file="$_f" && break
+      done
+      [ -z "${db_archive_file}" ] && { wget -c ${DB_URL} > /dev/null 2>&1; }
+      for _f in ${DB_filename}.tar.?z; do
+        [ -f "$_f" ] && db_archive_file="$_f" && break
+      done
+      if [ -n "${db_archive_file}" ]; then
+        echo "Download [${CMSG}${db_archive_file}${CEND}] successfully! "
       else
         echo "${CWARNING}${DB} version does not exist! ${CEND}"
       fi
@@ -73,8 +80,12 @@ Upgrade_DB() {
     fi
   done
 
-  if [ -e "$(ls ${DB_filename}.tar.?z 2>/dev/null)" ]; then
-    echo "[${CMSG}$(ls ${DB_filename}.tar.?z 2>/dev/null)${CEND}] found"
+  local db_archive_file=""
+  for _f in ${DB_filename}.tar.?z; do
+    [ -f "$_f" ] && db_archive_file="$_f" && break
+  done
+  if [ -n "${db_archive_file}" ]; then
+    echo "[${CMSG}${db_archive_file}${CEND}] found"
     if [ "${db_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."
       char=$(get_char)
@@ -82,6 +93,11 @@ Upgrade_DB() {
     if [[ "${DB}" == MariaDB ]]; then
       tar xzf ${DB_filename}.tar.gz
       svc_stop mysqld
+      local timeout=60
+      while pidof mysqld mariadbd >/dev/null 2>&1; do
+        [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; return 1; }
+        sleep 1
+      done
       mv ${mariadb_install_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
       mv ${mariadb_data_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
       [ ! -d "${mariadb_install_dir}" ] && mkdir -p ${mariadb_install_dir}
@@ -108,6 +124,11 @@ Upgrade_DB() {
     elif [[ "${DB}" == MySQL ]]; then
       tar xJf ${DB_filename}.tar.xz
       svc_stop mysqld
+      local timeout=60
+      while pidof mysqld >/dev/null 2>&1; do
+        [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; return 1; }
+        sleep 1
+      done
       mv ${mysql_install_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
       mv ${mysql_data_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
       [ ! -d "${mysql_install_dir}" ] && mkdir -p ${mysql_install_dir}

@@ -69,9 +69,10 @@ Upgrade_Nginx() {
       echo "Press Ctrl+c to cancel or Press any key to continue..."
       char=$(get_char)
     fi
-    ${nginx_install_dir}/sbin/nginx -V &> $$
-    nginx_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
-    rm -rf $$
+    local nginx_v_tmp=$(mktemp "${current_dir}/src/nginx_v.XXXXXX")
+    ${nginx_install_dir}/sbin/nginx -V &> "${nginx_v_tmp}"
+    nginx_configure_args_tmp=$(grep 'configure arguments:' "${nginx_v_tmp}" | awk -F: '{print $2}')
+    rm -f "${nginx_v_tmp}"
     nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-[0-9.]\+@lua-nginx-module-${lua_nginx_module_ver}@" | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Apply allocator from options.conf
@@ -129,12 +130,14 @@ Upgrade_Nginx() {
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
+      local brotli_arch=""
+      [[ "${armplatform}" != 'y' ]] && brotli_arch="-m64 "
       pushd ngx_brotli/deps/brotli > /dev/null
       mkdir -p out
       pushd out > /dev/null
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
-        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
       cmake --build . --config Release --target brotlienc
       popd > /dev/null
@@ -228,9 +231,10 @@ Upgrade_Tengine() {
     tar xzf tengine-${NEW_tengine_ver}.tar.gz
     pushd tengine-${NEW_tengine_ver}
     make clean
-    ${tengine_install_dir}/sbin/nginx -V &> $$
-    tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
-    rm -rf $$
+    local tengine_v_tmp=$(mktemp "${current_dir}/src/tengine_v.XXXXXX")
+    ${tengine_install_dir}/sbin/nginx -V &> "${tengine_v_tmp}"
+    tengine_configure_args_tmp=$(grep 'configure arguments:' "${tengine_v_tmp}" | awk -F: '{print $2}')
+    rm -f "${tengine_v_tmp}"
     tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-[0-9.]\+@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Apply allocator from options.conf
@@ -292,12 +296,14 @@ Upgrade_Tengine() {
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
+      local brotli_arch=""
+      [[ "${armplatform}" != 'y' ]] && brotli_arch="-m64 "
       pushd ngx_brotli/deps/brotli > /dev/null
       mkdir -p out
       pushd out > /dev/null
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
-        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
       cmake --build . --config Release --target brotlienc
       popd > /dev/null
@@ -374,12 +380,14 @@ Upgrade_OpenResty() {
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
+      local brotli_arch=""
+      [[ "${armplatform}" != 'y' ]] && brotli_arch="-m64 "
       pushd ngx_brotli/deps/brotli > /dev/null
       mkdir -p out
       pushd out > /dev/null
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
-        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
       cmake --build . --config Release --target brotlienc
       popd > /dev/null
@@ -390,7 +398,6 @@ Upgrade_OpenResty() {
     make clean
     local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
     [ -n "$nginx_bundle_dir" ] && sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' "${nginx_bundle_dir}/auto/cc/gcc"
-    ${openresty_install_dir}/nginx/sbin/nginx -V &> $$
     ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_v2_module --with-http_v3_module --with-http_ssl_module --with-stream --with-stream_ssl_preread_module --with-stream_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --add-module=../ngx_brotli --with-ld-opt="${allocator_ldflag:--ltcmalloc} -Wl,-u,pcre_version" ${nginx_modules_options}
     compile_check
     local nginx_build_dir=$(ls -d build/nginx-* 2>/dev/null | head -1)

@@ -816,7 +816,7 @@ Del_NGX_Vhost() {
             echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
           else
             if [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ]; then
-              Directory=$(grep '^  root' ${web_install_dir}/conf/vhost/${domain}.conf | head -1 | awk -F'[ ;]' '{print $(NF-1)}')
+              Directory=$(grep '^  root' "${web_install_dir}/conf/vhost/${domain}.conf" | head -1 | sed 's/^[[:space:]]*root[[:space:]]*//;s/;$//')
               if [ -z "${Directory}" ] || [ "${Directory}" == "/" ] || ! echo "${Directory}" | grep -q "^${wwwroot_dir}"; then
                 echo "${CFAILURE}Invalid directory path detected. Only directories under ${wwwroot_dir} can be deleted.${CEND}"
                 continue
