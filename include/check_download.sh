@@ -68,8 +68,8 @@ verify_sha256() {
       return 1
     fi
   else
-    echo "${CYELLOW}Could not download checksum file, skipping verification${CEND}"
-    return 0
+    echo "${CFAILURE}Failed to download checksum file${CEND}"
+    return 1
   fi
 }
 
@@ -98,8 +98,8 @@ verify_sha1() {
       return 1
     fi
   else
-    echo "${CYELLOW}Could not download SHA1 checksum file, skipping verification${CEND}"
-    return 0
+    echo "${CFAILURE}Failed to download SHA1 checksum file${CEND}"
+    return 1
   fi
 }
 
@@ -121,8 +121,8 @@ verify_php_sha256() {
   api_response=$(curl -s --connect-timeout 10 --max-time 30 "$api_url" 2>/dev/null)
   
   if [ -z "$api_response" ]; then
-    echo "${CYELLOW}Could not fetch PHP releases API, skipping verification${CEND}"
-    return 0
+    echo "${CFAILURE}Could not fetch PHP releases API${CEND}"
+    return 1
   fi
   
   # 从 JSON 中提取对应文件的 sha256
@@ -131,8 +131,8 @@ verify_php_sha256() {
   expected=$(echo "$api_response" | grep -oP "\"${file_name}\"[^}]*\"sha256\"\s*:\s*\"\K[a-f0-9]{64}" | head -1)
   
   if [ -z "$expected" ]; then
-    echo "${CYELLOW}Could not parse SHA256 from API response, skipping verification${CEND}"
-    return 0
+    echo "${CFAILURE}Could not parse SHA256 from API response${CEND}"
+    return 1
   fi
   
   local actual
@@ -160,16 +160,16 @@ verify_md5_with_retry() {
   
   # 下载 MD5 文件
   wget -q "$md5_url" -O "${file_name}.md5" 2>/dev/null || {
-    echo "${CYELLOW}Could not download MD5 file${CEND}"
-    return 0
+    echo "${CFAILURE}Could not download MD5 file${CEND}"
+    return 1
   }
   
   local expected_md5=$(awk '{print $1}' "${file_name}.md5")
   [ -z "$expected_md5" ] && expected_md5=$(curl -s "$md5_url" | grep "$file_name" | awk '{print $1}')
   
   if [ -z "$expected_md5" ]; then
-    echo "${CYELLOW}Could not extract MD5 from file${CEND}"
-    return 0
+    echo "${CFAILURE}Could not extract MD5 from file${CEND}"
+    return 1
   fi
   
   # 验证并重试下载
@@ -224,7 +224,7 @@ download_openssl() {
   Download_src
   # OpenSSL GitHub releases 提供 SHA256 校验
   local checksum_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/${file_name}.sha256"
-  verify_sha256 "$file_name" "$checksum_url"
+  verify_sha256 "$file_name" "$checksum_url" || die_hard "Checksum verification failed for ${file_name}"
 }
 
 checkDownload() {
@@ -340,7 +340,7 @@ checkDownload() {
         fi
         src_url="https://cdn.mysql.com/Downloads/MySQL-8.4/${FILE_NAME}"
         Download_src
-        verify_md5_with_retry "$FILE_NAME" "https://cdn.mysql.com/Downloads/MySQL-8.4/${FILE_NAME}.md5" "$src_url"
+        verify_md5_with_retry "$FILE_NAME" "https://cdn.mysql.com/Downloads/MySQL-8.4/${FILE_NAME}.md5" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
         ;;
       2)
         # MySQL 8.0
@@ -353,7 +353,7 @@ checkDownload() {
         fi
         src_url="https://cdn.mysql.com/Downloads/MySQL-8.0/${FILE_NAME}"
         Download_src
-        verify_md5_with_retry "$FILE_NAME" "https://cdn.mysql.com/Downloads/MySQL-8.0/${FILE_NAME}.md5" "$src_url"
+        verify_md5_with_retry "$FILE_NAME" "https://cdn.mysql.com/Downloads/MySQL-8.0/${FILE_NAME}.md5" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
         ;;
       [3-5])
         case "${db_option}" in
@@ -374,7 +374,7 @@ checkDownload() {
         local china_url="${MIRROR_BASE_URL}/mariadb/mariadb-${mariadb_ver}/${FILE_TYPE}/${FILE_NAME}"
         src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
         Download_src
-        verify_md5_with_retry "$FILE_NAME" "https://archive.mariadb.org/mariadb-${mariadb_ver}/${FILE_TYPE}/md5sums.txt" "$src_url"
+        verify_md5_with_retry "$FILE_NAME" "https://archive.mariadb.org/mariadb-${mariadb_ver}/${FILE_TYPE}/md5sums.txt" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
         ;;
       6)
         # PostgreSQL (APT repo or source)
@@ -448,7 +448,7 @@ checkDownload() {
     local file_name="php-${php_ver_to_use}.tar.gz"
     src_url="https://www.php.net/distributions/php-${php_ver_to_use}.tar.gz"
     Download_src
-    verify_php_sha256 "$file_name" "$php_ver_to_use"
+    verify_php_sha256 "$file_name" "$php_ver_to_use" || die_hard "Checksum verification failed for ${file_name}"
   fi
 
   # APCU (PECL - official only)
@@ -551,7 +551,7 @@ checkDownload() {
     local file_name="phpMyAdmin-${phpmyadmin_ver}-all-languages.tar.gz"
     src_url="https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/${file_name}"
     Download_src
-    verify_sha256 "$file_name" "https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/${file_name}.sha256"
+    verify_sha256 "$file_name" "https://files.phpmyadmin.net/phpMyAdmin/${phpmyadmin_ver}/${file_name}.sha256" || die_hard "Checksum verification failed for ${file_name}"
   fi
 
   popd > /dev/null
