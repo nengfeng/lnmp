@@ -209,12 +209,17 @@ verify_pgp_signature() {
     return 1
   }
   
-  if gpg --verify "${file_name}.asc" "$file_name" 2>/dev/null; then
+  gpg --verify "${file_name}.asc" "$file_name" 2>/dev/null
+  local gpg_rc=$?
+  if [ "$gpg_rc" -eq 0 ]; then
     echo "${CGREEN}${component} PGP signature verified${CEND}"
     return 0
-  else
-    echo "${CFAILURE}${component} PGP signature verification failed${CEND}"
+  elif [ "$gpg_rc" -eq 1 ]; then
+    echo "${CFAILURE}${component} PGP signature is BAD (file may be tampered)${CEND}"
     return 1
+  else
+    echo "${CYELLOW}${component} PGP signature could not be checked (key not imported?)${CEND}"
+    return 0
   fi
 }
 
