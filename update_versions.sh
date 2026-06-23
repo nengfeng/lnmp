@@ -404,6 +404,7 @@ LUA_NGINX_RESTY_CORE_MAP=(
     ["0.10.29"]="0.1.32"
     ["0.10.30"]="0.1.33"
     ["0.10.31"]="0.1.34rc3"
+    ["0.10.32rc1"]="0.1.35rc1"
 )
 
 _check_nginx_lua_group() {
@@ -418,6 +419,17 @@ _check_nginx_lua_group() {
     # Fetch latest versions
     local latest_lua_ngx
     latest_lua_ngx=$(gh_tags "openresty/lua-nginx-module" "^[0-9]+\.[0-9]+\.[0-9]+$")
+    # Also check rc tags for lua-nginx-module (compatibility map may reference rc versions)
+    local latest_lua_ngx_rc
+    latest_lua_ngx_rc=$(curl -sL --connect-timeout 10 --max-time 20 \
+        "https://github.com/openresty/lua-nginx-module/tags.atom" 2>/dev/null | \
+        grep "<title>" | grep -vE "(alpha|beta|dev)" | \
+        grep -oP "<title>v?\K[0-9][0-9.]*[a-z0-9]*" | \
+        grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | \
+        sort -V | tail -1)
+    if [ -n "$latest_lua_ngx_rc" ] && version_lt "$latest_lua_ngx" "$latest_lua_ngx_rc"; then
+        latest_lua_ngx="$latest_lua_ngx_rc"
+    fi
     local latest_core
     latest_core=$(gh_tags "openresty/lua-resty-core" "^[0-9]+\.[0-9]+\.[0-9]+$")
     # Also check rc tags for lua-resty-core (compatibility map may reference rc versions)
