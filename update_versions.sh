@@ -411,10 +411,12 @@ _check_nginx_lua_group() {
     local cur_ngx="$lua_nginx_module_ver"
     local cur_core="$lua_resty_core_ver"
     local cur_lru="$lua_resty_lrucache_ver"
+    local cur_cjson="$lua_cjson_ver"
     local tgt_ngx="$cur_ngx"   # target after updates
     local tgt_core="$cur_core"
     local tgt_lru="$cur_lru"
-    total=$((total + 3))
+    local tgt_cjson="$cur_cjson"
+    total=$((total + 4))
 
     # Fetch latest versions
     local latest_lua_ngx
@@ -445,6 +447,8 @@ _check_nginx_lua_group() {
     fi
     local latest_lru
     latest_lru=$(gh_tags "openresty/lua-resty-lrucache" "^[0-9]+\.[0-9]+(\.[0-9]+)?$")
+    local latest_cjson
+    latest_cjson=$(gh_tags "openresty/lua-cjson" "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$")
 
     # --- lua-nginx-module ---
     local ngx_updated="n"
@@ -537,6 +541,22 @@ _check_nginx_lua_group() {
         up_to_date=$((up_to_date + 1))
     fi
 
+    # --- lua-cjson ---
+    if [ -z "$latest_cjson" ]; then
+        results="${results}⚠️  lua-cjson: 无法获取版本信息\n"
+        check_failed=$((check_failed + 1))
+    elif [[ "$cur_cjson" == "$latest_cjson" ]]; then
+        results="${results}✅ lua-cjson: ${cur_cjson} (最新)\n"
+        up_to_date=$((up_to_date + 1))
+    elif version_lt "$cur_cjson" "$latest_cjson"; then
+        results="${results}🔄 lua-cjson: ${cur_cjson} → ${latest_cjson}\n"
+        minor_updated=$((minor_updated + 1))
+        tgt_cjson="$latest_cjson"
+    else
+        results="${results}✅ lua-cjson: ${cur_cjson} (最新: ${latest_cjson})\n"
+        up_to_date=$((up_to_date + 1))
+    fi
+
     # --- 应用更改 ---
     if [[ "$apply_changes" == "y" ]]; then
         if [[ "$tgt_ngx" != "$cur_ngx" ]]; then
@@ -550,6 +570,10 @@ _check_nginx_lua_group() {
         if [[ "$tgt_lru" != "$cur_lru" ]]; then
             sed -i "s/^lua_resty_lrucache_ver=.*/lua_resty_lrucache_ver=${tgt_lru}/" versions.txt
             results="${results}   ✏️  已更新 lua_resty_lrucache_ver=${tgt_lru}\n"
+        fi
+        if [[ "$tgt_cjson" != "$cur_cjson" ]]; then
+            sed -i "s/^lua_cjson_ver=.*/lua_cjson_ver=${tgt_cjson}/" versions.txt
+            results="${results}   ✏️  已更新 lua_cjson_ver=${tgt_cjson}\n"
         fi
     fi
 }
