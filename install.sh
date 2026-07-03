@@ -587,6 +587,7 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
   _dl "lua-nginx-module-${lua_nginx_module_ver}.tar.gz" "https://github.com/openresty/lua-nginx-module/archive/v${lua_nginx_module_ver}.tar.gz"
   _dl "lua-resty-core-${lua_resty_core_ver}.tar.gz" "https://github.com/openresty/lua-resty-core/archive/v${lua_resty_core_ver}.tar.gz"
   _dl "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz" "https://github.com/openresty/lua-resty-lrucache/archive/v${lua_resty_lrucache_ver}.tar.gz"
+  _dl "lua-cjson-${lua_cjson_ver}.tar.gz" "https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz"
 fi
 
 # Nginx server

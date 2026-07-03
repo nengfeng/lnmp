@@ -218,6 +218,16 @@ install_web_server() {
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
   fi
+  # Build lua-cjson (Lua C module for JSON support)
+  if [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ]; then
+    _extract_tar "lua-cjson-${lua_cjson_ver}.tar.gz"
+    pushd "lua-cjson-${lua_cjson_ver}" > /dev/null
+    sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
+    make -j$(nproc) && make install
+    [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && fail_msg "lua-cjson"
+    popd > /dev/null
+    rm -rf "lua-cjson-${lua_cjson_ver}"
+  fi
   # ngx_brotli: download, extract, build brotli static library
   if [ ! -d "ngx_brotli" ]; then
     if [ -f "ngx_brotli-master.tar.gz" ]; then
@@ -278,7 +288,8 @@ install_web_server() {
     cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name} ngx_brotli \
       lua-nginx-module-${lua_nginx_module_ver} \
       lua-resty-core-${lua_resty_core_ver} \
-      lua-resty-lrucache-${lua_resty_lrucache_ver}
+      lua-resty-lrucache-${lua_resty_lrucache_ver} \
+      lua-cjson-${lua_cjson_ver}
     success_msg "${server_type}"
   else
     rm -rf ${install_dir}

@@ -37,6 +37,7 @@ Upgrade_Nginx() {
         src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+        src_url="https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz" && Download_src "lua-cjson-${lua_cjson_ver}.tar.gz"
         src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
         src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
@@ -45,6 +46,7 @@ Upgrade_Nginx() {
         tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
         tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+        tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
         tar xzf "ngx_brotli-master.tar.gz"
         rm -rf ngx_brotli
         mv ngx_brotli-master ngx_brotli
@@ -126,6 +128,17 @@ Upgrade_Nginx() {
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
+    # Build lua-cjson (Lua C module for JSON support)
+    if [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ]; then
+      tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
+      pushd "lua-cjson-${lua_cjson_ver}"
+      sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
+      make -j$(nproc) && make install
+      [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
+      popd > /dev/null
+      rm -rf "lua-cjson-${lua_cjson_ver}"
+    fi
+
     tar xzf nginx-${NEW_nginx_ver}.tar.gz
 
     # Build brotli static library for ngx_brotli
@@ -200,6 +213,7 @@ Upgrade_Tengine() {
         src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
         src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+        src_url="https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz" && Download_src "lua-cjson-${lua_cjson_ver}.tar.gz"
         src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
         src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
@@ -287,6 +301,17 @@ Upgrade_Tengine() {
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
+    # Build lua-cjson (Lua C module for JSON support)
+    if [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ]; then
+      tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
+      pushd "lua-cjson-${lua_cjson_ver}"
+      sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
+      make -j$(nproc) && make install
+      [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
+      popd > /dev/null
+      rm -rf "lua-cjson-${lua_cjson_ver}"
+    fi
+
     # Download lua-nginx-module for Tengine build
     src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
     tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
@@ -348,10 +373,12 @@ Upgrade_OpenResty() {
       if [ -e "openresty-${NEW_openresty_ver}.tar.gz" ]; then
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
+        src_url="https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz" && Download_src "lua-cjson-${lua_cjson_ver}.tar.gz"
         src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
         src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
         tar xzf openssl-${openssl_ver}.tar.gz
         tar xzf pcre2-${pcre_ver}.tar.gz
+        tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
         tar xzf "ngx_brotli-master.tar.gz"
         rm -rf ngx_brotli
         mv ngx_brotli-master ngx_brotli
@@ -394,6 +421,17 @@ Upgrade_OpenResty() {
       popd > /dev/null
     fi
 
+    # Build lua-cjson (Lua C module for JSON support)
+    if [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ]; then
+      tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
+      pushd "lua-cjson-${lua_cjson_ver}"
+      sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
+      make -j$(nproc) && make install
+      [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
+      popd > /dev/null
+      rm -rf "lua-cjson-${lua_cjson_ver}"
+    fi
+
     pushd openresty-${NEW_openresty_ver}
     make clean
     local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
@@ -410,7 +448,7 @@ Upgrade_OpenResty() {
       popd > /dev/null
       sed -i 's/^#brotli/brotli/' ${openresty_install_dir}/nginx/conf/nginx.conf 2>/dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_openresty_ver}${CEND} to ${CWARNING}${NEW_openresty_ver}${CEND}"
-      cleanup_src openresty-${NEW_openresty_ver} ngx_brotli
+      cleanup_src openresty-${NEW_openresty_ver} ngx_brotli lua-cjson-${lua_cjson_ver}
     else
       fail_msg "OpenResty upgrade"
     fi
