@@ -83,7 +83,7 @@ lua_nginx_module_ver=0.10.32rc1
 luajit2_ver=2.1-20260620
 lua_resty_core_ver=0.1.35rc1
 lua_resty_lrucache_ver=0.15
-lua_cjson_ver=2.1.0.15
+lua_cjson_ver=2.1.0.19
 fail2ban_ver=master
 
 # ngx_brotli
