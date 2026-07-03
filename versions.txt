@@ -21,15 +21,15 @@ pgsql17_ver=17.10
 pgsql16_ver=16.14
 
 # PHP
-php83_ver=8.3.31
-php84_ver=8.4.22
-php85_ver=8.5.7
+php83_ver=8.3.32
+php84_ver=8.4.23
+php85_ver=8.5.8
 
 # Nodejs
 nodejs_ver=20.20.2
 
 libiconv_ver=1.19
-curl_ver=8.20.0
+curl_ver=8.21.0
 libmcrypt_ver=2.5.8
 mcrypt_ver=2.6.8
 mhash_ver=0.9.9.9
@@ -42,7 +42,7 @@ imagemagick_ver=7.1.2-13
 imagick_ver=3.8.1
 zendopcache_ver=7.0.5
 apcu_ver=5.1.28
-phalcon_ver=5.15.0
+phalcon_ver=5.16.0
 yaf_ver=3.3.6
 yar_ver=2.3.4
 swoole_ver=6.2.1
@@ -56,7 +56,7 @@ redis_ver=8.8.0
 pecl_redis_ver=6.3.0
 
 # Memcached
-memcached_ver=1.6.42
+memcached_ver=1.6.43
 libmemcached_ver=1.0.18
 pecl_memcached_ver=3.4.0
 pecl_memcache_ver=8.2
@@ -80,7 +80,7 @@ boost_oldver=1.59.0
 # Others
 ngx_devel_kit_ver=0.3.4
 lua_nginx_module_ver=0.10.32rc2
-luajit2_ver=2.1-20260620
+luajit2_ver=2.1-20260701
 lua_resty_core_ver=0.1.35rc1
 lua_resty_lrucache_ver=0.15
 lua_cjson_ver=2.1.0.19
