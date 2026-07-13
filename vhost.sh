@@ -617,6 +617,7 @@ Create_nginx_phpfpm_conf() {
 server {
   ${Nginx_conf}
   server_name ${domain}${moredomainame};
+  ${verynginx_include}
   ${Nginx_log}
   index index.html index.htm index.php;
   root ${vhostdir};
@@ -713,6 +714,7 @@ Create_nginx_proxy_conf() {
 server {
   ${Nginx_conf}
   server_name ${domain}${moredomainame};
+  ${verynginx_include}
   ${Nginx_log}
   index index.html index.htm index.php;
   root /dev/null;
@@ -790,6 +792,24 @@ Add_Vhost() {
     Choose_ENV
     Input_Add_domain
     Nginx_anti_hotlinking
+
+    # If VeryNginx is installed, add WAF protection to this vhost
+    verynginx_include=""
+    if [ -f "/opt/verynginx/nginx_conf/in_server_block.conf" ]; then
+      verynginx_include="  rewrite_by_lua_file /opt/verynginx/on_rewrite.lua;
+  access_by_lua_file /opt/verynginx/on_access.lua;
+  log_by_lua_file /opt/verynginx/on_log.lua;
+
+  location /verynginx/static/ {
+      alias /opt/verynginx/dashboard/;
+      access_by_lua_block { }
+      log_by_lua_block { }
+      expires epoch;
+  }
+  location /verynginx/ {
+  }"
+    fi
+
     if [[ "${proxy_flag}" == "y" ]]; then
         Input_Add_proxy
         Create_nginx_proxy_conf
