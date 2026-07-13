@@ -795,13 +795,20 @@ Add_Vhost() {
 
     # If VeryNginx is installed, add WAF protection to this vhost
     verynginx_include=""
-    if [ -f "/opt/verynginx/nginx_conf/in_server_block.conf" ]; then
-      verynginx_include="  rewrite_by_lua_file /opt/verynginx/on_rewrite.lua;
-  access_by_lua_file /opt/verynginx/on_access.lua;
-  log_by_lua_file /opt/verynginx/on_log.lua;
+    local verynginx_dir=""
+    if [[ -f "${web_install_dir}/conf/nginx.conf" ]]; then
+      verynginx_dir=$(grep -oP 'include\s+\K/.*?(?=/nginx_conf/in_)' "${web_install_dir}/conf/nginx.conf" 2>/dev/null | head -1)
+    fi
+    if [[ -z "${verynginx_dir}" ]] && [[ -f "/opt/verynginx/nginx_conf/in_server_block.conf" ]]; then
+      verynginx_dir="/opt/verynginx"
+    fi
+    if [[ -n "${verynginx_dir}" ]] && [[ -f "${verynginx_dir}/nginx_conf/in_server_block.conf" ]]; then
+      verynginx_include="  rewrite_by_lua_file ${verynginx_dir}/on_rewrite.lua;
+  access_by_lua_file ${verynginx_dir}/on_access.lua;
+  log_by_lua_file ${verynginx_dir}/on_log.lua;
 
   location /verynginx/static/ {
-      alias /opt/verynginx/dashboard/;
+      alias ${verynginx_dir}/dashboard/;
       access_by_lua_block { }
       log_by_lua_block { }
       expires epoch;
