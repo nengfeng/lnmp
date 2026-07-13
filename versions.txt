@@ -45,7 +45,7 @@ apcu_ver=5.1.28
 phalcon_ver=5.16.0
 yaf_ver=3.3.6
 yar_ver=2.3.4
-swoole_ver=6.2.1
+swoole_ver=6.2.2
 xdebug_ver=3.5.3
 
 # Ftp
@@ -56,7 +56,7 @@ redis_ver=8.8.0
 pecl_redis_ver=6.3.0
 
 # Memcached
-memcached_ver=1.6.43
+memcached_ver=1.6.45
 libmemcached_ver=1.0.18
 pecl_memcached_ver=3.4.0
 pecl_memcache_ver=8.2
