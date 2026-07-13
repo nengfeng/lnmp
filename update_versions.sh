@@ -406,6 +406,7 @@ LUA_NGINX_RESTY_CORE_MAP=(
     ["0.10.31"]="0.1.34rc3"
     ["0.10.32rc1"]="0.1.35rc1"
     ["0.10.32rc2"]="0.1.35rc1"
+    ["0.10.32rc3"]="0.1.35rc1"
 )
 
 _check_nginx_lua_group() {
