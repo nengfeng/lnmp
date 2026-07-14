@@ -9,12 +9,14 @@ pcre_ver=10.47
 nghttp2_ver=1.59.0
 
 # DB
+mysql97_ver=9.7.1
 mysql84_ver=8.4.8
-mysql80_ver=8.0.45
+mysql80_ver=8.0.46
 
+mariadb123_ver=12.3.2
 mariadb118_ver=11.8.8
 mariadb114_ver=11.4.12
-mariadb1011_ver=10.11.15
+mariadb1011_ver=10.11.18
 
 pgsql18_ver=18.4
 pgsql17_ver=17.10

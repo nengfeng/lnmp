@@ -175,13 +175,24 @@ check_latest "OpenResty" "$openresty_ver" \
   "https://openresty.org/en/download.html" '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
 
 # --- Databases ---
-# MySQL uses specific major versions
-mysql84_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
-  "https://dev.mysql.com/downloads/mysql/8.0.html" 2>/dev/null | \
-  grep -oP 'mysql-8\.\d+\.\d+' | head -1 | grep -oP '8\.\d+\.\d+')
-# Skip MySQL complex check - just note
+# MySQL
+check_latest "MySQL 9.7" "$mysql97_ver" \
+  "https://dev.mysql.com/downloads/mysql/9.0.html" \
+  'mysql-9\.\d+\.\d+'
+
+check_latest "MySQL 8.4" "$mysql84_ver" \
+  "https://dev.mysql.com/downloads/mysql/8.0.html" \
+  'mysql-8\.4\.\d+'
+
+check_latest "MySQL 8.0" "$mysql80_ver" \
+  "https://dev.mysql.com/downloads/mysql/8.0.html" \
+  'mysql-8\.0\.\d+'
 
 # MariaDB
+check_latest "MariaDB 12.3" "$mariadb123_ver" \
+  "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
+  '12\.3\.[0-9]+'
+
 check_latest "MariaDB 11.8" "$mariadb118_ver" \
   "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
   '11\.8\.[0-9]+'
@@ -189,6 +200,10 @@ check_latest "MariaDB 11.8" "$mariadb118_ver" \
 check_latest "MariaDB 11.4" "$mariadb114_ver" \
   "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
   '11\.4\.[0-9]+'
+
+check_latest "MariaDB 10.11" "$mariadb1011_ver" \
+  "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
+  '10\.11\.[0-9]+'
 
 # PostgreSQL - use official versions.json API
 pgsql_json=$(curl -sL --connect-timeout 10 --max-time 20 \

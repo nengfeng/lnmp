@@ -5,7 +5,7 @@
 installDepsDebian() {
   echo "${CMSG}Removing the conflicting packages...${CEND}"
 
-  if [[ "${db_option}" =~ ^[1-6]$ ]]; then
+  if [[ "${db_option}" =~ ^[1-8]$ ]]; then
     pkgList="mysql-client mysql-server mysql-common mysql-server-core-5.5 mysql-client-5.5 mariadb-client mariadb-server mariadb-common"
     for Package in ${pkgList};do
       apt-get -y purge ${Package}
@@ -52,7 +52,7 @@ installDepsUbuntu() {
   # Uninstall the conflicting software
   echo "${CMSG}Removing the conflicting packages...${CEND}"
 
-  if [[ "${db_option}" =~ ^[1-6]$ ]]; then
+  if [[ "${db_option}" =~ ^[1-8]$ ]]; then
     pkgList="mysql-client mysql-server mysql-common mysql-server-core-5.5 mysql-client-5.5 mariadb-client mariadb-server mariadb-common"
     for Package in ${pkgList};do
       apt-get -y purge ${Package}

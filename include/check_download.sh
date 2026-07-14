@@ -268,7 +268,7 @@ checkDownload() {
   fi
 
   # Memory allocator (tcmalloc / jemalloc)
-  if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-6]$ ]]; then
+  if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-8]$ ]]; then
     case "${allocator_option:-2}" in
       2)
         echo "Download tcmalloc (gperftools)..."
@@ -327,9 +327,9 @@ checkDownload() {
   # ============================================
   # Database downloads
   # ============================================
-  if [[ "${db_option}" =~ ^[1-6]$ ]]; then
-    if [[ "${db_option}" =~ ^[2-5]$ ]] && [[ "${dbinstallmethod}" == "2" ]]; then
-      [[ "${db_option}" =~ ^[2-5]$ ]] && boost_ver=${boost_oldver}
+  if [[ "${db_option}" =~ ^[1-8]$ ]]; then
+    if [[ "${db_option}" =~ ^[2-7]$ ]] && [[ "${dbinstallmethod}" == "2" ]]; then
+      [[ "${db_option}" =~ ^[2-7]$ ]] && boost_ver=${boost_oldver}
       echo "Download boost..."
       boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
       src_url="https://downloads.sourceforge.net/project/boost/boost/${boost_ver}/boost_${boostVersion2}.tar.gz"
@@ -338,6 +338,19 @@ checkDownload() {
 
     case "${db_option}" in
       1)
+        # MySQL 9.7
+        if [[ "${dbinstallmethod}" == "1" ]]; then
+          echo "Download MySQL 9.7 binary..."
+          FILE_NAME=mysql-${mysql97_ver}-linux-glibc2.28-x86_64.tar.xz
+        else
+          echo "Download MySQL 9.7 source..."
+          FILE_NAME=mysql-${mysql97_ver}.tar.gz
+        fi
+        src_url="https://cdn.mysql.com/Downloads/MySQL-9.7/${FILE_NAME}"
+        Download_src
+        verify_md5_with_retry "$FILE_NAME" "https://cdn.mysql.com/Downloads/MySQL-9.7/${FILE_NAME}.md5" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
+        ;;
+      2)
         # MySQL 8.4
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 8.4 binary..."
@@ -350,7 +363,7 @@ checkDownload() {
         Download_src
         verify_md5_with_retry "$FILE_NAME" "https://cdn.mysql.com/Downloads/MySQL-8.4/${FILE_NAME}.md5" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
         ;;
-      2)
+      3)
         # MySQL 8.0
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 8.0 binary..."
@@ -363,11 +376,12 @@ checkDownload() {
         Download_src
         verify_md5_with_retry "$FILE_NAME" "https://cdn.mysql.com/Downloads/MySQL-8.0/${FILE_NAME}.md5" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
         ;;
-      [3-5])
+      [4-7])
         case "${db_option}" in
-          3) mariadb_ver=${mariadb118_ver} ;;
-          4) mariadb_ver=${mariadb114_ver} ;;
-          5) mariadb_ver=${mariadb1011_ver} ;;
+          4) mariadb_ver=${mariadb123_ver} ;;
+          5) mariadb_ver=${mariadb118_ver} ;;
+          6) mariadb_ver=${mariadb114_ver} ;;
+          7) mariadb_ver=${mariadb1011_ver} ;;
         esac
         if [[ "${dbinstallmethod}" == "1" ]]; then
           FILE_NAME=mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz
@@ -384,7 +398,7 @@ checkDownload() {
         Download_src
         verify_md5_with_retry "$FILE_NAME" "https://archive.mariadb.org/mariadb-${mariadb_ver}/${FILE_TYPE}/md5sums.txt" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
         ;;
-      6)
+      8)
         # PostgreSQL (APT repo or source)
         if [[ "${pgsqlinstallmethod}" == "2" ]]; then
           echo "Download PostgreSQL source..."

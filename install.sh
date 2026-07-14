@@ -56,7 +56,7 @@ Show_Help() {
                               imagick,fileinfo,imap,ldap,phalcon,
                               yaf,redis,memcached,memcache,mongodb,swoole,xdebug
   --nodejs                    Install Nodejs
-  --db_option [1-6]           Install DB version
+  --db_option [1-8]           Install DB version
   --dbinstallmethod [1-2]     DB install method, default: 1 binary install
   --dbrootpwd [password]      DB super password
   --pureftpd                  Install Pure-Ftpd
@@ -152,14 +152,14 @@ parse_args() {
         ;;
       --db_option)
         db_option=$2; shift 2
-        if [[ "${db_option}" =~ ^[1-6]$ ]]; then
+        if [[ "${db_option}" =~ ^[1-8]$ ]]; then
           if [[ "${db_option}" == 6 ]]; then
             [ -e "${pgsql_install_dir}/bin/psql" ] && { echo "${CWARNING}PostgreSQL already installed! ${CEND}"; unset db_option; }
           else
             [ -d "${db_install_dir}/support-files" ] && { echo "${CWARNING}MySQL already installed! ${CEND}"; unset db_option; }
           fi
         else
-          echo "${CWARNING}db_option input error! Please only input number 1~6${CEND}"
+          echo "${CWARNING}db_option input error! Please only input number 1~8${CEND}"
           exit 1
         fi
         ;;
@@ -277,13 +277,15 @@ if [[ ${ARG_NUM} == 0 ]]; then
   confirm "Do you want to install Database?" db_flag n
   if [[ "${db_flag}" == y ]]; then
     echo 'Please select a version of the Database:'
-    printf "%b" "	${CMSG}1${CEND}. Install MySQL-8.4\n"
-    printf "%b" "	${CMSG}2${CEND}. Install MySQL-8.0\n"
-    printf "%b" "	${CMSG}3${CEND}. Install MariaDB-11.8\n"
-    printf "%b" "	${CMSG}4${CEND}. Install MariaDB-11.4\n"
-    printf "%b" "	${CMSG}5${CEND}. Install MariaDB-10.11\n"
-    printf "%b" "	${CMSG}6${CEND}. Install PostgreSQL\n"
-    select_number "Please input a number" db_option 1 6 1
+    printf "%b" "	${CMSG}1${CEND}. Install MySQL-9.7\n"
+    printf "%b" "	${CMSG}2${CEND}. Install MySQL-8.4\n"
+    printf "%b" "	${CMSG}3${CEND}. Install MySQL-8.0\n"
+    printf "%b" "	${CMSG}4${CEND}. Install MariaDB-12.3\n"
+    printf "%b" "	${CMSG}5${CEND}. Install MariaDB-11.8\n"
+    printf "%b" "	${CMSG}6${CEND}. Install MariaDB-11.4\n"
+    printf "%b" "	${CMSG}7${CEND}. Install MariaDB-10.11\n"
+    printf "%b" "	${CMSG}8${CEND}. Install PostgreSQL\n"
+    select_number "Please input a number" db_option 1 8 1
 
     if [[ "${db_option}" == 6 ]]; then
       check_installed file "${pgsql_install_dir}/bin/psql" "PostgreSQL" || unset db_option
@@ -302,7 +304,7 @@ if [[ ${ARG_NUM} == 0 ]]; then
       fi
 
       # Install method (MySQL/MariaDB only)
-      if [[ "${db_option}" =~ ^[1-5]$ ]]; then
+        if [[ "${db_option}" =~ ^[1-7]$ ]]; then
         echo "Please choose installation of the database:"
         printf "%b" "	${CMSG}1${CEND}. Install database from binary package.\n"
         printf "%b" "	${CMSG}2${CEND}. Install database from source package.\n"
@@ -468,7 +470,7 @@ startTime=$(date +%s)
 Install_openSSL | tee -a ${current_dir}/install.log
 
 # Memory allocator (tcmalloc / jemalloc / none)
-if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-6]$ ]]; then
+if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-8]$ ]]; then
   case "${allocator_option}" in
     2)
       . include/tcmalloc.sh
@@ -484,26 +486,34 @@ fi
 # Database
 case "${db_option}" in
   1)
+    . include/mysql-9.7.sh
+    Install_MySQL97 2>&1 | tee -a ${current_dir}/install.log
+    ;;
+  2)
     . include/mysql-8.4.sh
     Install_MySQL84 2>&1 | tee -a ${current_dir}/install.log
     ;;
-  2)
+  3)
     . include/mysql-8.0.sh
     Install_MySQL80 2>&1 | tee -a ${current_dir}/install.log
     ;;
-  3)
+  4)
+    . include/mariadb-12.3.sh
+    Install_MariaDB123 2>&1 | tee -a ${current_dir}/install.log
+    ;;
+  5)
     . include/mariadb-11.8.sh
     Install_MariaDB118 2>&1 | tee -a ${current_dir}/install.log
     ;;
-  4)
+  6)
     . include/mariadb-11.4.sh
     Install_MariaDB114 2>&1 | tee -a ${current_dir}/install.log
     ;;
-  5)
+  7)
     . include/mariadb-10.11.sh
     Install_MariaDB1011 2>&1 | tee -a ${current_dir}/install.log
     ;;
-  6)
+  8)
     . include/postgresql.sh
     Install_PostgreSQL 2>&1 | tee -a ${current_dir}/install.log
     ;;
@@ -666,10 +676,10 @@ else
   echo "Total Install Time: ${CQUESTION}${installTimeMin}m ${installTimeSec}s${CEND}"
 fi
 [[ "${nginx_option}" =~ ^[1-3]$ ]] && printf "%b" "\n$(printf "%-32s" "Nginx install dir":)${CMSG}${web_install_dir}${CEND}\n"
-[[ "${db_option}" =~ ^[1-5]$ ]] && printf "%b" "\n$(printf "%-32s" "Database install dir:")${CMSG}${db_install_dir}${CEND}\n"
-[[ "${db_option}" =~ ^[1-5]$ ]] && echo "$(printf "%-32s" "Database data dir:")${CMSG}${db_data_dir}${CEND}"
-[[ "${db_option}" =~ ^[1-5]$ ]] && echo "$(printf "%-32s" "Database user:")${CMSG}root${CEND}"
-[[ "${db_option}" =~ ^[1-5]$ ]] && echo "$(printf "%-32s" "Database password:")${CMSG}${dbrootpwd}${CEND}"
+    [[ "${db_option}" =~ ^[1-7]$ ]] && printf "%b" "\n$(printf "%-32s" "Database install dir:")${CMSG}${db_install_dir}${CEND}\n"
+    [[ "${db_option}" =~ ^[1-7]$ ]] && echo "$(printf "%-32s" "Database data dir:")${CMSG}${db_data_dir}${CEND}"
+    [[ "${db_option}" =~ ^[1-7]$ ]] && echo "$(printf "%-32s" "Database user:")${CMSG}root${CEND}"
+    [[ "${db_option}" =~ ^[1-7]$ ]] && echo "$(printf "%-32s" "Database password:")${CMSG}${dbrootpwd}${CEND}"
 [[ "${db_option}" == 6 ]] && printf "%b" "\n$(printf "%-32s" "PostgreSQL install dir:")${CMSG}${pgsql_install_dir}${CEND}\n"
 [[ "${db_option}" == 6 ]] && echo "$(printf "%-32s" "PostgreSQL data dir:")${CMSG}${pgsql_data_dir}${CEND}"
 [[ "${db_option}" == 6 ]] && echo "$(printf "%-32s" "PostgreSQL user:")${CMSG}postgres${CEND}"

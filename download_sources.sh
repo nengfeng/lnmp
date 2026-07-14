@@ -170,9 +170,11 @@ get_version() {
     openssl)        ver=${VERSIONS[openssl_ver]} ;;
     pcre)           ver=${VERSIONS[pcre_ver]} ;;
     nghttp2)        ver=${VERSIONS[nghttp2_ver]} ;;
+    mysql97)        ver=${VERSIONS[mysql97_ver]} ;;
     mysql84)        ver=${VERSIONS[mysql84_ver]} ;;
     mysql80)        ver=${VERSIONS[mysql80_ver]} ;;
-    mysql-src)      ver=${VERSIONS[mysql84_ver]} ;;
+    mysql-src)      ver=${VERSIONS[mysql97_ver]} ;;
+    mariadb123)     ver=${VERSIONS[mariadb123_ver]} ;;
     mariadb)        ver=${VERSIONS[mariadb118_ver]} ;;
     mariadb-src)    ver=${VERSIONS[mariadb118_ver]} ;;
     postgresql)     ver=${VERSIONS[pgsql18_ver]} ;;
