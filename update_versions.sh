@@ -178,15 +178,15 @@ check_latest "OpenResty" "$openresty_ver" \
 # MySQL
 check_latest "MySQL 9.7" "$mysql97_ver" \
   "https://dev.mysql.com/downloads/mysql/9.0.html" \
-  'mysql-9\.\d+\.\d+'
+  'mysql-\K9\.\d+\.\d+'
 
 check_latest "MySQL 8.4" "$mysql84_ver" \
-  "https://dev.mysql.com/downloads/mysql/8.0.html" \
-  'mysql-8\.4\.\d+'
+  "https://dev.mysql.com/downloads/mysql/8.4.html" \
+  'mysql-\K8\.4\.\d+'
 
 check_latest "MySQL 8.0" "$mysql80_ver" \
   "https://dev.mysql.com/downloads/mysql/8.0.html" \
-  'mysql-8\.0\.\d+'
+  'mysql-\K8\.0\.\d+'
 
 # MariaDB
 check_latest "MariaDB 12.3" "$mariadb123_ver" \
