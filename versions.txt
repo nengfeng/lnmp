@@ -1,6 +1,6 @@
 # newest software version
 # Web
-nginx_ver=1.30.3
+nginx_ver=1.30.4
 tengine_ver=3.1.0
 openresty_ver=1.31.1.1
 openssl_ver=3.5.7
@@ -10,7 +10,7 @@ nghttp2_ver=1.59.0
 
 # DB
 mysql97_ver=9.7.1
-mysql84_ver=8.4.8
+mysql84_ver=8.4.10
 mysql80_ver=8.0.46
 
 mariadb123_ver=12.3.2
@@ -44,7 +44,7 @@ imagemagick_ver=7.1.2-13
 imagick_ver=3.8.1
 zendopcache_ver=7.0.5
 apcu_ver=5.1.28
-phalcon_ver=5.16.0
+phalcon_ver=5.17.0
 yaf_ver=3.3.6
 yar_ver=2.3.4
 swoole_ver=6.2.2
@@ -82,7 +82,7 @@ boost_oldver=1.59.0
 # Others
 ngx_devel_kit_ver=0.3.4
 lua_nginx_module_ver=0.10.32rc3
-luajit2_ver=2.1-20260701
+luajit2_ver=2.1-20260717
 lua_resty_core_ver=0.1.35rc1
 lua_resty_lrucache_ver=0.15
 lua_cjson_ver=2.1.0.19
