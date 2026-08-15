@@ -597,10 +597,34 @@ _check_nginx_lua_group() {
 
 _check_nginx_lua_group
 
-# --- Redis ---
-check_latest "Redis" "$redis_ver" \
-  "https://download.redis.io/redis-stable/00-RELEASENOTES" \
-  '[0-9]+\.[0-9]+\.[0-9]+'
+# --- Redis (use GitHub tags for reliable latest stable) ---
+redis_latest=$(gh_tags "redis/redis" "^[0-9]+\.[0-9]+\.[0-9]+$")
+if [ -n "$redis_latest" ]; then
+  total=$((total + 1))
+  if [[ "$redis_ver" == "$redis_latest" ]]; then
+    results="${results}✅ Redis: ${redis_ver} (最新)\n"
+    up_to_date=$((up_to_date + 1))
+  elif version_lt "$redis_ver" "$redis_latest"; then
+    update_type=$(classify_update "$redis_ver" "$redis_latest")
+    if [[ "$update_type" == "minor" ]]; then
+      results="${results}🔄 Redis: ${redis_ver} → ${redis_latest} (小版本更新)\n"
+      minor_updated=$((minor_updated + 1))
+      if [[ "$apply_changes" == "y" ]]; then
+        sed -i "s/^redis_ver=.*/redis_ver=${redis_latest}/" versions.txt
+        results="${results}   ✏️  已更新 redis_ver=${redis_latest}\n"
+      fi
+    else
+      results="${results}🆕 Redis: ${redis_ver} → ${redis_latest} (大版本更新，请手动确认)\n"
+      major_available=$((major_available + 1))
+    fi
+  else
+    results="${results}✅ Redis: ${redis_ver} (最新: ${redis_latest})\n"
+    up_to_date=$((up_to_date + 1))
+  fi
+else
+  results="${results}⚠️  Redis: 无法获取最新版本 (当前: ${redis_ver})\n"
+  check_failed=$((check_failed + 1))
+fi
 
 # --- Node.js ---
 node_major=$(echo "$nodejs_ver" | cut -d. -f1)
