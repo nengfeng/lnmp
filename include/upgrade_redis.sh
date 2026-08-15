@@ -6,8 +6,8 @@ Upgrade_Redis() {
   pushd ${current_dir}/src > /dev/null
   [ ! -d "$redis_install_dir" ] && echo "${CWARNING}Redis is not installed on your system! ${CEND}" && exit 1
   OLD_redis_ver=$($redis_install_dir/bin/redis-cli --version | awk '{print $2}')
-  Latest_redis_ver=$(curl --connect-timeout 2 -m 3 -s https://download.redis.io/releases/00-RELEASENOTES | awk '/Released/{print $2}' | head -1)
-  Latest_redis_ver=${Latest_redis_ver:-7.4.2}
+  Latest_redis_ver=$(curl --connect-timeout 2 -m 3 -s https://github.com/redis/redis/releases.atom | grep -oP '<title>v?\K[0-9][0-9.]*' | sort -V | tail -1)
+  Latest_redis_ver=${Latest_redis_ver:-8.10.0}
   echo "Current Redis Version: ${CMSG}$OLD_redis_ver${CEND}"
   while :; do echo
     [ "${redis_flag}" != 'y' ] && read -e -p "Please input upgrade Redis Version(default: ${Latest_redis_ver}): " NEW_redis_ver
