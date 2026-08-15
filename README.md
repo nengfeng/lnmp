@@ -34,7 +34,7 @@ vim options.conf
 
 主要配置项：
 - `nginx_option`: Web 服务器 (1=Nginx, 2=Tengine, 3=OpenResty)
-- `db_option`: 数据库 (1=MySQL 8.4, 2=MySQL 8.0, 3-5=MariaDB, 6=PostgreSQL)
+- `db_option`: 数据库 (1=MySQL 9.7, 2=MySQL 8.4, 3=MySQL 8.0, 4-7=MariaDB, 8=PostgreSQL)
 - `php_option`: PHP 版本 (1=8.3, 2=8.4, 3=8.5)
 - `allocator_option`: 内存分配器 (1=无, 2=tcmalloc, 3=jemalloc，默认 jemalloc)
 - `server_scenario`: 服务器场景 (vps=资源受限, dedicated=独立服务器)

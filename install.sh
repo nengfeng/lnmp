@@ -153,7 +153,7 @@ parse_args() {
       --db_option)
         db_option=$2; shift 2
         if [[ "${db_option}" =~ ^[1-8]$ ]]; then
-          if [[ "${db_option}" == 6 ]]; then
+          if [[ "${db_option}" == 8 ]]; then
             [ -e "${pgsql_install_dir}/bin/psql" ] && { echo "${CWARNING}PostgreSQL already installed! ${CEND}"; unset db_option; }
           else
             [ -d "${db_install_dir}/support-files" ] && { echo "${CWARNING}MySQL already installed! ${CEND}"; unset db_option; }
@@ -287,7 +287,7 @@ if [[ ${ARG_NUM} == 0 ]]; then
     printf "%b" "	${CMSG}8${CEND}. Install PostgreSQL\n"
     select_number "Please input a number" db_option 1 8 1
 
-    if [[ "${db_option}" == 6 ]]; then
+    if [[ "${db_option}" == 8 ]]; then
       check_installed file "${pgsql_install_dir}/bin/psql" "PostgreSQL" || unset db_option
     else
       check_installed dir "${db_install_dir}/support-files" "MySQL/MariaDB" || unset db_option
@@ -295,7 +295,7 @@ if [[ ${ARG_NUM} == 0 ]]; then
 
     if [ -n "${db_option}" ]; then
       # DB password
-      if [[ "${db_option}" == 6 ]]; then
+      if [[ "${db_option}" == 8 ]]; then
         input_password "Please input the postgres password" dbpwd "${dbpostgrespwd}" 5
         dbpostgrespwd=${dbpwd}
       else
@@ -323,7 +323,7 @@ if [[ ${ARG_NUM} == 0 ]]; then
       fi
 
       # PostgreSQL version
-      if [[ "${db_option}" == 6 ]]; then
+      if [[ "${db_option}" == 8 ]]; then
         echo 'Please select a version of the PostgreSQL:'
         printf "%b" "	${CMSG}1${CEND}. Install PostgreSQL-18\n"
         printf "%b" "	${CMSG}2${CEND}. Install PostgreSQL-17\n"
@@ -680,10 +680,10 @@ fi
     [[ "${db_option}" =~ ^[1-7]$ ]] && echo "$(printf "%-32s" "Database data dir:")${CMSG}${db_data_dir}${CEND}"
     [[ "${db_option}" =~ ^[1-7]$ ]] && echo "$(printf "%-32s" "Database user:")${CMSG}root${CEND}"
     [[ "${db_option}" =~ ^[1-7]$ ]] && echo "$(printf "%-32s" "Database password:")${CMSG}${dbrootpwd}${CEND}"
-[[ "${db_option}" == 6 ]] && printf "%b" "\n$(printf "%-32s" "PostgreSQL install dir:")${CMSG}${pgsql_install_dir}${CEND}\n"
-[[ "${db_option}" == 6 ]] && echo "$(printf "%-32s" "PostgreSQL data dir:")${CMSG}${pgsql_data_dir}${CEND}"
-[[ "${db_option}" == 6 ]] && echo "$(printf "%-32s" "PostgreSQL user:")${CMSG}postgres${CEND}"
-[[ "${db_option}" == 6 ]] && echo "$(printf "%-32s" "postgres password:")${CMSG}${dbpostgrespwd}${CEND}"
+[[ "${db_option}" == 8 ]] && printf "%b" "\n$(printf "%-32s" "PostgreSQL install dir:")${CMSG}${pgsql_install_dir}${CEND}\n"
+[[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "PostgreSQL data dir:")${CMSG}${pgsql_data_dir}${CEND}"
+[[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "PostgreSQL user:")${CMSG}postgres${CEND}"
+[[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "postgres password:")${CMSG}${dbpostgrespwd}${CEND}"
 [[ "${php_option}" =~ ^[1-3]$ ]] && printf "%b" "\n$(printf "%-32s" "PHP install dir:")${CMSG}${php_install_dir}${CEND}\n"
 [[ "${phpcache_option}" == 1 ]] && echo "$(printf "%-32s" "Opcache Control Panel URL:")${CMSG}http://${IPADDR}/ocp.php${CEND}"
 [[ "${phpcache_option}" == 2 ]] && echo "$(printf "%-32s" "APC Control Panel URL:")${CMSG}http://${IPADDR}/apc.php${CEND}"
