@@ -177,7 +177,7 @@ check_latest "OpenResty" "$openresty_ver" \
 # --- Databases ---
 # MySQL
 check_latest "MySQL 9.7" "$mysql97_ver" \
-  "https://dev.mysql.com/downloads/mysql/9.0.html" \
+  "https://dev.mysql.com/downloads/mysql/9.7.html" \
   'mysql-\K9\.\d+\.\d+'
 
 check_latest "MySQL 8.4" "$mysql84_ver" \
