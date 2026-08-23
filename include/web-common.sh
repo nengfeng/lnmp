@@ -181,16 +181,19 @@ install_web_server() {
   local conf_dir=${install_dir}
 
   # Build LuaJIT first (required by lua-nginx-module)
-  if [ ! -e "/usr/local/lib/libluajit-5.1.so" ]; then
+  # Rebuild if either library or headers are missing (partial uninstall)
+  if [ ! -e "/usr/local/lib/libluajit-5.1.so" ] || [ ! -f "/usr/local/include/luajit-2.1/luajit.h" ]; then
     _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}"
     pushd "luajit2-${luajit2_ver}" > /dev/null
     make -j$(nproc) && make install
     popd > /dev/null
     rm -rf "luajit2-${luajit2_ver}"
-    export LUAJIT_LIB=/usr/local/lib
-    export LUAJIT_INC=/usr/local/include/luajit-2.1
     ldconfig
   fi
+  # Always export: lua-nginx-module auto-discovery only knows luajit-2.0 paths,
+  # without these env vars configure fails on luajit-2.1 when lib already exists
+  export LUAJIT_LIB=/usr/local/lib
+  export LUAJIT_INC=/usr/local/include/luajit-2.1
 
   _extract_tar "pcre2-${pcre_ver}.tar.gz"
   _extract_tar "${src_name}.tar.gz"
