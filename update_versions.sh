@@ -185,22 +185,46 @@ check_latest "MySQL 8.0" "$mysql80_ver" \
   "https://dev.mysql.com/downloads/mysql/8.0.html" \
   'mysql-\K8\.0\.\d+'
 
-# MariaDB
-check_latest "MariaDB 12.3" "$mariadb123_ver" \
-  "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
-  '12\.3\.[0-9]+'
-
-check_latest "MariaDB 11.8" "$mariadb118_ver" \
-  "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
-  '11\.8\.[0-9]+'
-
-check_latest "MariaDB 11.4" "$mariadb114_ver" \
-  "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
-  '11\.4\.[0-9]+'
-
-check_latest "MariaDB 10.11" "$mariadb1011_ver" \
-  "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" \
-  '10\.11\.[0-9]+'
+# MariaDB - use REST API and filter status=="stable" (Preview/RC excluded,
+# otherwise a tracked series could jump to a non-GA release with no tarball)
+mariadb_json=$(curl -sL --connect-timeout 10 --max-time 20 \
+  "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=false" 2>/dev/null)
+if [ -n "$mariadb_json" ]; then
+  for mdb_series in "12.3" "11.8" "11.4" "10.11"; do
+    total=$((total + 1))
+    mdb_latest=$(echo "$mariadb_json" | python3 -c "
+import json,sys
+series='${mdb_series}'
+try:
+    rels=json.load(sys.stdin).get('releases',[])
+except Exception:
+    sys.exit()
+stable=[r['release_number'] for r in rels
+        if r.get('status')=='stable' and str(r.get('release_number','')).startswith(series+'.')]
+if stable:
+    print(max(stable, key=lambda v:[int(x) for x in v.split('.')]))" 2>/dev/null)
+    eval "mdb_current=\$mariadb${mdb_series/./}_ver"
+    if [ -n "$mdb_latest" ]; then
+      if [[ "$mdb_current" == "$mdb_latest" ]]; then
+        results="${results}✅ MariaDB ${mdb_series}: ${mdb_current} (最新)\n"
+        up_to_date=$((up_to_date + 1))
+      elif version_lt "$mdb_current" "$mdb_latest"; then
+        results="${results}🔄 MariaDB ${mdb_series}: ${mdb_current} → ${mdb_latest} (小版本更新)\n"
+        minor_updated=$((minor_updated + 1))
+        [[ "$apply_changes" == "y" ]] && sed -i "s/^mariadb${mdb_series/./}_ver=.*/mariadb${mdb_series/./}_ver=${mdb_latest}/" versions.txt
+      else
+        results="${results}✅ MariaDB ${mdb_series}: ${mdb_current} (最新: ${mdb_latest})\n"
+        up_to_date=$((up_to_date + 1))
+      fi
+    else
+      results="${results}⚠️  MariaDB ${mdb_series}: 无法解析版本\n"
+      check_failed=$((check_failed + 1))
+    fi
+  done
+else
+  results="${results}⚠️  MariaDB: 无法获取版本信息\n"
+  check_failed=$((check_failed + 4))
+fi
 
 # PostgreSQL - use official versions.json API
 pgsql_json=$(curl -sL --connect-timeout 10 --max-time 20 \
@@ -327,10 +351,13 @@ check_latest "OpenSSL" "$openssl_ver" \
   "openssl-\K${openssl_minor}\.[0-9]+" "sort -V | tail -1"
 
 # --- PCRE2 (web scraping releases atom) ---
+# Filter titles BEFORE extracting: the digit regex truncates at "-" so
+# "PCRE2-10.46-RC1" would yield "10.46", and filtering after extraction
+# can never match RC on a pure number string
 pcre2_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   "https://github.com/PCRE2Project/pcre2/releases.atom" 2>/dev/null | \
+  grep "<title>" | grep -viE "(alpha|beta|rc)" | \
   grep -oP "<title>PCRE2[ -]\K[0-9][0-9.]*" | \
-  grep -vE '(alpha|beta|RC|RC)' | \
   sort -V | tail -1)
 if [ -n "$pcre2_latest" ]; then
   total=$((total + 1))
