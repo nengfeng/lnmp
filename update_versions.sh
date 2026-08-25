@@ -86,9 +86,9 @@ classify_update() {
 }
 
 # Helper: check latest version from URL pattern
-# Usage: check_latest <name> <current> <url> <regex>
+# Usage: check_latest <name> <current> <url> <regex> [sort_cmd] <versions_var>
 check_latest() {
-  local name="$1" current="$2" url="$3" regex="$4" sort_cmd="${5:-head -1}"
+  local name="$1" current="$2" url="$3" regex="$4" sort_cmd="${5:-head -1}" varname="$6"
   total=$((total + 1))
 
   local latest
@@ -118,7 +118,6 @@ check_latest() {
       results="${results}🔄 ${name}: ${current} → ${latest} (小版本更新)\n"
       minor_updated=$((minor_updated + 1))
       if [[ "$apply_changes" == "y" ]]; then
-        local varname=$(awk -F= -v v="$current" '$1 ~ /_ver$/ && $2 == v {print $1; exit}' versions.txt)
         if [ -n "$varname" ]; then
           sed -i "s/^${varname}=.*/${varname}=${latest}/" versions.txt
           results="${results}   ✏️  已更新 ${varname}=${latest}\n"
@@ -169,21 +168,21 @@ else
 fi
 
 check_latest "OpenResty" "$openresty_ver" \
-  "https://openresty.org/en/download.html" '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+  "https://openresty.org/en/download.html" '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "head -1" openresty_ver
 
 # --- Databases ---
 # MySQL
 check_latest "MySQL 9.7" "$mysql97_ver" \
   "https://dev.mysql.com/downloads/mysql/9.7.html" \
-  'mysql-\K9\.\d+\.\d+'
+  'mysql-\K9\.\d+\.\d+' "head -1" mysql97_ver
 
 check_latest "MySQL 8.4" "$mysql84_ver" \
   "https://dev.mysql.com/downloads/mysql/8.4.html" \
-  'mysql-\K8\.4\.\d+'
+  'mysql-\K8\.4\.\d+' "head -1" mysql84_ver
 
 check_latest "MySQL 8.0" "$mysql80_ver" \
   "https://dev.mysql.com/downloads/mysql/8.0.html" \
-  'mysql-\K8\.0\.\d+'
+  'mysql-\K8\.0\.\d+' "head -1" mysql80_ver
 
 # MariaDB - use REST API and filter status=="stable" (Preview/RC excluded,
 # otherwise a tracked series could jump to a non-GA release with no tarball)
@@ -289,7 +288,7 @@ done
 # --- curl ---
 check_latest "curl" "$curl_ver" \
   "https://curl.se/download.html" \
-  '[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+  '[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1" curl_ver
 
 # --- libsodium (web scraping) ---
 libsodium_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
@@ -317,7 +316,7 @@ fi
 # --- libiconv ---
 check_latest "libiconv" "$libiconv_ver" \
   "https://ftp.gnu.org/pub/gnu/libiconv/" \
-  'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1"
+  'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1" libiconv_ver
 
 # --- memcached (web scraping tags page) ---
 memcached_latest=$(gh_tags "memcached/memcached" "^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -342,13 +341,13 @@ fi
 # --- libmemcached ---
 check_latest "libmemcached" "$libmemcached_ver" \
   "https://launchpad.net/libmemcached/+download" \
-  'libmemcached-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+  'libmemcached-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1" libmemcached_ver
 
 # --- OpenSSL LTS (match same major.minor, e.g. 3.5.x when current is 3.5.5) ---
 openssl_minor=$(echo "$openssl_ver" | cut -d. -f1,2)
 check_latest "OpenSSL" "$openssl_ver" \
   "https://www.openssl.org/source/" \
-  "openssl-\K${openssl_minor}\.[0-9]+" "sort -V | tail -1"
+  "openssl-\K${openssl_minor}\.[0-9]+" "sort -V | tail -1" openssl_ver
 
 # --- PCRE2 (web scraping releases atom) ---
 # Filter titles BEFORE extracting: the digit regex truncates at "-" so
@@ -655,24 +654,21 @@ fi
 node_major=$(echo "$nodejs_ver" | cut -d. -f1)
 check_latest "Node.js" "$nodejs_ver" \
   "https://nodejs.org/dist/latest-v${node_major}.x/SHASUMS256.txt" \
-  "node-v\\K[0-9]+\.[0-9]+\.[0-9]+"
+  "node-v\\K[0-9]+\.[0-9]+\.[0-9]+" "head -1" nodejs_ver
 
 # --- PECL extensions (web scraping releases atom feeds) ---
 pecl_repos=(
-  "pecl-redis:phpredis/phpredis:${pecl_redis_ver}"
-  "pecl-mongodb:mongodb/mongo-php-driver:${pecl_mongodb_ver}"
-  "pecl-swoole:swoole/swoole-src:${swoole_ver}"
-  "pecl-xdebug:xdebug/xdebug:${xdebug_ver}"
-  "pecl-imagick:Imagick/imagick:${imagick_ver}"
-  "pecl-apcu:krakjoe/apcu:${apcu_ver}"
-  "pecl-phalcon:phalcon/cphalcon:${phalcon_ver}"
+  "pecl-redis|phpredis/phpredis|pecl_redis_ver|${pecl_redis_ver}"
+  "pecl-mongodb|mongodb/mongo-php-driver|pecl_mongodb_ver|${pecl_mongodb_ver}"
+  "pecl-swoole|swoole/swoole-src|swoole_ver|${swoole_ver}"
+  "pecl-xdebug|xdebug/xdebug|xdebug_ver|${xdebug_ver}"
+  "pecl-imagick|Imagick/imagick|imagick_ver|${imagick_ver}"
+  "pecl-apcu|krakjoe/apcu|apcu_ver|${apcu_ver}"
+  "pecl-phalcon|phalcon/cphalcon|phalcon_ver|${phalcon_ver}"
 )
 
 for item in "${pecl_repos[@]}"; do
-  name="${item%%:*}"
-  repo="${item#*:}"
-  repo="${repo%:*}"
-  current="${item##*:}"
+  IFS='|' read -r name repo varname current <<< "$item"
   total=$((total + 1))
 
   # apcu uses "Version X.Y.Z" format in release titles
@@ -698,8 +694,8 @@ for item in "${pecl_repos[@]}"; do
     results="${results}🔄 ${name}: ${current} → ${latest} (小版本更新)\n"
     minor_updated=$((minor_updated + 1))
     if [[ "$apply_changes" == "y" ]]; then
-      varname=$(awk -F= -v v="$current" '$1 ~ /_ver$/ && $2 == v {print $1; exit}' versions.txt)
-      [ -n "$varname" ] && sed -i "s/^${varname}=.*/${varname}=${latest}/" versions.txt
+      sed -i "s/^${varname}=.*/${varname}=${latest}/" versions.txt
+      results="${results}   ✏️  已更新 ${varname}=${latest}\n"
     fi
   else
     results="${results}✅ ${name}: ${current} (最新: ${latest})\n"
@@ -710,11 +706,11 @@ done
 # --- Others ---
 # phpMyAdmin: use context-aware regex to avoid matching unrelated numbers
 check_latest "phpMyAdmin" "$phpmyadmin_ver" \
-  "https://www.phpmyadmin.net/" 'Download\s+\K[0-9]+\.[0-9]+\.[0-9]+'
+  "https://www.phpmyadmin.net/" 'Download\s+\K[0-9]+\.[0-9]+\.[0-9]+' "head -1" phpmyadmin_ver
 
 check_latest "Pure-FTPd" "$pureftpd_ver" \
   "https://download.pureftpd.org/pub/pure-ftpd/releases/" \
-  'pure-ftpd-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1"
+  'pure-ftpd-\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1" pureftpd_ver
 
 # --- fail2ban (web scraping releases atom) ---
 if [ "$fail2ban_ver" != "master" ]; then

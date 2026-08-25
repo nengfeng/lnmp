@@ -3,7 +3,7 @@
 nginx_ver=1.30.4
 tengine_ver=3.1.0
 openresty_ver=1.31.1.1
-openssl_ver=3.5.7
+openssl_ver=3.5.8
 
 pcre_ver=10.47
 nghttp2_ver=1.59.0
