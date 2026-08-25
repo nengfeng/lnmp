@@ -85,6 +85,20 @@ classify_update() {
   fi
 }
 
+# Helper: rc-aware version less-than
+# sort -V ranks 0.10.32rc4 AFTER 0.10.32, but semantically an rc precedes
+# the stable release of the same base version
+ver_lt_rc() {
+  local a="$1" b="$2"
+  [[ "$a" == "$b" ]] && return 1
+  local a_base="${a%%rc*}" b_base="${b%%rc*}"
+  if [ "$a_base" == "$b_base" ]; then
+    [[ "$a" == *rc* ]] && [[ "$b" != *rc* ]]
+  else
+    version_lt "$a_base" "$b_base"
+  fi
+}
+
 # Helper: check latest version from URL pattern
 # Usage: check_latest <name> <current> <url> <regex> [sort_cmd] <versions_var>
 check_latest() {
@@ -470,7 +484,7 @@ _check_nginx_lua_group() {
         grep -oP "<title>v?\K[0-9][0-9.]*[a-z0-9]*" | \
         grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | \
         sort -V | tail -1)
-    if [ -n "$latest_lua_ngx_rc" ] && version_lt "$latest_lua_ngx" "$latest_lua_ngx_rc"; then
+    if [ -n "$latest_lua_ngx_rc" ] && ver_lt_rc "$latest_lua_ngx" "$latest_lua_ngx_rc"; then
         latest_lua_ngx="$latest_lua_ngx_rc"
     fi
     local latest_core
@@ -483,7 +497,7 @@ _check_nginx_lua_group() {
         grep -oP "<title>v?\K[0-9][0-9.]*[a-z0-9]*" | \
         grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | \
         sort -V | tail -1)
-    if [ -n "$latest_core_rc" ] && version_lt "$latest_core" "$latest_core_rc"; then
+    if [ -n "$latest_core_rc" ] && ver_lt_rc "$latest_core" "$latest_core_rc"; then
         latest_core="$latest_core_rc"
     fi
     local latest_lru
@@ -499,7 +513,7 @@ _check_nginx_lua_group() {
     elif [[ "$cur_ngx" == "$latest_lua_ngx" ]]; then
         results="${results}✅ lua-nginx-module: ${cur_ngx} (最新)\n"
         up_to_date=$((up_to_date + 1))
-    elif version_lt "$cur_ngx" "$latest_lua_ngx"; then
+    elif ver_lt_rc "$cur_ngx" "$latest_lua_ngx"; then
         local matched_core="${LUA_NGINX_RESTY_CORE_MAP[$latest_lua_ngx]}"
         if [ -n "$matched_core" ]; then
             results="${results}🔄 lua-nginx-module: ${cur_ngx} → ${latest_lua_ngx} (有已知兼容 lua-resty-core ${matched_core})\n"
@@ -533,7 +547,7 @@ _check_nginx_lua_group() {
             results="${results}✅ lua-resty-core: ${tgt_core} (最新)\n"
             up_to_date=$((up_to_date + 1))
         fi
-    elif version_lt "$tgt_core" "$latest_core"; then
+    elif ver_lt_rc "$tgt_core" "$latest_core"; then
         # core has a newer version available
         if [[ "$ngx_updated" == "n" ]]; then
             local expected="${LUA_NGINX_RESTY_CORE_MAP[$cur_ngx]}"
