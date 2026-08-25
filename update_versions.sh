@@ -121,7 +121,7 @@ check_latest() {
       results="${results}🔄 ${name}: ${current} → ${latest} (小版本更新)\n"
       minor_updated=$((minor_updated + 1))
       if [[ "$apply_changes" == "y" ]]; then
-        local varname=$(grep "_ver=" versions.txt | grep "$current" | head -1 | cut -d= -f1)
+        local varname=$(awk -F= -v v="$current" '$1 ~ /_ver$/ && $2 == v {print $1; exit}' versions.txt)
         if [ -n "$varname" ]; then
           sed -i "s/^${varname}=.*/${varname}=${latest}/" versions.txt
           results="${results}   ✏️  已更新 ${varname}=${latest}\n"
@@ -674,7 +674,7 @@ for item in "${pecl_repos[@]}"; do
     results="${results}🔄 ${name}: ${current} → ${latest} (小版本更新)\n"
     minor_updated=$((minor_updated + 1))
     if [[ "$apply_changes" == "y" ]]; then
-      varname=$(grep "_ver=" versions.txt | grep "$current" | head -1 | cut -d= -f1)
+      varname=$(awk -F= -v v="$current" '$1 ~ /_ver$/ && $2 == v {print $1; exit}' versions.txt)
       [ -n "$varname" ] && sed -i "s/^${varname}=.*/${varname}=${latest}/" versions.txt
     fi
   else

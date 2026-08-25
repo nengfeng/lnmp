@@ -13,10 +13,10 @@ mysql97_ver=9.7.2
 mysql84_ver=8.4.11
 mysql80_ver=8.0.46
 
-mariadb123_ver=12.3.2
-mariadb118_ver=11.8.8
-mariadb114_ver=11.4.12
-mariadb1011_ver=10.11.18
+mariadb123_ver=12.3.3
+mariadb118_ver=11.8.9
+mariadb114_ver=11.4.13
+mariadb1011_ver=10.11.19
 
 pgsql18_ver=18.6
 pgsql17_ver=17.11
@@ -44,7 +44,7 @@ imagemagick_ver=7.1.2-13
 imagick_ver=3.8.1
 zendopcache_ver=7.0.5
 apcu_ver=5.1.28
-phalcon_ver=5.18.2
+phalcon_ver=5.20.1
 yaf_ver=3.3.6
 yar_ver=2.3.4
 swoole_ver=6.2.2
@@ -54,7 +54,7 @@ xdebug_ver=3.5.3
 pureftpd_ver=1.0.54
 
 # Redis
-redis_ver=8.10.0
+redis_ver=8.10.1
 pecl_redis_ver=6.3.0
 
 # Memcached
@@ -64,7 +64,7 @@ pecl_memcached_ver=3.4.0
 pecl_memcache_ver=8.2
 
 # MongoDB
-pecl_mongodb_ver=2.3.3
+pecl_mongodb_ver=2.4.0
 
 # phpMyadmin
 phpmyadmin_ver=5.2.3
@@ -82,7 +82,7 @@ boost_oldver=1.59.0
 # Others
 ngx_devel_kit_ver=0.3.4
 lua_nginx_module_ver=0.10.32rc4
-luajit2_ver=2.1-20260724
+luajit2_ver=2.1-20260824
 lua_resty_core_ver=0.1.35rc1
 lua_resty_lrucache_ver=0.15
 lua_cjson_ver=2.1.0.19
