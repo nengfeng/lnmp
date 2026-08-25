@@ -10,16 +10,13 @@
 # Usage:
 #   ./update_versions.sh           # Check only (dry-run)
 #   ./update_versions.sh --apply   # Apply minor updates
-#   ./update_versions.sh --json    # Output as JSON
 
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 current_dir=$(dirname "$(readlink -f "$0")")
 cd "${current_dir}"
 
 apply_changes="n"
-output_json="n"
 [[ "$1" == "--apply" ]] && apply_changes="y"
-[[ "$1" == "--json" ]] && output_json="y"
 
 . ./include/color.sh 2>/dev/null || true
 . ./versions.txt
