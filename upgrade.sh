@@ -247,22 +247,51 @@ while [ $# -gt 0 ]; do
       fi
       ;;
     --db)
-      db_flag=y; NEW_db_ver=$2; shift 2
+      db_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        NEW_db_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --php)
-      php_flag=y; NEW_php_ver=$2; shift 2
+      php_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        NEW_php_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --redis)
-      redis_flag=y; NEW_redis_ver=$2; shift 2
+      redis_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        NEW_redis_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --memcached)
-      memcached_flag=y; NEW_memcached_ver=$2; shift 2
+      memcached_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        NEW_memcached_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --allocator)
-      allocator_option=$2; init_allocator; shift 2
+      if [[ "$2" =~ ^[123]$ ]]; then
+        allocator_option=$2; init_allocator; shift 2
+      else
+        shift 1
+      fi
       ;;
     --phpmyadmin)
-      phpmyadmin_flag=y; NEW_phpmyadmin_ver=$2; shift 2
+      phpmyadmin_flag=y
+      if [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        NEW_phpmyadmin_ver=$2; shift 2
+      else
+        shift 1
+      fi
       ;;
     --script)
       NEW_Script_ver=latest; shift 1
