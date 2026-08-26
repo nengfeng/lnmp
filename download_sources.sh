@@ -175,6 +175,7 @@ get_version() {
     mysql80)        ver=${VERSIONS[mysql80_ver]} ;;
     mysql-src)      ver=${VERSIONS[mysql97_ver]} ;;
     mariadb123)     ver=${VERSIONS[mariadb123_ver]} ;;
+    mariadb118)     ver=${VERSIONS[mariadb118_ver]} ;;
     mariadb)        ver=${VERSIONS[mariadb118_ver]} ;;
     mariadb-src)    ver=${VERSIONS[mariadb118_ver]} ;;
     postgresql)     ver=${VERSIONS[pgsql18_ver]} ;;
@@ -218,6 +219,8 @@ get_version() {
     pecl-yar)       ver=${VERSIONS[yar_ver]} ;;
     pecl-swoole)    ver=${VERSIONS[swoole_ver]} ;;
     pecl-xdebug)    ver=${VERSIONS[xdebug_ver]} ;;
+    brotli)         ver=${VERSIONS[brotli_ver]} ;;
+    ngx-brotli)     ver="current" ;;
     ioncube)        ver="current" ;;
     cacert)         ver="current" ;;
     *)              ver="" ;;
@@ -693,11 +696,11 @@ download_all() {
     
     local name=$(echo "$line" | cut -d'|' -f1)
     
-    ((++total))
+    total=$((total+1))
     if download_component "$name" "$mirror_mode"; then
-      ((++success))
+      success=$((success+1))
     else
-      ((++failed))
+      failed=$((failed+1))
     fi
     echo ""
   done < "${SOURCES_FILE}"
@@ -803,8 +806,8 @@ check_existing() {
       local size=$(stat -c%s "$f" 2>/dev/null || echo "0")
       local size_mb=$((size / 1024 / 1024))
       printf "%-40s %6d MB\n" "$filename" "$size_mb"
-      ((count++))
-      ((total_size += size))
+      count=$((count+1))
+      total_size=$((total_size+size))
     fi
   done
   
