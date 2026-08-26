@@ -844,15 +844,25 @@ Del_NGX_Vhost() {
           else
             if [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ]; then
               Directory=$(grep '^  root' "${web_install_dir}/conf/vhost/${domain}.conf" | head -1 | sed 's/^[[:space:]]*root[[:space:]]*//;s/;$//')
-              if [ -z "${Directory}" ] || [ "${Directory}" == "/" ] || ! echo "${Directory}" | grep -q "^${wwwroot_dir}"; then
-                echo "${CFAILURE}Invalid directory path detected. Only directories under ${wwwroot_dir} can be deleted.${CEND}"
+              # Canonicalize and validate: the vhost root must be a directory
+              # STRICTLY deeper than ${wwwroot_dir}; deleting ${wwwroot_dir}
+              # itself (or anything escaping it, e.g. via ..) is refused.
+              local dir_real wwwroot_real
+              dir_real=$(realpath -m "${Directory}" 2>/dev/null)
+              wwwroot_real=$(realpath -m "${wwwroot_dir%/}" 2>/dev/null)
+              local dir_ok=n
+              case "${dir_real}" in
+                "${wwwroot_real}"/*) [ "${dir_real}" != "${wwwroot_real}" ] && dir_ok=y ;;
+              esac
+              if [[ "${dir_ok}" != y ]] || [ ! -d "${dir_real}" ]; then
+                echo "${CFAILURE}Invalid directory path detected. Only existing directories under ${wwwroot_dir} can be deleted.${CEND}"
                 continue
               fi
-              /bin/mv ${web_install_dir}/conf/vhost/${domain}.conf ${web_install_dir}/conf/vhost/${domain}.conf.bak
+              /bin/mv "${web_install_dir}/conf/vhost/${domain}.conf" "${web_install_dir}/conf/vhost/${domain}.conf.bak"
               if ${web_install_dir}/sbin/nginx -t; then
-                rm -f ${web_install_dir}/conf/vhost/${domain}.conf.bak
-                [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f ${web_install_dir}/conf/rewrite/${domain}.conf
-                [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f ${web_install_dir}/conf/ssl/${domain}.{crt,key,csr}
+                rm -f "${web_install_dir}/conf/vhost/${domain}.conf.bak"
+                [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f "${web_install_dir}/conf/rewrite/${domain}.conf"
+                [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f "${web_install_dir}/conf/ssl/${domain}".{crt,key,csr}
                 ${web_install_dir}/sbin/nginx -s reload
               else
                 /bin/mv ${web_install_dir}/conf/vhost/${domain}.conf.bak ${web_install_dir}/conf/vhost/${domain}.conf
@@ -872,7 +882,7 @@ Del_NGX_Vhost() {
                   echo "Press Ctrl+c to cancel or Press any key to continue..."
                   char=$(get_char)
                 fi
-                rm -rf ${Directory}
+                rm -rf -- "${dir_real}"
               fi
               echo
               [ -d "${HOME}/.acme.sh/${domain}" ] && "${HOME}/.acme.sh/acme.sh" --force --remove -d ${domain} > /dev/null 2>&1
