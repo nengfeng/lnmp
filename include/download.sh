@@ -15,6 +15,31 @@ Download_src() {
   
   # Check if file already exists and has content
   if [ -s "${file_name}" ]; then
+    # Integrity probe for cached archives: a truncated file from a previous
+    # interrupted download must not be trusted ("non-empty != complete")
+    case "${file_name}" in
+      *.tar.gz|*.tgz)
+        if command -v gzip >/dev/null 2>&1 && ! gzip -t "${file_name}" 2>/dev/null; then
+          echo "${CWARNING}[${file_name}] is corrupted (truncated?), re-downloading${CEND}"
+          rm -f "${file_name}"
+          Download_src "$@"
+          return $?
+        fi ;;
+      *.tar.xz)
+        if command -v xz >/dev/null 2>&1 && ! xz -t "${file_name}" 2>/dev/null; then
+          echo "${CWARNING}[${file_name}] is corrupted (truncated?), re-downloading${CEND}"
+          rm -f "${file_name}"
+          Download_src "$@"
+          return $?
+        fi ;;
+      *.tar.bz2)
+        if command -v bzip2 >/dev/null 2>&1 && ! bzip2 -t "${file_name}" 2>/dev/null; then
+          echo "${CWARNING}[${file_name}] is corrupted (truncated?), re-downloading${CEND}"
+          rm -f "${file_name}"
+          Download_src "$@"
+          return $?
+        fi ;;
+    esac
     echo "[${CMSG}${file_name}${CEND}] found"
     return 0
   fi

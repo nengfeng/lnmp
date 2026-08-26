@@ -16,7 +16,7 @@ Upgrade_DB() {
       break
     else
       echo
-      read -e -p "Please input the root password of database: " NEW_dbrootpwd
+      read -e -p "Please input the root password of database: " NEW_dbrootpwd || { echo "${CFAILURE}No interactive terminal available (stdin closed), aborting.${CEND}" && exit 1; }
       ${db_install_dir}/bin/mysql -uroot -p${NEW_dbrootpwd} -e "quit" >/dev/null 2>&1
       if [ $? -eq 0 ]; then
         dbrootpwd=${NEW_dbrootpwd}
@@ -44,8 +44,15 @@ Upgrade_DB() {
   #backup
   echo
   echo "${CSUCCESS}Starting ${DB} backup${CEND}......"
-  ${db_install_dir}/bin/mysqldump -uroot -p${dbrootpwd} --opt --all-databases > DB_all_backup_$(date +"%Y%m%d").sql
-  [ -f "DB_all_backup_$(date +"%Y%m%d").sql" ] && echo "${DB} backup success, Backup file: ${MSG}$(pwd)/DB_all_backup_$(date +"%Y%m%d").sql${CEND}"
+  local DB_backup_file="DB_all_backup_$(date +"%Y%m%d").sql"
+  ${db_install_dir}/bin/mysqldump -uroot -p${dbrootpwd} --opt --all-databases > "${DB_backup_file}"
+  if [ $? -eq 0 ] && [ -s "${DB_backup_file}" ]; then
+    echo "${DB} backup success, Backup file: ${MSG}$(pwd)/${DB_backup_file}${CEND}"
+  else
+    rm -f "${DB_backup_file}"
+    echo "${CFAILURE}${DB} backup failed (check password/disk space)! Upgrade aborted, your data is untouched.${CEND}"
+    return 1
+  fi
 
   #upgrade
   echo
@@ -84,14 +91,34 @@ Upgrade_DB() {
   for _f in ${DB_filename}.tar.?z; do
     [ -f "$_f" ] && db_archive_file="$_f" && break
   done
-  if [ -n "${db_archive_file}" ]; then
-    echo "[${CMSG}${db_archive_file}${CEND}] found"
-    if [ "${db_flag}" != 'y' ]; then
-      echo "Press Ctrl+c to cancel or Press any key to continue..."
-      char=$(get_char)
-    fi
-    if [[ "${DB}" == MariaDB ]]; then
-      tar xzf ${DB_filename}.tar.gz
+  if [ -z "${db_archive_file}" ]; then
+    echo "Downloading ${CMSG}${DB_URL}${CEND}......"
+    wget -c ${DB_URL} > /dev/null 2>&1
+  fi
+  for _f in ${DB_filename}.tar.?z; do
+    [ -f "$_f" ] && db_archive_file="$_f" && break
+  done
+
+  if [ -z "${db_archive_file}" ]; then
+    echo "${CFAILURE}Archive not found and download failed! Upgrade aborted, nothing was changed.${CEND}"
+    return 1
+  fi
+  echo "[${CMSG}${db_archive_file}${CEND}] found"
+  if [ "${db_flag}" != 'y' ]; then
+    echo "Press Ctrl+c to cancel or Press any key to continue..."
+    char=$(get_char)
+  fi
+  if [[ "${DB}" == MariaDB ]]; then
+      rm -rf ${DB_filename}
+      echo "Extracting ${db_archive_file}......"
+      if ! tar xzf "${db_archive_file}"; then
+        echo "${CFAILURE}Extract failed: ${db_archive_file} is corrupted or truncated! Nothing was changed, please delete it and retry.${CEND}"
+        return 1
+      fi
+      if [ ! -e "${DB_filename}/bin/mysqld" ] || [ ! -f "${DB_filename}/scripts/mysql_install_db" ]; then
+        echo "${CFAILURE}Extracted tree incomplete (missing bin/mysqld or scripts/mysql_install_db)! Nothing was changed.${CEND}"
+        return 1
+      fi
       svc_stop mysqld
       local timeout=60
       while pidof mysqld mariadbd >/dev/null 2>&1; do
@@ -111,7 +138,11 @@ Upgrade_DB() {
       chown mysql:mysql -R ${mariadb_data_dir}
       svc_start mysqld
       wait_for_db_ready ${mariadb_install_dir} || { echo "${CFAILURE}Database failed to start${CEND}"; return 1; }
-      ${mariadb_install_dir}/bin/mysql < DB_all_backup_$(date +"%Y%m%d").sql
+      echo "Restoring data from ${DB_backup_file}......"
+      if ! ${mariadb_install_dir}/bin/mysql < "${DB_backup_file}"; then
+        echo "${CFAILURE}Data restore failed! Old data preserved at ${mariadb_data_dir}_old_*, please restore manually.${CEND}"
+        return 1
+      fi
       svc_restart mysqld
       ${mariadb_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
       ${mariadb_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "reset master;" >/dev/null 2>&1
@@ -122,7 +153,16 @@ Upgrade_DB() {
       setup_mariadb_root ${mariadb_install_dir} ${dbrootpwd} ${root_cmd}
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
     elif [[ "${DB}" == MySQL ]]; then
-      tar xJf ${DB_filename}.tar.xz
+      rm -rf ${DB_filename}
+      echo "Extracting ${db_archive_file}......"
+      if ! tar xJf "${db_archive_file}"; then
+        echo "${CFAILURE}Extract failed: ${db_archive_file} is corrupted or truncated! Nothing was changed, please delete it and retry.${CEND}"
+        return 1
+      fi
+      if [ ! -f "${DB_filename}/bin/mysqld" ]; then
+        echo "${CFAILURE}Extracted tree incomplete (missing bin/mysqld)! Nothing was changed.${CEND}"
+        return 1
+      fi
       svc_stop mysqld
       local timeout=60
       while pidof mysqld >/dev/null 2>&1; do
@@ -143,7 +183,11 @@ Upgrade_DB() {
       sed -i '/myisam_repair_threads/d' /etc/my.cnf
       svc_start mysqld
       wait_for_db_ready ${mysql_install_dir} || { echo "${CFAILURE}Database failed to start${CEND}"; return 1; }
-      ${mysql_install_dir}/bin/mysql < DB_all_backup_$(date +"%Y%m%d").sql
+      echo "Restoring data from ${DB_backup_file}......"
+      if ! ${mysql_install_dir}/bin/mysql < "${DB_backup_file}"; then
+        echo "${CFAILURE}Data restore failed! Old data preserved at ${mysql_data_dir}_old_*, please restore manually.${CEND}"
+        return 1
+      fi
       svc_restart mysqld
       ${mysql_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
       ${mysql_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "reset master;" >/dev/null 2>&1
@@ -152,5 +196,4 @@ Upgrade_DB() {
       setup_mysql_root ${mysql_install_dir} ${dbrootpwd}
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
     fi
-  fi
 }
