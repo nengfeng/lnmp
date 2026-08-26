@@ -1,2 +1,5 @@
-# md5sum.txt will be generated at release time
-# Use GitHub releases for distribution
+# md5sum.txt -- package checksums (generated at release time)
+# Format: <md5>  <filename>
+#   e.g.  d41d8cd98f00b204e9800998ecf8427e  lnmp-full.tar.gz
+# Consumers: install.sh (--md5sum), include/upgrade_script.sh
+# Generate:  cd <parent-dir> && md5sum lnmp-full.tar.gz > lnmp/md5sum.txt

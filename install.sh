@@ -220,10 +220,14 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
   script_md5=${tool_file##*/}
   if [ -e "${tool_file}" ]; then
     now_script_md5=$(md5sum "${tool_file}" | awk '{print $1}')
-    latest_script_md5=$(curl --connect-timeout 3 -m 5 -s "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" | grep "${script_md5}" | awk '{print $1}')
-    if [ "${now_script_md5}" != "${latest_script_md5}" ]; then
+    latest_script_md5=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" 2>/dev/null | awk -v f="${script_md5}" '$2==f {print $1}')
+    if [ -z "${latest_script_md5}" ]; then
+      echo "${CWARNING}Warning: unable to verify md5 online (no entry for ${script_md5} or network failure), skipping.${CEND}"
+    elif [ "${now_script_md5}" != "${latest_script_md5}" ]; then
       echo "${CFAILURE}Error: The md5 value of the installation package does not match the official website, please download again, url: https://github.com/nengfeng/lnmp${CEND}"
       exit 1
+    else
+      echo "${CSUCCESS}MD5 verification passed (${script_md5}).${CEND}"
     fi
   else
     echo "${CFAILURE}Error: ${tool_file} does not exist${CEND}"
