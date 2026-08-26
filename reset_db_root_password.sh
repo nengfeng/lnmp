@@ -89,79 +89,77 @@ Reset_Interaction_dbrootpwd() {
 }
 
 Reset_force_dbrootpwd() {
-  DB_Ver="$(${db_install_dir}/bin/mysql_config --version)"
   echo "${CMSG}Stopping MySQL...${CEND}"
   svc_stop mysqld > /dev/null 2>&1
   local timeout=60
-  while [ -n "$(pidof mysqld)" ]; do
+  while [ -n "$(pidof mysqld mariadbd)" ]; do
     [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
     sleep 1
   done
+
+  # Start with grants bypassed (server forces skip-networking in this mode,
+  # so exposure is limited to the local unix socket)
   echo "${CMSG}skip grant tables...${CEND}"
   sed -i '/\[mysqld\]/a\skip-grant-tables' /etc/my.cnf
   svc_start mysqld > /dev/null 2>&1
   timeout=60
-  while [ -z "$(pidof mysqld)" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
+  while [ -z "$(pidof mysqld mariadbd)" ]; do
+    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; sed -i '/^skip-grant-tables/d' /etc/my.cnf; popd; return 1; }
     sleep 1
   done
   sleep 2
-  echo "${CMSG}Removing skip-grant-tables and restarting MySQL...${CEND}"
-  svc_stop mysqld > /dev/null 2>&1
-  timeout=60
-  while [ -n "$(pidof mysqld)" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; popd; return 1; }
-    sleep 1
-  done
-  sed -i '/^skip-grant-tables/d' /etc/my.cnf
-  svc_start mysqld > /dev/null 2>&1
-  timeout=60
-  while [ -z "$(pidof mysqld)" ]; do
-    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
-    sleep 1
-  done
-  # Detect MySQL or MariaDB
+
+  # Change the password WHILE grants are still bypassed:
+  # FLUSH PRIVILEGES reloads the grant tables, enabling ALTER USER
+  # (official recipe for skip-grant-tables mode)
+  echo "${CMSG}Setting new password...${CEND}"
   local escaped_pwd=$(echo "${New_dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
-  if ${db_install_dir}/bin/mysql -V | grep -qi MariaDB; then
-    # MariaDB (10.11, 11.4, 11.8)
-    # Detect MariaDB version to use correct command (mysql or mariadb)
-    local mdb_cmd="mysql"
-    local mdb_ver=$(${db_install_dir}/bin/mysql -V | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    if [[ $(echo "$mdb_ver" | cut -d. -f1) -ge 11 ]]; then
-      mdb_cmd="mariadb"
-    fi
-    ${db_install_dir}/bin/${mdb_cmd} -uroot -hlocalhost << EOF
+  local reset_ok=n
+  if ${db_install_dir}/bin/mysql -uroot -hlocalhost << EOF 2>/dev/null
 FLUSH PRIVILEGES;
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${escaped_pwd}';
 ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '${escaped_pwd}';
 FLUSH PRIVILEGES;
 EOF
-  else
-    # MySQL 8.0/8.4
-    ${db_install_dir}/bin/mysql -uroot -hlocalhost << EOF
-FLUSH PRIVILEGES;
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${escaped_pwd}';
-ALTER USER 'root'@'127.0.0.1' IDENTIFIED WITH mysql_native_password BY '${escaped_pwd}';
-FLUSH PRIVILEGES;
-EOF
+  then
+    reset_ok=y
   fi
-  if [ $? -eq 0 ]; then
-    killall mysqld
-    timeout=60
-    while [ -n "$(pidof mysqld)" ]; do
-      [ $((timeout--)) -le 0 ] && { pidof mysqld | xargs kill -9 > /dev/null 2>&1; break; }
-      sleep 1
-    done
-    [ -n "$(pidof mysqld)" ] && pidof mysqld | xargs kill -9 > /dev/null 2>&1
-    svc_start mysqld > /dev/null 2>&1
-    sed -i "s+^dbrootpwd.*+dbrootpwd='${escaped_pwd}'+" ./options.conf
-    chmod 600 ./options.conf
-    [ -e ~/ReadMe ] && sed -i "s+^MySQL root password:.*+MySQL root password: ${New_dbrootpwd}+"  ~/ReadMe
-    echo
-    echo "Password reset successfully! "
-    echo "The new password: ${CMSG}${New_dbrootpwd}${CEND}"
-    echo
+
+  # Restore normal mode unconditionally (also cleans up on failure)
+  echo "${CMSG}Removing skip-grant-tables and restarting MySQL...${CEND}"
+  svc_stop mysqld > /dev/null 2>&1
+  timeout=60
+  while [ -n "$(pidof mysqld mariadbd)" ]; do
+    [ $((timeout--)) -le 0 ] && { pidof mysqld mariadbd | xargs kill -9 > /dev/null 2>&1; break; }
+    sleep 1
+  done
+  sed -i '/^skip-grant-tables/d' /etc/my.cnf
+  svc_start mysqld > /dev/null 2>&1
+  timeout=60
+  while [ -z "$(pidof mysqld mariadbd)" ]; do
+    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to start${CEND}"; popd; return 1; }
+    sleep 1
+  done
+  sleep 2
+
+  if [[ "${reset_ok}" != y ]]; then
+    echo "${CFAILURE}Failed to set the new password. Old password unchanged, please check the error log.${CEND}"
+    popd; return 1
   fi
+
+  # Verify the new credentials against the restarted, normally-authenticating server
+  if ! ${db_install_dir}/bin/mysql -uroot -p"${New_dbrootpwd}" -hlocalhost -e "SELECT 1;" > /dev/null 2>&1; then
+    echo "${CFAILURE}Verification failed with the new password, please inspect manually.${CEND}"
+    popd; return 1
+  fi
+
+  sed -i "s+^dbrootpwd.*+dbrootpwd='${escaped_pwd}'+" ./options.conf
+  chmod 600 ./options.conf
+  [ -e ~/ReadMe ] && sed -i "s+^MySQL root password:.*+MySQL root password: ${New_dbrootpwd}+"  ~/ReadMe
+  echo
+  echo "Password reset successfully! "
+  echo "The new password: ${CMSG}${New_dbrootpwd}${CEND}"
+  echo
 }
 
 [[ "${password_flag}" == y ]] && quiet_flag=y
