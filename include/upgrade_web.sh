@@ -4,6 +4,48 @@
 
 . include/common.sh
 
+# Verified zero-downtime binary swap via USR2/QUIT.
+# Usage: _nginx_hot_swap <active_bin> <backup_bin> <service_name>
+# Assumes new binary already installed at <active_bin>.
+# Only quits the old master after the new one is confirmed alive; restores
+# the backup binary on any failure (old master keeps serving meanwhile).
+_nginx_hot_swap() {
+  local bin="$1" backup="$2" svc="$3"
+  local pid_file=/var/run/nginx.pid
+  local old_pid=$(cat ${pid_file} 2>/dev/null)
+  local new_pid="" i=0
+  if [ -n "${old_pid}" ] && kill -0 ${old_pid} 2>/dev/null; then
+    kill -USR2 ${old_pid}
+    while [ ${i} -lt 10 ]; do
+      sleep 1
+      new_pid=$(cat ${pid_file} 2>/dev/null)
+      [ -n "${new_pid}" ] && [ "${new_pid}" != "${old_pid}" ] && kill -0 ${new_pid} 2>/dev/null && break
+      i=$((i+1))
+    done
+    if [ -n "${new_pid}" ] && [ "${new_pid}" != "${old_pid}" ] && kill -0 ${new_pid} 2>/dev/null; then
+      kill -QUIT ${old_pid}
+      return 0
+    fi
+    echo "${CFAILURE}New Nginx master failed to start, old master still serving.${CEND}"
+  else
+    echo "${CWARNING}Nginx not running, starting with new binary...${CEND}"
+    rm -f ${pid_file}
+    svc_start ${svc}
+    sleep 1
+    new_pid=$(cat ${pid_file} 2>/dev/null)
+    if [ -n "${new_pid}" ] && kill -0 ${new_pid} 2>/dev/null; then
+      return 0
+    fi
+    echo "${CFAILURE}Nginx failed to start with new binary.${CEND}"
+  fi
+  if /bin/mv -f ${backup} ${bin}; then
+    echo "Binary rolled back to previous version."
+  else
+    echo "${CFAILURE}Rollback failed! Please restore ${backup} manually.${CEND}"
+  fi
+  return 1
+}
+
 Upgrade_Nginx() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${nginx_install_dir}/sbin/nginx" ] && echo "${CWARNING}Nginx is not installed on your system! ${CEND}" && exit 1
@@ -165,15 +207,25 @@ Upgrade_Nginx() {
     ./configure ${nginx_configure_args}
     compile_check
     if [ -f "objs/nginx" ]; then
-      /bin/mv ${nginx_install_dir}/sbin/nginx{,$(date +%m%d)}
-      /bin/cp objs/nginx ${nginx_install_dir}/sbin/nginx
-      kill -USR2 $(cat /var/run/nginx.pid)
-      sleep 1
-      kill -QUIT $(cat /var/run/nginx.pid.oldbin)
+      echo "Config test with new binary......"
+      if ! ./objs/nginx -t; then
+        fail_msg "Nginx upgrade (config test failed)"
+      fi
+      local ts=$(date +%m%d%H%M%S)
+      /bin/cp -a ${nginx_install_dir}/sbin/nginx ${nginx_install_dir}/sbin/nginx.bak${ts} || { fail_msg "Nginx upgrade (backup failed)"; }
+      if ! /bin/cp objs/nginx ${nginx_install_dir}/sbin/nginx; then
+        /bin/mv -f ${nginx_install_dir}/sbin/nginx.bak${ts} ${nginx_install_dir}/sbin/nginx 2>/dev/null
+        fail_msg "Nginx upgrade (install new binary failed)"
+      fi
+      chmod +x ${nginx_install_dir}/sbin/nginx
       popd > /dev/null
       sed -i 's/^#brotli/brotli/' ${nginx_install_dir}/conf/nginx.conf 2>/dev/null
-      echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_nginx_ver}${CEND} to ${CWARNING}${NEW_nginx_ver}${CEND}"
-      cleanup_src nginx-${NEW_nginx_ver} ngx_brotli
+      if _nginx_hot_swap ${nginx_install_dir}/sbin/nginx ${nginx_install_dir}/sbin/nginx.bak${ts} nginx; then
+        echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_nginx_ver}${CEND} to ${CWARNING}${NEW_nginx_ver}${CEND}"
+        cleanup_src nginx-${NEW_nginx_ver} ngx_brotli
+      else
+        echo "${CFAILURE}Nginx upgrade failed! ${CEND}"
+      fi
     else
       fail_msg "Nginx upgrade"
     fi
@@ -338,18 +390,31 @@ Upgrade_Tengine() {
     ./configure ${tengine_configure_args}
     make
     if [ -f "objs/nginx" ]; then
-      /bin/mv ${tengine_install_dir}/sbin/nginx{,$(date +%m%d)}
-      /bin/mv ${tengine_install_dir}/modules{,$(date +%m%d)}
-      /bin/cp objs/nginx ${tengine_install_dir}/sbin/nginx
+      echo "Config test with new binary......"
+      if ! ./objs/nginx -t; then
+        fail_msg "Tengine upgrade (config test failed)"
+      fi
+      local ts=$(date +%m%d%H%M%S)
+      /bin/cp -a ${tengine_install_dir}/sbin/nginx ${tengine_install_dir}/sbin/nginx.bak${ts} || { fail_msg "Tengine upgrade (backup failed)"; }
+      if ! /bin/cp objs/nginx ${tengine_install_dir}/sbin/nginx; then
+        /bin/mv -f ${tengine_install_dir}/sbin/nginx.bak${ts} ${tengine_install_dir}/sbin/nginx 2>/dev/null
+        fail_msg "Tengine upgrade (install new binary failed)"
+      fi
       chmod +x ${tengine_install_dir}/sbin/*
-      make install
-      kill -USR2 $(cat /var/run/nginx.pid)
-      sleep 1
-      kill -QUIT $(cat /var/run/nginx.pid.oldbin)
+      [ -d ${tengine_install_dir}/modules ] && mv ${tengine_install_dir}/modules{,.bak${ts}}
+      if ! make install > /dev/null 2>&1; then
+        /bin/mv -f ${tengine_install_dir}/sbin/nginx.bak${ts} ${tengine_install_dir}/sbin/nginx 2>/dev/null
+        fail_msg "Tengine upgrade (make install failed)"
+      fi
       popd > /dev/null
       sed -i 's/^#brotli/brotli/' ${tengine_install_dir}/conf/nginx.conf 2>/dev/null
-      echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}$OLD_tengine_ver${CEND} to ${CWARNING}${NEW_tengine_ver}${CEND}"
-      rm -rf tengine-${NEW_tengine_ver} ngx_brotli
+      if _nginx_hot_swap ${tengine_install_dir}/sbin/nginx ${tengine_install_dir}/sbin/nginx.bak${ts} nginx; then
+        echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}$OLD_tengine_ver${CEND} to ${CWARNING}${NEW_tengine_ver}${CEND}"
+        rm -rf tengine-${NEW_tengine_ver} ngx_brotli
+      else
+        [ -d ${tengine_install_dir}/modules.bak${ts} ] && rm -rf ${tengine_install_dir}/modules && mv ${tengine_install_dir}/modules.bak${ts} ${tengine_install_dir}/modules
+        echo "${CFAILURE}Tengine upgrade failed! ${CEND}"
+      fi
     else
       echo "${CFAILURE}Upgrade Tengine failed! ${CEND}"
     fi
@@ -440,15 +505,24 @@ Upgrade_OpenResty() {
     compile_check
     local nginx_build_dir=$(ls -d build/nginx-* 2>/dev/null | head -1)
     if [ -n "$nginx_build_dir" ] && [ -f "${nginx_build_dir}/objs/nginx" ]; then
-      /bin/mv ${openresty_install_dir}/nginx/sbin/nginx{,$(date +%m%d)}
-      make install
-      kill -USR2 $(cat /var/run/nginx.pid)
-      sleep 1
-      kill -QUIT $(cat /var/run/nginx.pid.oldbin)
+      echo "Config test with new binary......"
+      if ! ${nginx_build_dir}/objs/nginx -t; then
+        fail_msg "OpenResty upgrade (config test failed)"
+      fi
+      local ts=$(date +%m%d%H%M%S)
+      /bin/cp -a ${openresty_install_dir}/nginx/sbin/nginx ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} || { fail_msg "OpenResty upgrade (backup failed)"; }
+      if ! make install > /dev/null 2>&1; then
+        /bin/mv -f ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} ${openresty_install_dir}/nginx/sbin/nginx 2>/dev/null
+        fail_msg "OpenResty upgrade (make install failed)"
+      fi
       popd > /dev/null
       sed -i 's/^#brotli/brotli/' ${openresty_install_dir}/nginx/conf/nginx.conf 2>/dev/null
-      echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_openresty_ver}${CEND} to ${CWARNING}${NEW_openresty_ver}${CEND}"
-      cleanup_src openresty-${NEW_openresty_ver} ngx_brotli lua-cjson-${lua_cjson_ver}
+      if _nginx_hot_swap ${openresty_install_dir}/nginx/sbin/nginx ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} nginx; then
+        echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_openresty_ver}${CEND} to ${CWARNING}${NEW_openresty_ver}${CEND}"
+        cleanup_src openresty-${NEW_openresty_ver} ngx_brotli lua-cjson-${lua_cjson_ver}
+      else
+        echo "${CFAILURE}OpenResty upgrade failed! ${CEND}"
+      fi
     else
       fail_msg "OpenResty upgrade"
     fi
