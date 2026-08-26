@@ -45,7 +45,7 @@ Upgrade_DB() {
   echo
   echo "${CSUCCESS}Starting ${DB} backup${CEND}......"
   local DB_backup_file="DB_all_backup_$(date +"%Y%m%d").sql"
-  ${db_install_dir}/bin/mysqldump -uroot -p${dbrootpwd} --opt --all-databases > "${DB_backup_file}"
+  ${db_install_dir}/bin/mysqldump -uroot -p${dbrootpwd} --opt --all-databases --routines --events > "${DB_backup_file}"
   if [ $? -eq 0 ] && [ -s "${DB_backup_file}" ]; then
     echo "${DB} backup success, Backup file: ${MSG}$(pwd)/${DB_backup_file}${CEND}"
   else

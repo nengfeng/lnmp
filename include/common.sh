@@ -426,7 +426,11 @@ compile_and_install() {
 # Usage: compile_check [extra_make_args]
 compile_check() {
   local log_file="${current_dir}/compile_error.log"
-  if ! make -j ${THREAD} ${1:+${1}} 2>&1 | tee "${log_file}"; then
+  # judge make via PIPESTATUS[0]: the pipeline's $? is tee's, which
+  # almost always succeeds and masked real build failures
+  make -j ${THREAD} ${1:+${1}} 2>&1 | tee "${log_file}"
+  local make_rc=${PIPESTATUS[0]}
+  if [ ${make_rc} -ne 0 ]; then
     echo ""
     echo "${CFAILURE}========================================${CEND}"
     echo "${CFAILURE}Compilation failed!${CEND}"

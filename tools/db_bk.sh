@@ -14,8 +14,8 @@ OldFile=${backup_dir}/DB_${DBname}_$(date +%Y%m%d --date="${expired_days} days a
 
 [ ! -e "${backup_dir}" ] && mkdir -p ${backup_dir}
 
-DB_tmp=$(${db_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "show databases\G" | grep ${DBname})
-[ -z "${DB_tmp}" ] && { echo "[${DBname}] not exist" >> ${LogFile} ;  exit 1 ; }
+DB_tmp=$(${db_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -N -B -e "SHOW DATABASES" 2>/dev/null | grep -Fxq "${DBname}" && echo OK)
+[ -z "${DB_tmp}" ] && { echo "[${DBname}] not exist" >> "${LogFile}" ; exit 1 ; }
 
 if [ -n "$(ls ${OldFile} 2>/dev/null)" ]; then
   rm -f ${OldFile}
@@ -27,8 +27,13 @@ fi
 if [ -e "${NewFile}" ]; then
   echo "[${NewFile}] The Backup File is exists, Can't Backup" >> ${LogFile}
 else
-  ${db_install_dir}/bin/mysqldump -uroot -p"${dbrootpwd}" ${DBname} > ${DumpFile}
-  pushd ${backup_dir} > /dev/null
+  ${db_install_dir}/bin/mysqldump -uroot -p"${dbrootpwd}" --routines --events "${DBname}" > "${DumpFile}"
+  if [ $? -ne 0 ] || [ ! -s "${DumpFile}" ]; then
+    echo "[${DumpFile}] Backup FAILED (dump error or empty file)" >> "${LogFile}"
+    rm -f "${DumpFile}"
+    exit 1
+  fi
+  pushd "${backup_dir}" > /dev/null
   tar czf ${NewFile} ${DumpFile##*/} >> ${LogFile} 2>&1
   echo "[${NewFile}] Backup success ">> ${LogFile}
   rm -f ${DumpFile}

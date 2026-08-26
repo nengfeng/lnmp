@@ -8,23 +8,24 @@ Upgrade_Script() {
   [ ! -e README.md ] && ois_flag=n
   if [ -z "${latest_md5}" ] || [ "${script_md5}" != "${latest_md5}" ]; then
     UPGRADE_TMP_DIR=$(mktemp -d /tmp/lnmp_upgrade.XXXXXX)
-    trap "rm -rf $UPGRADE_TMP_DIR" EXIT
-    /bin/mv options.conf $UPGRADE_TMP_DIR/
-    sed -i '/current_dir=/d' $UPGRADE_TMP_DIR/options.conf
-    # Download from GitHub (lnmp.tar.gz is generated at release time)
-    wget -qc "https://github.com/nengfeng/lnmp/archive/main.tar.gz" -O $UPGRADE_TMP_DIR/lnmp.tar.gz
-    tar xzf $UPGRADE_TMP_DIR/lnmp.tar.gz -C $UPGRADE_TMP_DIR/
-    /bin/cp -R $UPGRADE_TMP_DIR/lnmp/* ${current_dir}/
-    /bin/rm -rf $UPGRADE_TMP_DIR/lnmp
-    IFS=$'\n'
-    for L in $(grep -vE '^#|^$' $UPGRADE_TMP_DIR/options.conf)
-    do
-      IFS=$IFS_old
-      Key="$(echo ${L%%=*})"
-      Value="$(echo ${L#*=})"
-      sed -i "s|^${Key}=.*|${Key}=${Value}|" ./options.conf
+    trap 'rm -rf "${UPGRADE_TMP_DIR}"' EXIT
+
+    # Download and extract FIRST; user files are only touched after the
+    # new tree is verified good (a failed download previously deleted
+    # options.conf via the EXIT trap and still reported success)
+    wget -qc "https://github.com/nengfeng/lnmp/archive/main.tar.gz" -O "${UPGRADE_TMP_DIR}/lnmp.tar.gz"
+    if [ ! -s "${UPGRADE_TMP_DIR}/lnmp.tar.gz" ] || ! tar xzf "${UPGRADE_TMP_DIR}/lnmp.tar.gz" -C "${UPGRADE_TMP_DIR}/" || [ ! -d "${UPGRADE_TMP_DIR}/lnmp" ]; then
+      echo "${CFAILURE}LNMP upgrade failed: could not download or extract the package. Your files were not modified.${CEND}"
+      popd > /dev/null
+      return 1
+    fi
+
+    # Merge user settings into the NEW options.conf, then overlay the tree
+    grep -vE '^#|^$' ./options.conf | while IFS='=' read -r Key Value; do
+      [ -n "${Key}" ] && sed -i "s|^${Key}=.*|${Key}=${Value}|" "${UPGRADE_TMP_DIR}/lnmp/options.conf"
     done
-    rm -rf $UPGRADE_TMP_DIR
+    /bin/cp -R "${UPGRADE_TMP_DIR}/lnmp/"* "${current_dir}/"
+    rm -rf "${UPGRADE_TMP_DIR}"
     trap - EXIT
     [[ "${ois_flag}" == "n" ]] && rm -f ss.sh LICENSE README.md
     [ -n "${latest_md5}" ] && sed -i "s@^script_md5=.*@script_md5=${latest_md5}@" ./options.conf
