@@ -114,15 +114,21 @@ Reset_force_dbrootpwd() {
   # (official recipe for skip-grant-tables mode)
   echo "${CMSG}Setting new password...${CEND}"
   local escaped_pwd=$(echo "${New_dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
-  local reset_ok=n
-  if ${db_install_dir}/bin/mysql -uroot -hlocalhost << EOF 2>/dev/null
+  local reset_ok=n rc_127=0
+  ${db_install_dir}/bin/mysql -uroot -hlocalhost << EOF 2>/dev/null
 FLUSH PRIVILEGES;
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${escaped_pwd}';
-ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '${escaped_pwd}';
-FLUSH PRIVILEGES;
 EOF
-  then
+  if [ $? -eq 0 ]; then
     reset_ok=y
+    # root@'127.0.0.1' is optional: a manually removed account must not
+    # mask the localhost success above
+    ${db_install_dir}/bin/mysql -uroot -hlocalhost << EOF 2>/dev/null
+FLUSH PRIVILEGES;
+ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '${escaped_pwd}';
+EOF
+    rc_127=$?
+    [ ${rc_127} -ne 0 ] && echo "${CWARNING}Warning: could not update root@'127.0.0.1' (account may not exist). The localhost password WAS changed.${CEND}"
   fi
 
   # Restore normal mode unconditionally (also cleans up on failure)
