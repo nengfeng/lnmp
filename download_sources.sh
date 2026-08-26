@@ -414,7 +414,20 @@ download_file() {
     local filesize=$(stat -c%s "${filename}" 2>/dev/null || echo "0")
     if [ "$filesize" -gt 0 ]; then
       log INFO "File already exists: ${filename} (${filesize} bytes)"
-      
+
+      # 完整性探测：上次中断留下的截断文件不能当作完整缓存
+      local probe_failed=n
+      case "${filename}" in
+        *.tar.gz|*.tgz)   command -v gzip  >/dev/null 2>&1 && ! gzip  -t "${filename}" 2>/dev/null && probe_failed=y ;;
+        *.tar.xz)         command -v xz    >/dev/null 2>&1 && ! xz    -t "${filename}" 2>/dev/null && probe_failed=y ;;
+        *.tar.bz2)        command -v bzip2 >/dev/null 2>&1 && ! bzip2 -t "${filename}" 2>/dev/null && probe_failed=y ;;
+      esac
+      if [[ "${probe_failed}" == y ]]; then
+        log WARN "Existing file is corrupted (truncated?), re-downloading: ${filename}"
+        rm -f "${filename}" "${filename}.part"
+      else
+        rm -f "${filename}.part"
+
       # 如果有校验码，验证已存在的文件
       if [[ -n "$checksum_url" ]] && [ -n "$checksum_type" ] && [[ "$VERIFY_CHECKSUM" == "yes" ]]; then
         local checksum_file="${filename}.${checksum_type}"
@@ -435,21 +448,29 @@ download_file() {
           verify_checksum "$filename" "$checksum_file" "$checksum_type" "$filename"
         fi
       fi
-      
+
       popd > /dev/null
       return 0
+      fi
     fi
   fi
   
   log INFO "Downloading: ${url}"
-  
-  # 使用 wget 下载，支持断点续传
-  if wget --progress=bar:force -c "${url}" -O "${filename}" 2>&1 | tee -a "${LOG_FILE}"; then
+
+  # 下载到 .part 临时文件：最终文件名只会在完整下载后才出现；
+  # 失败时保留 .part 以便下次 -c 断点续传。
+  # 注意：无 pipefail 时 $? 是 tee 的退出码，必须用 PIPESTATUS[0]
+  # 判定 wget 的真实退出码（tee 几乎总是成功，会吞掉下载错误）。
+  local part_file="${filename}.part"
+  wget --progress=bar:force -c "${url}" -O "${part_file}" 2>&1 | tee -a "${LOG_FILE}"
+  local wget_rc=${PIPESTATUS[0]}
+  if [ ${wget_rc} -eq 0 ] && [ -s "${part_file}" ]; then
+    mv -f "${part_file}" "${filename}"
     if [ -f "${filename}" ]; then
       local filesize=$(stat -c%s "${filename}" 2>/dev/null || echo "0")
       if [ "$filesize" -gt 0 ]; then
         log INFO "Downloaded: ${filename} (${filesize} bytes)"
-        
+
         # 下载并验证校验码
         if [[ -n "$checksum_url" ]] && [ -n "$checksum_type" ] && [[ "$VERIFY_CHECKSUM" == "yes" ]]; then
           if download_checksum "$checksum_url" "$checksum_type" "$filename"; then
@@ -463,14 +484,16 @@ download_file() {
             log WARN "Could not download checksum file, skipping verification"
           fi
         fi
-        
+
         popd > /dev/null
         return 0
       fi
     fi
   fi
-  
-  log ERROR "Failed to download: ${url}"
+
+  log ERROR "Failed to download: ${url} (wget exit code: ${wget_rc})"
+  # 清理空的 .part 文件；非空则保留供断点续传
+  [ -f "${part_file}" ] && [ ! -s "${part_file}" ] && rm -f "${part_file}"
   # 清理可能存在的空文件
   [ -f "${filename}" ] && [ ! -s "${filename}" ] && rm -f "${filename}"
   popd > /dev/null
