@@ -71,8 +71,8 @@ Uninstall_fail2ban() {
     done
   fi
   if command -v nft >/dev/null 2>&1; then
-    nft list tables 2>/dev/null | awk '/f2b-/{print $2}' | while read -r t; do
-      nft delete table "$t" >/dev/null 2>&1 || true
+    nft list tables 2>/dev/null | awk '/f2b-/{print $2, $3}' | while read -r family name; do
+      nft delete table "$family" "$name" >/dev/null 2>&1 || true
     done
   fi
   svc_stop fail2ban
