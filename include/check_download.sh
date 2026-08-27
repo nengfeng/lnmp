@@ -341,7 +341,7 @@ checkDownload() {
         # MySQL 9.7
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 9.7 binary..."
-          FILE_NAME=mysql-${mysql97_ver}-linux-glibc2.28-x86_64.tar.xz
+          FILE_NAME=mysql-${mysql97_ver}-linux-glibc2.28-$(uname -m).tar.xz
         else
           echo "Download MySQL 9.7 source..."
           FILE_NAME=mysql-${mysql97_ver}.tar.gz
@@ -354,7 +354,7 @@ checkDownload() {
         # MySQL 8.4
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 8.4 binary..."
-          FILE_NAME=mysql-${mysql84_ver}-linux-glibc2.28-x86_64.tar.xz
+          FILE_NAME=mysql-${mysql84_ver}-linux-glibc2.28-$(uname -m).tar.xz
         else
           echo "Download MySQL 8.4 source..."
           FILE_NAME=mysql-${mysql84_ver}.tar.gz
@@ -367,7 +367,7 @@ checkDownload() {
         # MySQL 8.0
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 8.0 binary..."
-          FILE_NAME=mysql-${mysql80_ver}-linux-glibc2.28-x86_64.tar.xz
+          FILE_NAME=mysql-${mysql80_ver}-linux-glibc2.28-$(uname -m).tar.xz
         else
           echo "Download MySQL 8.0 source..."
           FILE_NAME=mysql-${mysql80_ver}.tar.gz
@@ -384,8 +384,8 @@ checkDownload() {
           7) mariadb_ver=${mariadb1011_ver} ;;
         esac
         if [[ "${dbinstallmethod}" == "1" ]]; then
-          FILE_NAME=mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz
-          FILE_TYPE=bintar-linux-systemd-x86_64
+          FILE_NAME=mariadb-${mariadb_ver}-linux-systemd-$(uname -m).tar.gz
+          FILE_TYPE=bintar-linux-systemd-$(uname -m)
         else
           FILE_NAME=mariadb-${mariadb_ver}.tar.gz
           FILE_TYPE=source

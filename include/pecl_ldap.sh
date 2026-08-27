@@ -14,7 +14,7 @@ Install_pecl_ldap() {
     ln -s /usr/lib/${ARCH}-linux-gnu/libldap.so /usr/lib/
     ln -s /usr/lib/${ARCH}-linux-gnu/liblber.so /usr/lib/
     ${php_install_dir}/bin/phpize
-    ./configure --with-php-config=${php_install_dir}/bin/php-config --with-ldap --with-libdir=lib/x86_64-linux-gnu
+    ./configure --with-php-config=${php_install_dir}/bin/php-config --with-ldap --with-libdir=lib/${ARCH}-linux-gnu
     compile_and_install
     popd > /dev/null
     if [ -f "${phpExtensionDir}/ldap.so" ]; then

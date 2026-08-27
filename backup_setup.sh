@@ -5,6 +5,8 @@
 #
 
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+# Machine architecture token for prebuilt binaries (amd64 / arm64)
+M_ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
 clear
 printf "
 #######################################################################
@@ -350,13 +352,8 @@ if [ -n "$(echo ${desc_bk} | grep -w 5)" ]; then
   if [ ! -e "/usr/local/bin/upx" ]; then
     UPX_TMP_DIR=$(mktemp -d /tmp/lnmp_upx.XXXXXX)
     trap "rm -rf $UPX_TMP_DIR" EXIT
-    if [[ "${1}" == y ]]; then
-      wget -qc https://collection.b0.upaiyun.com/softwares/upx/upx_0.4.8_linux_arm64.tar.gz -O $UPX_TMP_DIR/upx_0.4.8_linux_arm64.tar.gz
-      tar xzf $UPX_TMP_DIR/upx_0.4.8_linux_arm64.tar.gz -C $UPX_TMP_DIR/
-    else
-      wget -qc https://collection.b0.upaiyun.com/softwares/upx/upx_0.4.8_linux_amd64.tar.gz -O $UPX_TMP_DIR/upx_0.4.8_linux_x86_64.tar.gz
-      tar xzf $UPX_TMP_DIR/upx_0.4.8_linux_x86_64.tar.gz -C $UPX_TMP_DIR/
-    fi
+    wget -qc https://collection.b0.upaiyun.com/softwares/upx/upx_0.4.8_linux_${M_ARCH}.tar.gz -O $UPX_TMP_DIR/upx_0.4.8_linux_${M_ARCH}.tar.gz
+    tar xzf $UPX_TMP_DIR/upx_0.4.8_linux_${M_ARCH}.tar.gz -C $UPX_TMP_DIR/
     /bin/mv $UPX_TMP_DIR/upx /usr/local/bin/upx
     chmod +x /usr/local/bin/upx
     rm -rf $UPX_TMP_DIR
@@ -391,8 +388,8 @@ if [ -n "$(echo ${desc_bk} | grep -w 6)" ]; then
       wget -qc https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-arm64.tar.gz -O $QSHELL_TMP_DIR/qshell-v2.15.0-linux-arm64.tar.gz
       tar xzf $QSHELL_TMP_DIR/qshell-v2.15.0-linux-arm64.tar.gz -C /usr/local/bin/
     else
-      wget -qc https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-amd64.tar.gz -O $QSHELL_TMP_DIR/qshell-v2.15.0-linux-amd64.tar.gz
-      tar xzf $QSHELL_TMP_DIR/qshell-v2.15.0-linux-amd64.tar.gz -C /usr/local/bin/
+      wget -qc https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-${M_ARCH}.tar.gz -O $QSHELL_TMP_DIR/qshell-v2.15.0-linux-${M_ARCH}.tar.gz
+      tar xzf $QSHELL_TMP_DIR/qshell-v2.15.0-linux-${M_ARCH}.tar.gz -C /usr/local/bin/
     fi
     chmod +x /usr/local/bin/qshell
     rm -rf $QSHELL_TMP_DIR
@@ -551,7 +548,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 8)" ]; then
     if [[ "${1}" == y ]]; then
       wget -qc https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-arm -O /usr/local/bin/dbxcli
     else
-      wget -qc https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-amd64 -O /usr/local/bin/dbxcli
+      wget -qc https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-${M_ARCH} -O /usr/local/bin/dbxcli
     fi
     chmod +x /usr/local/bin/dbxcli
   fi

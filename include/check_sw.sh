@@ -2,6 +2,9 @@
 # Author:  Alpha Eva <kaneawk AT gmail.com>
 # SPDX-License-Identifier: Apache-2.0
 
+# Machine architecture token for binary tarball names ($SYS_ARCH_M / aarch64)
+SYS_ARCH_M=$(uname -m)
+
 installDepsDebian() {
   echo "${CMSG}Removing the conflicting packages...${CEND}"
 
@@ -38,10 +41,10 @@ installDepsDebian() {
   
   # Debian 13+ libaio time64 transition fix (same as Ubuntu 24.04+)
   if [[ "${Debian_ver}" =~ ^1[3-9]$ ]]; then
-    if [ ! -e /usr/lib/x86_64-linux-gnu/libaio.so.1 ]; then
+    if [ ! -e /usr/lib/$SYS_ARCH_M-linux-gnu/libaio.so.1 ]; then
       libaio_src=$(find /usr/lib -name 'libaio.so.1t64*' 2>/dev/null | head -1)
       if [ -n "${libaio_src}" ]; then
-        ln -sf "${libaio_src}" /usr/lib/x86_64-linux-gnu/libaio.so.1
+        ln -sf "${libaio_src}" /usr/lib/$SYS_ARCH_M-linux-gnu/libaio.so.1
         echo "${CMSG}Created libaio.so.1 symlink for Debian 13+ compatibility${CEND}"
       fi
     fi
@@ -81,11 +84,11 @@ installDepsUbuntu() {
   # Ubuntu 24.04+ libaio time64 transition fix
   # The package installs libaio.so.1t64 but MySQL expects libaio.so.1
   if [[ "${Ubuntu_ver}" =~ ^2[4-9]$ ]]; then
-    if [ ! -e /usr/lib/x86_64-linux-gnu/libaio.so.1 ]; then
+    if [ ! -e /usr/lib/$SYS_ARCH_M-linux-gnu/libaio.so.1 ]; then
       # Find the actual libaio library file
       libaio_src=$(find /usr/lib -name 'libaio.so.1t64*' 2>/dev/null | head -1)
       if [ -n "${libaio_src}" ]; then
-        ln -sf "${libaio_src}" /usr/lib/x86_64-linux-gnu/libaio.so.1
+        ln -sf "${libaio_src}" /usr/lib/$SYS_ARCH_M-linux-gnu/libaio.so.1
         echo "${CMSG}Created libaio.so.1 symlink for Ubuntu 24.04+ compatibility${CEND}"
       fi
     fi

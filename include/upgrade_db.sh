@@ -61,10 +61,10 @@ Upgrade_DB() {
     [ "${db_flag}" != 'y' ] && read -e -p "Please input upgrade ${DB} Version(example: ${OLD_db_ver}): " NEW_db_ver
     if [[ "$(echo ${NEW_db_ver} | awk -F. '{print $1"."$2}')" == "$(echo ${OLD_db_ver} | awk -F. '{print $1"."$2}')" ]]; then
       if [[ "${DB}" == MariaDB ]]; then
-        DB_filename=mariadb-${NEW_db_ver}-linux-systemd-x86_64
-        DB_URL=${DOWN_ADDR}/mariadb-${NEW_db_ver}/bintar-linux-systemd-x86_64/${DB_filename}.tar.gz
+        DB_filename=mariadb-${NEW_db_ver}-linux-systemd-$SYS_ARCH_M
+        DB_URL=${DOWN_ADDR}/mariadb-${NEW_db_ver}/bintar-linux-systemd-$SYS_ARCH_M/${DB_filename}.tar.gz
       elif [[ "${DB}" == MySQL ]]; then
-        DB_filename=mysql-${NEW_db_ver}-linux-glibc2.28-x86_64
+        DB_filename=mysql-${NEW_db_ver}-linux-glibc2.28-$SYS_ARCH_M
         DB_URL=${DOWN_ADDR}/MySQL-$(echo ${NEW_db_ver} | awk -F. '{print $1"."$2}')/${DB_filename}.tar.xz
       fi
       local db_archive_file=""

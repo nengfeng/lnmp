@@ -40,6 +40,9 @@ MIRROR_MODE="${MIRROR_MODE:-auto}"
 # 是否验证校验码
 VERIFY_CHECKSUM="${VERIFY_CHECKSUM:-yes}"
 
+# Machine architecture token for binary tarball names (x86_64 / aarch64)
+SYS_ARCH_M=$(uname -m)
+
 # 检测系统架构
 detect_arch() {
   local arch=$(uname -m)
@@ -527,9 +530,9 @@ download_component() {
     local rename_dir_template=$(echo "$line" | cut -d'|' -f8)
     
     # 替换架构变量
-    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g")
-    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g")
-    filename_template=$(echo "$filename_template" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g")
+    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
+    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
+    filename_template=$(echo "$filename_template" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
     
     if [[ "$name" == "$component" ]]; then
       found=1
@@ -656,8 +659,8 @@ list_components() {
     local checksum_type=$(echo "$line" | cut -d'|' -f6)
     
     # 替换架构变量
-    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g")
-    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g")
+    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
+    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
     local ver=$(get_version "$name")
     
     local mirror_status=""

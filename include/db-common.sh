@@ -3,6 +3,9 @@
 # BLOG:  https://github.com/nengfeng/lnmp
 # Description: Common functions for MySQL/MariaDB installation
 
+# Machine architecture token for binary tarball names ($SYS_ARCH_M / aarch64)
+SYS_ARCH_M=$(uname -m)
+
 # ============================================
 # Library Compatibility Functions
 # ============================================
@@ -11,7 +14,7 @@
 # MySQL/MariaDB expects libaio.so.1 but newer distros install libaio.so.1t64
 # Usage: fix_libaio_symlink
 fix_libaio_symlink() {
-  local libaio_target="/usr/lib/x86_64-linux-gnu/libaio.so.1"
+  local libaio_target="/usr/lib/$SYS_ARCH_M-linux-gnu/libaio.so.1"
   
   # Check if libaio.so.1 already exists
   if [ -e "${libaio_target}" ]; then
@@ -115,7 +118,7 @@ wait_for_db_ready() {
 install_mysql_binary() {
   local mysql_ver=$1
   local install_dir=$2
-  local tarball="mysql-${mysql_ver}-linux-glibc2.28-x86_64.tar.xz"
+  local tarball="mysql-${mysql_ver}-linux-glibc2.28-$SYS_ARCH_M.tar.xz"
 
   echo "${CMSG}[install_mysql_binary] Starting MySQL ${mysql_ver} installation...${CEND}"
   echo "${CMSG}[install_mysql_binary] Current dir: $(pwd)${CEND}"
@@ -148,7 +151,7 @@ install_mysql_binary() {
     return 1
   }
 
-  local src_dir="mysql-${mysql_ver}-linux-glibc2.28-x86_64"
+  local src_dir="mysql-${mysql_ver}-linux-glibc2.28-$SYS_ARCH_M"
   if [ ! -d "$src_dir" ]; then
     echo "${CERROR}Expected directory ${src_dir} not found after extraction${CEND}"
     echo "${CERROR}Contents of current dir: $(ls -la)${CEND}"
@@ -215,7 +218,7 @@ cleanup_mysql_files() {
   local method=$2
   
   if [[ "${method}" == "1" ]]; then
-    rm -rf mysql-${mysql_ver}-*-x86_64
+    rm -rf mysql-${mysql_ver}-*-$SYS_ARCH_M
   elif [[ "${method}" == "2" ]]; then
     local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
     rm -rf mysql-${mysql_ver} boost_${boostVersion2}
@@ -268,17 +271,17 @@ setup_mysql_root() {
 install_mariadb_binary() {
   local mariadb_ver=$1
   local install_dir=$2
-  local tarball="mariadb-${mariadb_ver}-linux-systemd-x86_64.tar.gz"
+  local tarball="mariadb-${mariadb_ver}-linux-systemd-$SYS_ARCH_M.tar.gz"
 
   # Download if not present
   if [ ! -f "$tarball" ]; then
     echo "${CWARNING}MariaDB tarball not found, downloading...${CEND}"
     # Try mirror first (faster in China)
-    local mirror_url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mariadb/mariadb-${mariadb_ver}/bintar-linux-systemd-x86_64/${tarball}"
+    local mirror_url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mariadb/mariadb-${mariadb_ver}/bintar-linux-systemd-$SYS_ARCH_M/${tarball}"
     echo "${CMSG}Downloading: ${mirror_url}${CEND}"
     if ! wget --timeout=60 --tries=3 -O "$tarball" "$mirror_url" 2>/dev/null; then
       # Try official CDN
-      local url="https://dlm.mariadb.org/MariaDB/mariadb-${mariadb_ver}/bintar-linux-systemd-x86_64/${tarball}"
+      local url="https://dlm.mariadb.org/MariaDB/mariadb-${mariadb_ver}/bintar-linux-systemd-$SYS_ARCH_M/${tarball}"
       echo "${CMSG}Trying official: ${url}${CEND}"
       wget --timeout=60 --tries=3 -O "$tarball" "$url" || {
         echo "${CERROR}Failed to download MariaDB ${mariadb_ver}.${CEND}"
@@ -295,7 +298,7 @@ install_mariadb_binary() {
     return 1
   }
 
-  local src_dir="mariadb-${mariadb_ver}-linux-systemd-x86_64"
+  local src_dir="mariadb-${mariadb_ver}-linux-systemd-$SYS_ARCH_M"
   if [ ! -d "$src_dir" ]; then
     echo "${CERROR}Expected directory ${src_dir} not found after extraction${CEND}"
     return 1
@@ -362,7 +365,7 @@ cleanup_mariadb_files() {
   local method=$2
   
   if [[ "${method}" == "1" ]]; then
-    rm -rf mariadb-${mariadb_ver}-linux-systemd-x86_64
+    rm -rf mariadb-${mariadb_ver}-linux-systemd-$SYS_ARCH_M
   elif [[ "${method}" == "2" ]]; then
     local boostVersion2=$(echo ${boost_oldver} | awk -F. '{print $1"_"$2"_"$3}')
     rm -rf mariadb-${mariadb_ver} boost_${boostVersion2}
