@@ -20,9 +20,20 @@ Upgrade_Script() {
       return 1
     fi
 
-    # Merge user settings into the NEW options.conf, then overlay the tree
+    # Merge user settings into the NEW options.conf, then overlay the tree.
+    # Use delete-and-append, NOT `sed s|||`: the sed replacement field expands
+    # '&' to the whole match and '|' terminates the substitution — quoted
+    # passwords like dbrootpwd='p&ss|word' (written by install.sh) get
+    # corrupted. Keys absent from the new template (user-custom) are
+    # preserved via the same append path. printf, not echo: echo eats
+    # backslashes in values.
+    /bin/cp -a ./options.conf "./options.conf.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
     grep -vE '^#|^$' ./options.conf | while IFS='=' read -r Key Value; do
-      [ -n "${Key}" ] && sed -i "s|^${Key}=.*|${Key}=${Value}|" "${UPGRADE_TMP_DIR}/lnmp/options.conf"
+      [[ "${Key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      [ -z "${Key}" ] && continue
+      grep -v "^${Key}=" "${UPGRADE_TMP_DIR}/lnmp/options.conf" > "${UPGRADE_TMP_DIR}/lnmp/options.conf.new" 2>/dev/null \
+        && mv "${UPGRADE_TMP_DIR}/lnmp/options.conf.new" "${UPGRADE_TMP_DIR}/lnmp/options.conf"
+      printf '%s\n' "${Key}=${Value}" >> "${UPGRADE_TMP_DIR}/lnmp/options.conf"
     done
     /bin/cp -R "${UPGRADE_TMP_DIR}/lnmp/"* "${current_dir}/"
     rm -rf "${UPGRADE_TMP_DIR}"
