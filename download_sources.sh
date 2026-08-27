@@ -183,7 +183,6 @@ get_version() {
     php83)          ver=${VERSIONS[php83_ver]} ;;
     php84)          ver=${VERSIONS[php84_ver]} ;;
     php85)          ver=${VERSIONS[php85_ver]} ;;
-    libiconv)       ver=${VERSIONS[libiconv_ver]} ;;
     curl)           ver=${VERSIONS[curl_ver]} ;;
     freetype)       ver=${VERSIONS[freetype_ver]} ;;
     libsodium)      ver=${VERSIONS[libsodium_ver]} ;;
@@ -723,7 +722,6 @@ download_common() {
     "pcre"
     "nghttp2"
     "php"
-    "libiconv"
     "curl"
     "freetype"
     "libsodium"

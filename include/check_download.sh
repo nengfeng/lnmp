@@ -164,8 +164,8 @@ verify_md5_with_retry() {
     return 1
   }
   
-  local expected_md5=$(awk '{print $1}' "${file_name}.md5")
-  [ -z "$expected_md5" ] && expected_md5=$(curl -s "$md5_url" | grep "$file_name" | awk '{print $1}')
+  local expected_md5=$(awk -v f="$file_name" '$2==f || $0 ~ f {print $1; exit}' "${file_name}.md5")
+  [ -z "$expected_md5" ] && expected_md5=$(curl -s "$md5_url" | grep -w "$file_name" | awk '{print $1}')
   
   if [ -z "$expected_md5" ]; then
     echo "${CFAILURE}Could not extract MD5 from file${CEND}"
@@ -416,12 +416,7 @@ checkDownload() {
   # ============================================
   if [[ "${php_option}" =~ ^[1-3]$ ]] || [[ "${mphp_ver}" =~ ^8[3-5]$ ]]; then
     echo "PHP dependencies..."
-    # libiconv - ✅ Confirmed on mirror
-    local official_url="https://ftp.gnu.org/gnu/libiconv/libiconv-${libiconv_ver}.tar.gz"
-    local china_url="${MIRROR_BASE_URL}/gnu/libiconv/libiconv-${libiconv_ver}.tar.gz"
-    src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
-    Download_src
-
+    # libiconv: no longer downloaded — PHP uses glibc iconv (no GNU libiconv needed)
     # curl (official only)
     src_url="https://curl.se/download/curl-${curl_ver}.tar.gz"
     Download_src

@@ -19,6 +19,17 @@ src/*.tar.bz2
 src/*.tgz
 src/*.zip
 
+# 校验文件与签名 (运行时下载)
+src/*.asc
+src/*.sig
+src/*.sha256
+src/*.sha512
+src/*.md5
+src/SHASUMS256.txt
+
+# 解压后的源码目录 (运行时生成)
+src/*/
+
 # 保留的文件 (补丁和证书)
 !src/cacert.pem
 !src/*.patch

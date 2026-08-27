@@ -26,7 +26,8 @@ pushd ${current_dir} > /dev/null
 Show_Help() {
   echo
   echo "Usage: $0  command ...[parameters]....
-  --quiet, -q                   quiet operation
+  --quiet, -q                   quiet operation (skip prompts)
+  --yes, -y                     confirm uninstall (required in quiet mode)
   --all                         Uninstall All
   --web                         Uninstall Nginx/Tengine/OpenResty
   --mysql                       Uninstall MySQL/MariaDB
@@ -55,6 +56,9 @@ while [ $# -gt 0 ]; do
       ;;
     -q|--quiet)
       quiet_flag=y
+      shift 1
+      ;;
+    --yes|-y)
       uninstall_flag=y
       shift 1
       ;;
@@ -148,6 +152,10 @@ Uninstall_status() {
         break
       fi
     done
+  elif [ "${uninstall_flag}" != 'y' ]; then
+    # quiet mode must be confirmed explicitly, otherwise a stray -q wipes data with no prompt
+    echo "${CFAILURE}Quiet mode requires an explicit confirmation: pass --yes to uninstall.${CEND}"
+    exit 1
   fi
 }
 
@@ -177,8 +185,8 @@ Uninstall_Web() {
     rm -f /etc/ld.so.conf.d/luajit.conf
     ldconfig 2>/dev/null
   fi
-  if [ -e "${wwwroot_dir}" ]; then
-    read -e -p "Move ${wwwroot_dir} to ${wwwroot_dir}_bak? (y/n): " move_www
+   if [ -e "${wwwroot_dir}" ]; then
+    if [ "${quiet_flag}" == 'y' ]; then move_www=y; else read -e -p "Move ${wwwroot_dir} to ${wwwroot_dir}_bak? (y/n): " move_www; fi
     [[ "${move_www}" == "y" ]] && /bin/mv "${wwwroot_dir}" "${wwwroot_dir}_$(date +%Y%m%d%H)"
   fi
   sed -i 's@^website_name=.*@website_name=@' ./options.conf
@@ -214,7 +222,7 @@ Uninstall_MySQL() {
     rm -f /etc/ld.so.conf.d/*mysql*.conf /etc/ld.so.conf.d/*mariadb*.conf
     id -u mysql >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mysql
     if [ -e "${db_data_dir}" ]; then
-      read -e -p "Move ${db_data_dir} to ${db_data_dir}_bak? (y/n): " move_db
+      if [ "${quiet_flag}" == 'y' ]; then move_db=y; else read -e -p "Move ${db_data_dir} to ${db_data_dir}_bak? (y/n): " move_db; fi
       [[ "${move_db}" == "y" ]] && /bin/mv "${db_data_dir}" "${db_data_dir}_$(date +%Y%m%d%H)"
     fi
     sed -i 's@^dbrootpwd=.*@dbrootpwd=@' ./options.conf
@@ -232,7 +240,7 @@ Uninstall_PostgreSQL() {
     [ -e "${php_install_dir}/etc/php.d/07-pgsql.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-pgsql.ini"
     id -u postgres >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel postgres
     if [ -e "${pgsql_data_dir}" ]; then
-      read -e -p "Move ${pgsql_data_dir} to ${pgsql_data_dir}_bak? (y/n): " move_pg
+      if [ "${quiet_flag}" == 'y' ]; then move_pg=y; else read -e -p "Move ${pgsql_data_dir} to ${pgsql_data_dir}_bak? (y/n): " move_pg; fi
       [[ "${move_pg}" == "y" ]] && /bin/mv "${pgsql_data_dir}" "${pgsql_data_dir}_$(date +%Y%m%d%H)"
     fi
     sed -i 's@^dbpostgrespwd=.*@dbpostgrespwd=@' ./options.conf
@@ -251,7 +259,7 @@ Uninstall_MongoDB() {
     [ -e "${php_install_dir}/etc/php.d/07-mongodb.ini" ] && rm -f "${php_install_dir}/etc/php.d/07-mongodb.ini"
     id -u mongod >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mongod
     if [ -e "${mongo_data_dir}" ]; then
-      read -e -p "Move ${mongo_data_dir} to ${mongo_data_dir}_bak? (y/n): " move_mongo
+      if [ "${quiet_flag}" == 'y' ]; then move_mongo=y; else read -e -p "Move ${mongo_data_dir} to ${mongo_data_dir}_bak? (y/n): " move_mongo; fi
       [[ "${move_mongo}" == "y" ]] && /bin/mv "${mongo_data_dir}" "${mongo_data_dir}_$(date +%Y%m%d%H)"
     fi
     sed -i 's@^dbmongopwd=.*@dbmongopwd=@' ./options.conf
@@ -417,7 +425,16 @@ Print_phpMyAdmin() {
 }
 
 Uninstall_phpMyAdmin() {
-  [ -d "${wwwroot_dir}/default/phpMyAdmin" ] && rm -rf ${wwwroot_dir}/default/phpMyAdmin
+  if [ -d "${wwwroot_dir}/default/phpMyAdmin" ]; then
+    # README promises data dirs are renamed to a timestamped backup, never deleted
+    if [ "${quiet_flag}" == 'y' ]; then
+      /bin/mv "${wwwroot_dir}/default/phpMyAdmin" "${wwwroot_dir}/default/phpMyAdmin_$(date +%Y%m%d%H)"
+      echo "${CMSG}phpMyAdmin moved to backup (phpMyAdmin_$(date +%Y%m%d%H))${CEND}"
+    else
+      read -e -p "Move ${wwwroot_dir}/default/phpMyAdmin to ${wwwroot_dir}/default/phpMyAdmin_bak? (y/n): " move_pma
+      [[ "${move_pma}" == "y" ]] && /bin/mv "${wwwroot_dir}/default/phpMyAdmin" "${wwwroot_dir}/default/phpMyAdmin_$(date +%Y%m%d%H)"
+    fi
+  fi
 }
 
 Print_openssl() {

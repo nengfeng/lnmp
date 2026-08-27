@@ -27,6 +27,8 @@ Puredbfile=${pureftpd_install_dir}/etc/pureftpd.pdb
 Passwdfile=${pureftpd_install_dir}/etc/pureftpd.passwd
 FTP_bin=${pureftpd_install_dir}/bin/pure-pw
 [ -z "$(grep ^PureDB ${FTP_conf})" ] && { echo "${CFAILURE}pure-ftpd is not own password database${CEND}" ; exit 1; }
+# Never leave the plaintext-password temp file behind
+trap 'rm -f "${FTP_tmp_passfile}"' EXIT
 
 ARG_NUM=$#
 Show_Help() {
@@ -61,6 +63,9 @@ while [ $# -gt 0 ]; do
       ;;
     --delete|--userdel)
       userdel_flag=y; shift 1
+      ;;
+    -y|--yes)
+      yes_flag=y; shift 1
       ;;
     --list|--listalluser)
       listalluser_flag=y; shift 1
@@ -108,7 +113,7 @@ PASSWORD() {
     fi
     [ -n "$(echo ${Password} | grep '[+|&]')" ] && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
     if (( ${#Password} >= 5 )); then
-      printf "%b" "${Password}\n${Password}\n" > ${FTP_tmp_passfile}
+      # password is passed straight to pure-pw via stdin; never written to disk
       break
     else
       echo "${CWARNING}Ftp password least 5 characters! ${CEND}"
@@ -135,7 +140,7 @@ UserAdd() {
   USER
   [ -e "${Passwdfile}" ] && [ -n "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] is already existed! ${CEND}"; exit 1; }
   PASSWORD;DIRECTORY
-  ${FTP_bin} useradd ${User} -f ${Passwdfile} -u ${run_user} -g ${run_group} -d ${Directory} -m < ${FTP_tmp_passfile}
+  printf '%s\n%s\n' "${Password}" "${Password}" | ${FTP_bin} useradd ${User} -f ${Passwdfile} -u ${run_user} -g ${run_group} -d ${Directory} -m
   ${FTP_bin} mkdb ${Puredbfile} -f ${Passwdfile} > /dev/null 2>&1
   echo "#####################################"
   echo
@@ -166,7 +171,7 @@ UserPasswd() {
   USER
   [ -e "${Passwdfile}" ] && [ -z "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1; }
   PASSWORD
-  ${FTP_bin} passwd ${User} -f ${Passwdfile} -m < ${FTP_tmp_passfile}
+  printf '%s\n%s\n' "${Password}" "${Password}" | ${FTP_bin} passwd ${User} -f ${Passwdfile} -m
   ${FTP_bin} mkdb ${Puredbfile} -f ${Passwdfile} > /dev/null 2>&1
   echo "#####################################"
   echo
@@ -186,6 +191,10 @@ UserDel() {
 
   USER
   [ -e "${Passwdfile}" ] && [ -z "$(grep ^${User}: ${Passwdfile})" ] && { echo "${CQUESTION}[${User}] was not existed! ${CEND}"; exit 1; }
+  if [ "${yes_flag}" != 'y' ]; then
+    read -e -p "Confirm delete FTP user [${User}]? [y/n]: " del_confirm
+    [[ "${del_confirm}" != "y" ]] && { echo "${CWARNING}Aborted.${CEND}"; exit 1; }
+  fi
   ${FTP_bin} userdel ${User} -f ${Passwdfile} -m
   ${FTP_bin} mkdb ${Puredbfile} -f ${Passwdfile} > /dev/null 2>&1
   echo

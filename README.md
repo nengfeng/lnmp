@@ -277,7 +277,7 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 
 ```bash
 ./uninstall.sh                   # 交互式卸载
-./uninstall.sh --all --quiet     # 静默全部卸载
+./uninstall.sh --all --quiet --yes  # 静默全部卸载（--yes 显式确认）
 ```
 
 数据目录会重命名为带时间戳的备份，不会直接删除。

@@ -375,7 +375,7 @@ install_php_source() {
     local argon2_arg='--with-password-argon2'
   fi
   
-  ICONV_PLUG=1 ./configure --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) --prefix=${install_dir} --with-config-file-path=${install_dir}/etc \
+  php_cv_iconv_errno=yes ac_cv_lib_iconv_libiconv_open=no ./configure --build=$(dpkg-architecture -qDEB_BUILD_GNU_TYPE) --prefix=${install_dir} --with-config-file-path=${install_dir}/etc \
     --with-config-file-scan-dir=${install_dir}/etc/php.d \
     --with-fpm-user=${run_user} --with-fpm-group=${run_group} --enable-fpm ${phpcache_arg} --disable-fileinfo \
     --enable-mysqlnd --with-mysqli=mysqlnd --with-pdo-mysql=mysqlnd \

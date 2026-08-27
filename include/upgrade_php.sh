@@ -105,9 +105,10 @@ ROLLBACK_EOF
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
     # Get original configure command and fix iconv settings
     local configure_cmd=$(${php_install_dir}/bin/php -i | grep 'Configure Command' | awk -F'=>' '{print $2}')
-    # Fix iconv: remove any path after --with-iconv= and add ICONV_PLUG=1
+    # Fix iconv: use glibc's iconv (bare --with-iconv, no GNU libiconv path/plug)
     configure_cmd=$(echo "${configure_cmd}" | sed 's|--with-iconv=[^ ]*|--with-iconv|g')
-    ICONV_PLUG=1 bash -c "${configure_cmd}"
+    # Force glibc iconv: do NOT link GNU libiconv even if present on the system
+    php_cv_iconv_errno=yes ac_cv_lib_iconv_libiconv_open=no bash -c "${configure_cmd}"
     make -j ${THREAD}
     
     # ========== 【新增】编译后验证 ==========

@@ -327,10 +327,7 @@ else
   check_failed=$((check_failed + 1))
 fi
 
-# --- libiconv ---
-check_latest "libiconv" "$libiconv_ver" \
-  "https://ftp.gnu.org/pub/gnu/libiconv/" \
-  'libiconv-\K[0-9]+\.[0-9]+' "sort -V | tail -1" libiconv_ver
+# libiconv: skipped — PHP uses glibc iconv (no GNU libiconv download needed)
 
 # --- memcached (web scraping tags page) ---
 memcached_latest=$(gh_tags "memcached/memcached" "^[0-9]+\.[0-9]+\.[0-9]+$")
