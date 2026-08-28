@@ -151,11 +151,11 @@ ROLLBACK_EOF
     fi
     # ========================================
     
-    popd > /dev/null
+    popd > /dev/null || true
     echo "You have ${CMSG}successfully${CEND} upgraded from ${CWARNING}$OLD_php_ver${CEND} to ${CWARNING}${NEW_php_ver}${CEND}"
     echo "${CYELLOW}Backup location: ${BACKUP_DIR}${CEND}"
     echo "${CYELLOW}To rollback, run: ${BACKUP_DIR}/rollback.sh${CEND}"
     rm -rf php-${NEW_php_ver}
   fi
-  popd > /dev/null
+  popd > /dev/null || true
 }
