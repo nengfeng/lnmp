@@ -24,8 +24,8 @@ pgsql16_ver=16.15
 
 # PHP
 php83_ver=8.3.33
-php84_ver=8.4.24
-php85_ver=8.5.9
+php84_ver=8.4.25
+php85_ver=8.5.10
 
 # Nodejs
 nodejs_ver=20.20.2
@@ -44,7 +44,7 @@ imagemagick_ver=7.1.2-13
 imagick_ver=3.8.1
 zendopcache_ver=7.0.5
 apcu_ver=5.1.28
-phalcon_ver=5.20.1
+phalcon_ver=5.20.3
 yaf_ver=3.3.6
 yar_ver=2.3.4
 swoole_ver=6.2.2
@@ -64,7 +64,7 @@ pecl_memcached_ver=3.4.0
 pecl_memcache_ver=8.2
 
 # MongoDB
-pecl_mongodb_ver=2.4.0
+pecl_mongodb_ver=2.4.1
 
 # phpMyadmin
 phpmyadmin_ver=5.2.3
