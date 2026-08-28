@@ -113,8 +113,9 @@ ROLLBACK_EOF
     
     # ========== 【新增】编译后验证 ==========
     echo "Verifying compiled PHP binary..."
-    if ! "objs/php" -v > /dev/null 2>&1; then
+    if ! out=$("sapi/cli/php" -v 2>&1); then
       echo "${CFAILURE}Compilation verification failed! Rolling back...${CEND}"
+      echo "${out}" | head -10
       # 注意：此时 php-fpm 还在运行，不需要启动
       popd > /dev/null
       rm -rf php-${NEW_php_ver}
