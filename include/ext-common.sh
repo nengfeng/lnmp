@@ -54,8 +54,9 @@ install_php_ext() {
   local func2=$(echo "$spec" | cut -d'|' -f3)
 
   . include/${script}
+  local rc
   ${func1} 2>&1 | tee -a ${current_dir}/install.log
-  local rc=${PIPESTATUS[0]}
+  rc=${PIPESTATUS[0]}
   [ ${rc} -ne 0 ] && return ${rc}
   # Only call func2 if it's an install function (starts with Install_)
   if [[ -n "$func2" && "$func2" == Install_* ]]; then
@@ -63,6 +64,9 @@ install_php_ext() {
     rc=${PIPESTATUS[0]}
     [ ${rc} -ne 0 ] && return ${rc}
   fi
+  # Explicit success: a trailing '[ ... ] && return' list evaluates to 1
+  # when the condition is false and would leak as the function's status
+  return 0
 }
 
 # Uninstall a single PHP extension
@@ -95,13 +99,18 @@ ext_enabled() {
 }
 
 # Install all enabled PHP extensions
+# Stops at the first failure and returns its exit code
 # Usage: install_enabled_exts [log_prefix]
 install_enabled_exts() {
+  local rc=0
   for ext in "${!EXT_SCRIPTS[@]}"; do
     if ext_enabled "$ext"; then
       install_php_ext "$ext"
+      rc=$?
+      [ ${rc} -ne 0 ] && return ${rc}
     fi
   done
+  return 0
 }
 
 # Uninstall all enabled PHP extensions
