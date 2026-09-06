@@ -221,6 +221,21 @@ parse_args() {
 
 parse_args "$@"
 
+# Run an install step with logging to install.log and abort the whole
+# install on failure (the old pipeline never checked the exit code, so a
+# failed MySQL/PHP compile was followed by a bogus "Congratulations").
+# Usage: run_step <step_name> <command...>
+run_step() {
+  local step_name=$1; shift
+  "$@" 2>&1 | tee -a ${current_dir}/install.log
+  local rc=${PIPESTATUS[0]}
+  if [ ${rc} -ne 0 ]; then
+    echo
+    echo "${CFAILURE}Install ${step_name} failed (exit ${rc})! Aborting. See ${current_dir}/install.log for details. ${CEND}"
+    exit ${rc}
+  fi
+}
+
 # Check md5sum (only for tarball installations)
 [ -e "${current_dir}.tar.gz" ] && tool_file=${current_dir}.tar.gz
 [ -e "${current_dir}-full.tar.gz" ] && tool_file=${current_dir}-full.tar.gz
@@ -458,7 +473,7 @@ esac
 [[ "${armplatform}" == "y" ]] && dbinstallmethod=2
 # PostgreSQL non-interactive defaults (interactive menu sets these at runtime)
 [[ "${db_option}" == 8 && -z "${pgsql_ver}" ]] && pgsql_ver=${pgsql18_ver}
-checkDownload 2>&1 | tee -a ${current_dir}/install.log
+run_step checkDownload checkDownload
 
 # get OS Memory
 . ./include/memory.sh
@@ -468,34 +483,34 @@ if [ ! -e "${HOME}/.lnmp" ]; then
   . ./include/check_sw.sh
   case "${Family}" in
     "debian")
-      installDepsDebian 2>&1 | tee ${current_dir}/install.log
-      . include/init_Debian.sh 2>&1 | tee -a ${current_dir}/install.log
+      run_step installDepsDebian installDepsDebian
+      run_step include/init_Debian.sh . include/init_Debian.sh
       ;;
     "ubuntu")
-      installDepsUbuntu 2>&1 | tee ${current_dir}/install.log
-      . include/init_Ubuntu.sh 2>&1 | tee -a ${current_dir}/install.log
+      run_step installDepsUbuntu installDepsUbuntu
+      run_step include/init_Ubuntu.sh . include/init_Ubuntu.sh
       ;;
   esac
   # Install dependencies from source package
-  installDepsBySrc 2>&1 | tee -a ${current_dir}/install.log
+  run_step installDepsBySrc installDepsBySrc
 fi
 
 # start Time
 startTime=$(date +%s)
 
 # openSSL
-Install_openSSL | tee -a ${current_dir}/install.log
+run_step Install_openSSL Install_openSSL
 
 # Memory allocator (tcmalloc / jemalloc / none)
 if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-8]$ ]]; then
   case "${allocator_option}" in
     2)
       . include/tcmalloc.sh
-      Install_Tcmalloc | tee -a ${current_dir}/install.log
+      run_step Install_Tcmalloc Install_Tcmalloc
       ;;
     3)
       . include/jemalloc.sh
-      Install_Jemalloc | tee -a ${current_dir}/install.log
+      run_step Install_Jemalloc Install_Jemalloc
       ;;
   esac
 fi
@@ -504,35 +519,35 @@ fi
 case "${db_option}" in
   1)
     . include/mysql-9.7.sh
-    Install_MySQL97 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_MySQL97 Install_MySQL97
     ;;
   2)
     . include/mysql-8.4.sh
-    Install_MySQL84 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_MySQL84 Install_MySQL84
     ;;
   3)
     . include/mysql-8.0.sh
-    Install_MySQL80 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_MySQL80 Install_MySQL80
     ;;
   4)
     . include/mariadb-12.3.sh
-    Install_MariaDB123 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_MariaDB123 Install_MariaDB123
     ;;
   5)
     . include/mariadb-11.8.sh
-    Install_MariaDB118 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_MariaDB118 Install_MariaDB118
     ;;
   6)
     . include/mariadb-11.4.sh
-    Install_MariaDB114 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_MariaDB114 Install_MariaDB114
     ;;
   7)
     . include/mariadb-10.11.sh
-    Install_MariaDB1011 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_MariaDB1011 Install_MariaDB1011
     ;;
   8)
     . include/postgresql.sh
-    Install_PostgreSQL 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_PostgreSQL Install_PostgreSQL
     ;;
 esac
 
@@ -540,15 +555,15 @@ esac
 case "${php_option}" in
   1)
     . include/php-8.3.sh
-    Install_PHP83 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_PHP83 Install_PHP83
     ;;
   2)
     . include/php-8.4.sh
-    Install_PHP84 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_PHP84 Install_PHP84
     ;;
   3)
     . include/php-8.5.sh
-    Install_PHP85 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_PHP85 Install_PHP85
     ;;
 esac
 
@@ -557,11 +572,11 @@ PHP_addons() {
   case "${phpcache_option}" in
     1)
       . include/zendopcache.sh
-      Install_ZendOPcache 2>&1 | tee -a ${current_dir}/install.log
+      run_step Install_ZendOPcache Install_ZendOPcache
       ;;
     2)
       . include/apcu.sh
-      Install_APCU 2>&1 | tee -a ${current_dir}/install.log
+      run_step Install_APCU Install_APCU
       ;;
   esac
 
@@ -571,7 +586,7 @@ PHP_addons() {
   # pecl_pgsql (special case: depends on PostgreSQL being installed)
   if [ -e "${pgsql_install_dir}/bin/psql" ]; then
     . include/pecl_pgsql.sh
-    Install_pecl_pgsql 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_pecl_pgsql Install_pecl_pgsql
   fi
 }
 
@@ -579,7 +594,7 @@ PHP_addons() {
 
 if [[ "${mphp_flag}" == y ]]; then
   . include/mphp.sh
-  Install_MPHP 2>&1 | tee -a ${current_dir}/install.log
+  run_step Install_MPHP Install_MPHP
   PHP_addons
 fi
 
@@ -621,52 +636,52 @@ fi
 case "${nginx_option}" in
   1)
     . include/nginx.sh
-    Install_Nginx 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_Nginx Install_Nginx
     ;;
   2)
     . include/tengine.sh
-    Install_Tengine 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_Tengine Install_Tengine
     ;;
   3)
     . include/openresty.sh
-    Install_OpenResty 2>&1 | tee -a ${current_dir}/install.log
+    run_step Install_OpenResty Install_OpenResty
     ;;
 esac
 
 # Nodejs
 if [[ "${nodejs_flag}" == y ]]; then
   . include/nodejs.sh
-  Install_Nodejs 2>&1 | tee -a ${current_dir}/install.log
+  run_step Install_Nodejs Install_Nodejs
 fi
 
 # Pure-FTPd
 if [[ "${pureftpd_flag}" == y ]]; then
   . include/pureftpd.sh
-  Install_PureFTPd 2>&1 | tee -a ${current_dir}/install.log
+  run_step Install_PureFTPd Install_PureFTPd
 fi
 
 # phpMyAdmin
 if [[ "${phpmyadmin_flag}" == y ]]; then
   . include/phpmyadmin.sh
-  Install_phpMyAdmin 2>&1 | tee -a ${current_dir}/install.log
+  run_step Install_phpMyAdmin Install_phpMyAdmin
 fi
 
 # redis
 if [[ "${redis_flag}" == y ]]; then
   . include/redis.sh
-  Install_redis_server 2>&1 | tee -a ${current_dir}/install.log
+  run_step Install_redis_server Install_redis_server
 fi
 
 # memcached
 if [[ "${memcached_flag}" == y ]]; then
   . include/memcached.sh
-  Install_memcached_server 2>&1 | tee -a ${current_dir}/install.log
+  run_step Install_memcached_server Install_memcached_server
 fi
 
 # index example
 if [ -d "${wwwroot_dir}/default" ]; then
   . include/demo.sh
-  DEMO 2>&1 | tee -a ${current_dir}/install.log
+  run_step DEMO DEMO
 fi
 
 # get web_install_dir and db_install_dir
