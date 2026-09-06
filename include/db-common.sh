@@ -473,7 +473,13 @@ config_my_cnf_scenario() {
     local log_size=$((${innodb_buf} / 8))
     [ ${log_size} -lt 32 ] && log_size=32
     [ ${log_size} -gt 256 ] && log_size=256
-    sed -i "s@^innodb_log_file_size.*@innodb_log_file_size = ${log_size}M@" ${cnf_file}
+    # MySQL 8.4+/9.7 replaced innodb_log_file_size with innodb_redo_log_capacity;
+    # detect by presence of the new param (even commented) in the template.
+    if grep -q 'innodb_redo_log_capacity' "${cnf_file}"; then
+      sed -i "s@^#*innodb_redo_log_capacity.*@innodb_redo_log_capacity = ${log_size}M@" "${cnf_file}"
+    else
+      sed -i "s@^innodb_log_file_size.*@innodb_log_file_size = ${log_size}M@" "${cnf_file}"
+    fi
     sed -i 's@^innodb_log_buffer_size.*@innodb_log_buffer_size = 8M@' ${cnf_file}
     
     # Add innodb_flush_method if not exists
@@ -543,7 +549,12 @@ config_my_cnf_scenario() {
     sed -i 's@^#innodb_buffer_pool_instances.*@innodb_buffer_pool_instances = 1@' ${cnf_file} 2>/dev/null
     
     # Log file size
-    sed -i 's@^innodb_log_file_size.*@innodb_log_file_size = 32M@' ${cnf_file}
+    # MySQL 8.4+/9.7 replaced innodb_log_file_size with innodb_redo_log_capacity.
+    if grep -q 'innodb_redo_log_capacity' "${cnf_file}"; then
+      sed -i 's@^#*innodb_redo_log_capacity.*@innodb_redo_log_capacity = 32M@' "${cnf_file}"
+    else
+      sed -i 's@^innodb_log_file_size.*@innodb_log_file_size = 32M@' "${cnf_file}"
+    fi
     sed -i 's@^innodb_log_buffer_size.*@innodb_log_buffer_size = 2M@' ${cnf_file}
     
     # Add innodb_flush_method if not exists
@@ -690,7 +701,7 @@ innodb_flush_log_at_trx_commit = 2
 # Note: Value 2 may lose up to 1 second of data on crash. For production, use 1 for full ACID compliance.
 # This default will be adjusted by config_my_cnf_scenario() based on server_scenario setting
 innodb_log_buffer_size = 2M
-#innodb_redo_log_capacity = 2G
+innodb_redo_log_capacity = 2G
 innodb_max_dirty_pages_pct = 75
 innodb_lock_wait_timeout = 120
 
