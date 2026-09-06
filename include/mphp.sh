@@ -27,6 +27,11 @@ Install_MPHP() {
           exit 1
           ;;
       esac
+      rc=${PIPESTATUS[0]}
+      if [ ${rc} -ne 0 ]; then
+        echo "${CFAILURE}PHP${mphp_ver} installation failed (exit ${rc}). Aborting.${CEND}"
+        return ${rc}
+      fi
       if [ -e "${php_install_dir}/sbin/php-fpm" ]; then
         svc_stop php-fpm
         sed -i "s@/dev/shm/php-cgi.sock@/dev/shm/php${mphp_ver}-cgi.sock@" ${php_install_dir}/etc/php-fpm.conf
