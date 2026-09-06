@@ -581,7 +581,7 @@ PHP_addons() {
   esac
 
   # Install all enabled PHP extensions (unified)
-  install_enabled_exts
+  run_step install_enabled_exts install_enabled_exts
 
   # pecl_pgsql (special case: depends on PostgreSQL being installed)
   if [ -e "${pgsql_install_dir}/bin/psql" ]; then

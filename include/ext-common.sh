@@ -55,8 +55,14 @@ install_php_ext() {
 
   . include/${script}
   ${func1} 2>&1 | tee -a ${current_dir}/install.log
+  local rc=${PIPESTATUS[0]}
+  [ ${rc} -ne 0 ] && return ${rc}
   # Only call func2 if it's an install function (starts with Install_)
-  [[ -n "$func2" && "$func2" == Install_* ]] && ${func2} 2>&1 | tee -a ${current_dir}/install.log
+  if [[ -n "$func2" && "$func2" == Install_* ]]; then
+    ${func2} 2>&1 | tee -a ${current_dir}/install.log
+    rc=${PIPESTATUS[0]}
+    [ ${rc} -ne 0 ] && return ${rc}
+  fi
 }
 
 # Uninstall a single PHP extension
