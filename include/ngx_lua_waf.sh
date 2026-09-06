@@ -48,19 +48,19 @@ Nginx_lua_waf() {
     src_url=https://nginx.org/download/nginx-${nginx_ver}.tar.gz && Download_src
     src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
     src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
-    src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/0.3.3.tar.gz" && Download_src
-    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/${lua_nginx_module_ver}.tar.gz" && Download_src
+    src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
+    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
     tar xzf nginx-${nginx_ver}.tar.gz
     tar xzf openssl-${openssl_ver}.tar.gz
     tar xzf pcre2-${pcre_ver}.tar.gz
-    tar xzf ngx_devel_kit.tar.gz
+    tar xzf ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz
     tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
     pushd nginx-${nginx_ver}
     make clean
     sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' auto/cc/gcc # close debug
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
-    ./configure ${nginx_configure_args} --with-ld-opt="-Wl,-rpath,/usr/local/lib" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit
+    ./configure ${nginx_configure_args} --with-ld-opt="-Wl,-rpath,/usr/local/lib" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}
     compile_check
     if [ -f "objs/nginx" ]; then
       /bin/mv ${nginx_install_dir}/sbin/nginx{,$(date +%m%d)}
@@ -70,7 +70,7 @@ Nginx_lua_waf() {
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
       success_msg "lua-nginx-module"
-      sed -i "s@^nginx_modules_options='\(.*\)'@nginx_modules_options=\'\1 --with-ld-opt=\"-Wl,-rpath,/usr/local/lib\" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit\'@" ../options.conf
+      sed -i "s@^nginx_modules_options='\(.*\)'@nginx_modules_options=\'\1 --with-ld-opt=\"-Wl,-rpath,/usr/local/lib\" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}\'@" ../options.conf
       cleanup_src nginx-${nginx_ver}
     else
       fail_msg "lua-nginx-module"
@@ -110,18 +110,18 @@ Tengine_lua_waf() {
     src_url=https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz && Download_src
     src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
     src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
-    src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/0.3.3.tar.gz" && Download_src
-    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/${lua_nginx_module_ver}.tar.gz" && Download_src
+    src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
+    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
     tar xzf tengine-${tengine_ver}.tar.gz
     tar xzf openssl-${openssl_ver}.tar.gz
     tar xzf pcre2-${pcre_ver}.tar.gz
-    tar xzf ngx_devel_kit.tar.gz
+    tar xzf ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz
     tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
     pushd tengine-${tengine_ver}
     make clean
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
-    ./configure ${tengine_configure_args} --with-ld-opt="-Wl,-rpath,/usr/local/lib" --add-module=../lua-nginx-module --add-module=../ngx_devel_kit
+    ./configure ${tengine_configure_args} --with-ld-opt="-Wl,-rpath,/usr/local/lib" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}
     compile_check
     if [ -f "objs/nginx" ]; then
       /bin/mv ${tengine_install_dir}/sbin/nginx{,$(date +%m%d)}
@@ -133,7 +133,7 @@ Tengine_lua_waf() {
       sleep 1
       kill -QUIT $(cat /var/run/nginx.pid.oldbin)
       popd > /dev/null
-      sed -i "s@^nginx_modules_options='\(.*\)'@nginx_modules_options=\'\1 --with-ld-opt=\"-Wl,-rpath,/usr/local/lib\" --add-module=../lua-nginx-module --add-module=../ngx_devel_kit\'@" ../options.conf
+      sed -i "s@^nginx_modules_options='\(.*\)'@nginx_modules_options=\'\1 --with-ld-opt=\"-Wl,-rpath,/usr/local/lib\" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}\'@" ../options.conf
       success_msg "lua_module"
       cleanup_src tengine-${tengine_ver}
     else
