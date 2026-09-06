@@ -206,7 +206,7 @@ input_password() {
     read -e -p "${prompt} (default: ${default}): " value
     value=${value:-${default}}
     # Reject dangerous characters
-    if [[ "$value" =~ [+|\&] ]]; then
+    if [[ "$value" =~ [+|&] ]]; then
       echo "${CWARNING}Password cannot contain + or | or & ${CEND}"
       continue
     fi
