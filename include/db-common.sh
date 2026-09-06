@@ -982,7 +982,7 @@ EOF
 # Post-install MySQL/MariaDB setup
 # Unified database installation workflow
 # Handles common installation steps for both MySQL and MariaDB
-# Usage: install_db_common db_type install_dir data_dir install_method boost_ver thread_count init_cmd cleanup_func root_setup_func
+# Usage: install_db_common db_type install_dir data_dir install_method boost_ver thread_count init_cmd cleanup_func root_setup_func [mysql_ver] [mariadb_ver]
 #   db_type: mysql or mariadb
 #   install_dir: installation directory
 #   data_dir: data directory
@@ -1002,6 +1002,8 @@ install_db_common() {
   local init_cmd=$7
   local cleanup_func=$8
   local root_setup_func=$9
+  local mysql_ver=${10:-}
+  local mariadb_ver=${11:-}
 
   # Fix libaio symlink for Debian 13+ / Ubuntu 24.04+
   fix_libaio_symlink

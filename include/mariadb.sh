@@ -25,5 +25,6 @@ Install_MariaDB() {
     "${THREAD}" \
     "${init_cmd}" \
     "${cleanup_func}" \
-    "setup_mariadb_root"
+    "setup_mariadb_root" \
+    "" "${mariadb_ver}"
 }

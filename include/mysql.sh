@@ -27,5 +27,6 @@ Install_MySQL() {
     "${THREAD}" \
     "${init_cmd}" \
     "${cleanup_func}" \
-    "setup_mysql_root"
+    "setup_mysql_root" \
+    "${mysql_ver}" ""
 }
