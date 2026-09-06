@@ -205,11 +205,15 @@ input_password() {
   while :; do
     read -e -p "${prompt} (default: ${default}): " value
     value=${value:-${default}}
-    # Reject dangerous characters
-    if [[ "$value" =~ [+|&] ]]; then
-      echo "${CWARNING}Password cannot contain + or | or & ${CEND}"
-      continue
-    fi
+    # Reject dangerous characters (+, |, &) — use case instead of [[ =~ ]]
+    # because bash parses bare '&' inside [[ ]] as a logical operator,
+    # causing a syntax error; case globbing avoids that trap entirely.
+    case "$value" in
+      *'+'*|*'|'*|*'&'*)
+        echo "${CWARNING}Password cannot contain + or | or & ${CEND}"
+        continue
+        ;;
+    esac
     if (( ${#value} >= ${min_len} )); then
       break
     else
