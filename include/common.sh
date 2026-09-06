@@ -354,16 +354,16 @@ download_verify() {
   local try_count=0
   
   # Security: Use HTTPS with certificate verification
-  wget -c ${url}
-  
-  while [ "$(md5sum ${filename} 2>/dev/null | awk '{print $1}')" != "${expected_md5}" ]; do
+  wget -c "${url}"
+
+  while [ "$(md5sum "${filename}" 2>/dev/null | awk '{print $1}')" != "${expected_md5}" ]; do
     if [ -n "${backup_url}" ] && [ ${try_count} -ge 3 ]; then
-      wget -c ${backup_url}/${filename}
+      wget -c "${backup_url}/${filename}"
     else
-      wget -c ${url}
+      wget -c "${url}"
     fi
     let "try_count++"
-    [[ "$(md5sum ${filename} 2>/dev/null | awk '{print $1}')" == "${expected_md5}" || "${try_count}" == 6 ]] && break || continue
+    [[ "$(md5sum "${filename}" 2>/dev/null | awk '{print $1}')" == "${expected_md5}" || "${try_count}" == 6 ]] && break || continue
   done
   
   if [[ "${try_count}" == 6 ]]; then
