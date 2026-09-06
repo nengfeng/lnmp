@@ -872,7 +872,7 @@ compile_with_progress() {
   if [ $exit_status -eq 0 ]; then
     echo "${CSUCCESS}Compilation successful${CEND}"
     make install 2>&1 | tee -a "${log_file}"
-    return $?
+    return ${PIPESTATUS[0]}
   else
     echo "${CFAILURE}Compilation failed${CEND}"
     echo "Last 30 lines of log:"
