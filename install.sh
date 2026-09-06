@@ -37,6 +37,8 @@ init_allocator
 dbrootpwd=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16)
 dbpostgrespwd=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16)
 dbinstallmethod=1
+pgsqlinstallmethod=1
+pgsql_ver=""
 
 version() {
   echo "version: 1.1"
@@ -58,6 +60,8 @@ Show_Help() {
   --nodejs                    Install Nodejs
   --db_option [1-8]           Install DB version
   --dbinstallmethod [1-2]     DB install method, default: 1 binary install
+  --pgsqlinstallmethod [1-2]  PostgreSQL install method, default: 1 APT repository
+  --pgsql_ver [version]       PostgreSQL version, default: latest (18.x)
   --dbrootpwd [password]      DB super password
   --pureftpd                  Install Pure-Ftpd
   --redis                     Install Redis
@@ -169,6 +173,13 @@ parse_args() {
       --dbinstallmethod)
         dbinstallmethod=$2; shift 2
         [[ ! ${dbinstallmethod} =~ ^[1-2]$ ]] && { echo "${CWARNING}dbinstallmethod input error! Please only input number 1~2${CEND}"; exit 1; }
+        ;;
+      --pgsqlinstallmethod)
+        pgsqlinstallmethod=$2; shift 2
+        [[ ! ${pgsqlinstallmethod} =~ ^[1-2]$ ]] && { echo "${CWARNING}pgsqlinstallmethod input error! Please only input number 1~2${CEND}"; exit 1; }
+        ;;
+      --pgsql_ver)
+        pgsql_ver=$2; shift 2
         ;;
       --pureftpd)
         pureftpd_flag=y; shift 1
@@ -445,6 +456,8 @@ case "${php_option}" in
 esac
 
 [[ "${armplatform}" == "y" ]] && dbinstallmethod=2
+# PostgreSQL non-interactive defaults (interactive menu sets these at runtime)
+[[ "${db_option}" == 8 && -z "${pgsql_ver}" ]] && pgsql_ver=${pgsql18_ver}
 checkDownload 2>&1 | tee -a ${current_dir}/install.log
 
 # get OS Memory
