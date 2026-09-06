@@ -4,7 +4,12 @@
 
 Install_fail2ban() {
   pushd ${current_dir}/src > /dev/null
-  src_url="https://github.com/fail2ban/fail2ban/archive/refs/tags/${fail2ban_ver}.tar.gz" && Download_src
+  # master is a branch, not a tag: refs/tags/master.tar.gz is a 404
+  if [[ "${fail2ban_ver}" == "master" ]]; then
+    src_url="https://github.com/fail2ban/fail2ban/archive/refs/heads/master.tar.gz" && Download_src
+  else
+    src_url="https://github.com/fail2ban/fail2ban/archive/refs/tags/${fail2ban_ver}.tar.gz" && Download_src
+  fi
   tar xzf fail2ban-${fail2ban_ver}.tar.gz
   pushd fail2ban-${fail2ban_ver} > /dev/null
   if command -v python3 > /dev/null 2>&1; then
