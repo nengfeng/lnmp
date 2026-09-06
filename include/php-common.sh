@@ -362,9 +362,14 @@ install_php_source() {
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
   
   # Build opcache argument
-  # PHP 8.5+: opcache is built into the binary (no opcache.so), still needs --enable-opcache
-  # PHP 8.4 and earlier: opcache is a separate module, needs zend_extension=opcache.so
-  [[ "${phpcache_option}" == 1 ]] && local phpcache_arg='--enable-opcache' || local phpcache_arg='--disable-opcache'
+  # PHP 8.5+: opcache is always built into the binary and always loaded; the
+  #   --enable-opcache/--disable-opcache configure flags were REMOVED, and
+  #   enablement is controlled solely by the opcache.enable INI directive
+  # PHP 8.4 and earlier: opcache is an optional shared module (zend_extension=opcache.so)
+  local phpcache_arg=''
+  if [[ "${php_ver}" =~ ^8\.[0-4]\. ]]; then
+    [[ "${phpcache_option}" == 1 ]] && phpcache_arg='--enable-opcache' || phpcache_arg='--disable-opcache'
+  fi
   
   # Build argon2 argument (PHP 8.4+ with OpenSSL 3.2+ uses built-in Argon2)
   if can_use_openssl_argon2 "${php_ver}"; then
@@ -409,15 +414,17 @@ post_install_php() {
   /bin/cp ${current_dir}/src/php-${php_ver}/php.ini-production ${install_dir}/etc/php.ini
   generate_php_ini ${install_dir}
   
-  # PHP 8.5 has opcache built-in
+  # PHP 8.5+ has opcache built-in (always loaded, no .so, no zend_extension);
+  # enablement and JIT are controlled solely via INI
   if [[ "${php_ver}" =~ ^8\.[0-4]\. ]]; then
     generate_opcache_ini ${install_dir}
   else
-    # PHP 8.5+ opcache config (no zend_extension needed)
+    local opcache_enable=0
+    [[ "${phpcache_option}" == 1 ]] && opcache_enable=1
     cat > ${install_dir}/etc/php.d/02-opcache.ini << EOF
 [opcache]
-opcache.enable=1
-opcache.enable_cli=1
+opcache.enable=${opcache_enable}
+opcache.enable_cli=${opcache_enable}
 opcache.memory_consumption=${Memory_limit}
 opcache.interned_strings_buffer=8
 opcache.max_accelerated_files=100000
@@ -428,6 +435,9 @@ opcache.revalidate_freq=60
 ;opcache.save_comments=0
 opcache.consistency_checks=0
 ;opcache.optimization_level=0
+; JIT is also controlled via INI; uncomment to enable:
+;opcache.jit=tracing
+;opcache.jit_buffer_size=128M
 EOF
   fi
   

@@ -22,6 +22,9 @@ opcache.use_cwd=1
 opcache.validate_timestamps=1
 opcache.revalidate_freq=60
 opcache.consistency_checks=0
+; JIT is also controlled via INI; uncomment to enable:
+;opcache.jit=tracing
+;opcache.jit_buffer_size=128M
 EOF
       echo "${CSUCCESS}PHP opcache module (built-in) configured successfully! ${CEND}"
     else
@@ -52,7 +55,18 @@ EOF
 }
 
 Uninstall_ZendOPcache() {
-  if [ -e "${php_install_dir}/etc/php.d/02-opcache.ini" ]; then
+  local PHP_detail_ver=''
+  [ -e "${php_install_dir}/bin/php-config" ] && PHP_detail_ver=$(${php_install_dir}/bin/php-config --version)
+  if [[ "${PHP_detail_ver}" =~ ^8\.[5-9]\. ]] || [[ "${PHP_detail_ver}" =~ ^9\. ]]; then
+    # PHP 8.5+: opcache is built into the binary and always loaded; it cannot be
+    # removed, so "uninstall" means disabling it via INI
+    cat > ${php_install_dir}/etc/php.d/02-opcache.ini << EOF
+[opcache]
+opcache.enable=0
+opcache.enable_cli=0
+EOF
+    echo; echo "${CMSG}PHP opcache (built-in) disabled${CEND}"
+  elif [ -e "${php_install_dir}/etc/php.d/02-opcache.ini" ]; then
     rm -f ${php_install_dir}/etc/php.d/02-opcache.ini
     echo; echo "${CMSG}PHP opcache module uninstall completed${CEND}"
   else
