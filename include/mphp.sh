@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
+# Restore the main php-fpm.service that Install_MPHP renamed to _bk
+# before compiling; without this a failed mphp install leaves the main
+# PHP service missing after a reboot.
+restore_main_php_service() {
+  [ -e "/lib/systemd/system/php-fpm.service_bk" ] && /bin/mv /lib/systemd/system/php-fpm.service{_bk,}
+  svc_daemon_reload
+}
+
 Install_MPHP() {
   if [ -e "${php_install_dir}/sbin/php-fpm" ]; then
     if [ -e "${php_install_dir}${mphp_ver}/bin/phpize" ]; then
@@ -24,12 +32,14 @@ Install_MPHP() {
           ;;
         *)
           echo "${CWARNING}PHP${mphp_ver} is not supported. Only PHP 8.3, 8.4, 8.5 are supported. ${CEND}"
+          restore_main_php_service
           exit 1
           ;;
       esac
       rc=${PIPESTATUS[0]}
       if [ ${rc} -ne 0 ]; then
         echo "${CFAILURE}PHP${mphp_ver} installation failed (exit ${rc}). Aborting.${CEND}"
+        restore_main_php_service
         return ${rc}
       fi
       if [ -e "${php_install_dir}/sbin/php-fpm" ]; then
