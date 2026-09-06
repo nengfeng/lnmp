@@ -361,12 +361,10 @@ install_php_source() {
   export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
   
-  # Build opcache argument (PHP 8.5 has it built-in)
-  if [[ "${php_ver}" =~ ^8\.[0-4]\. ]]; then
-    [[ "${phpcache_option}" == 1 ]] && local phpcache_arg='--enable-opcache' || local phpcache_arg='--disable-opcache'
-  else
-    local phpcache_arg=''
-  fi
+  # Build opcache argument
+  # PHP 8.5+: opcache is built into the binary (no opcache.so), still needs --enable-opcache
+  # PHP 8.4 and earlier: opcache is a separate module, needs zend_extension=opcache.so
+  [[ "${phpcache_option}" == 1 ]] && local phpcache_arg='--enable-opcache' || local phpcache_arg='--disable-opcache'
   
   # Build argon2 argument (PHP 8.4+ with OpenSSL 3.2+ uses built-in Argon2)
   if can_use_openssl_argon2 "${php_ver}"; then
