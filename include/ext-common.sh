@@ -67,15 +67,14 @@ uninstall_php_ext() {
   [ -z "$spec" ] && return
 
   local script=$(echo "$spec" | cut -d'|' -f1)
-  local func_count=$(echo "$spec" | tr '|' '\n' | grep -c "^Uninstall_")
 
   . include/${script}
-  # Uninstall functions are at fields 4+ (after script, install1, install2)
-  local i=4
+  # Uninstall functions may appear at any field; only run fields named Uninstall_*
+  local i=1
   while true; do
     local func=$(echo "$spec" | cut -d'|' -f${i})
     [ -z "$func" ] && break
-    ${func}
+    [[ "$func" == Uninstall_* ]] && ${func}
     i=$((i+1))
   done
 }
