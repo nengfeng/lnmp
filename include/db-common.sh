@@ -249,23 +249,25 @@ setup_mysql_root() {
 
   # MySQL 8.0 uses --initialize-insecure which creates root@localhost with empty password
   # When use_password=y (post-upgrade-restore), root already has a password set
-  local auth_opts="-uroot -hlocalhost"
-  [ "${use_password}" == "y" ] && auth_opts="-uroot -p\"${root_pwd}\" -hlocalhost"
+  # Use arrays to avoid quote-polution: unquoted ${auth_opts[@]} expands each element
+  # as a separate word, so -p"secret" doesn't pass literal quotes to mysql.
+  local auth_opts=(-uroot -hlocalhost)
+  [ "${use_password}" == "y" ] && auth_opts=(-uroot "-p${root_pwd}" -hlocalhost)
 
   # 1. Create root@'127.0.0.1'
-  ${install_dir}/bin/mysql ${auth_opts} -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";" || {
+  ${install_dir}/bin/mysql "${auth_opts[@]}" -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";" || {
     echo "${CFAILURE}Failed to create root@'127.0.0.1' user${CEND}"
     return 1
   }
 
   # 2. Grant privileges to root@'127.0.0.1'
-  ${install_dir}/bin/mysql ${auth_opts} -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;" || {
+  ${install_dir}/bin/mysql "${auth_opts[@]}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;" || {
     echo "${CFAILURE}Failed to grant privileges to root@'127.0.0.1'${CEND}"
     return 1
   }
 
   # 3. Set password for root@'localhost'
-  ${install_dir}/bin/mysql ${auth_opts} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
+  ${install_dir}/bin/mysql "${auth_opts[@]}" -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
     echo "${CFAILURE}Failed to set root@localhost password${CEND}"
     return 1
   }
@@ -422,19 +424,20 @@ setup_mariadb_root() {
   # Use ALTER USER syntax (compatible with MariaDB 10.11+ and 11.x)
   # Note: MariaDB 10.4+ uses unix_socket auth by default, so root can connect without password (fresh install)
   # During upgrade after data restore, root already has a password — must authenticate
-  local pw_auth=""
-  [ "${use_password}" == "y" ] && pw_auth="-p\"${root_pwd}\""
+  # Use array to avoid quote-polution: -p"secret" as a string element keeps quotes out of the actual arg.
+  local pw_auth=()
+  [ "${use_password}" == "y" ] && pw_auth=("-p${root_pwd}")
 
   # 1. Set password for root@'localhost' (this user already exists after mysql_install_db)
   local password_set=0
 
   # Try ALTER USER first
-  if ${install_dir}/bin/${cmd} -uroot ${pw_auth} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" 2>/dev/null; then
+  if ${install_dir}/bin/${cmd} -uroot "${pw_auth[@]}" -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" 2>/dev/null; then
     password_set=1
     echo "${CMSG}root@localhost password set via ALTER USER${CEND}"
   else
     # Fallback to SET PASSWORD
-    if ${install_dir}/bin/${cmd} -uroot ${pw_auth} -e "SET PASSWORD FOR root@'localhost' = PASSWORD(\"${root_pwd}\");" 2>/dev/null; then
+    if ${install_dir}/bin/${cmd} -uroot "${pw_auth[@]}" -e "SET PASSWORD FOR root@'localhost' = PASSWORD(\"${root_pwd}\");" 2>/dev/null; then
       password_set=1
       echo "${CMSG}root@localhost password set via SET PASSWORD${CEND}"
     fi
