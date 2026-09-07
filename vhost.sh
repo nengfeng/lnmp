@@ -517,7 +517,10 @@ What Are You Doing?
     local ssl_stapling_conf=""
     if [[ "${Domain_Mode}" != "2" ]]; then
       # Not self-signed: enable OCSP stapling
-      ssl_stapling_conf="ssl_stapling on;\n  ssl_stapling_verify on;\n  resolver 8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 valid=300s;\n  resolver_timeout 5s;"
+      # ssl_trusted_certificate is required for stapling verification when the
+      # ssl_certificate file lacks intermediate certs (custom-cert mode);
+      # pointing it at the same file is harmless when it is a fullchain.
+      ssl_stapling_conf="ssl_stapling on;\n  ssl_stapling_verify on;\n  ssl_trusted_certificate ${PATH_SSL}/${domain}.crt;\n  resolver 8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 valid=300s;\n  resolver_timeout 5s;"
     fi
     
     if [ -n "$(ifconfig | grep inet6)" ]; then
@@ -668,7 +671,7 @@ EOF
       sed -i "s@^  listen 80;@&\n  listen 443 ssl;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  server_name.*;@&\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  add_header Strict-Transport.*@&\n  ssl_stapling on;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  ssl_stapling on;@&\n  ssl_stapling_verify on;@" ${web_install_dir}/conf/vhost/${domain}.conf
+      sed -i "s@^  ssl_stapling on;@&\n  ssl_stapling_verify on;\n  ssl_trusted_certificate ${PATH_SSL}/${domain}.crt;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  ssl_stapling_verify on;@&\n  resolver 8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 valid=300s;\n  resolver_timeout 5s;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  server_name.*;@&\n  ssl_buffer_size 2k;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  server_name.*;@&\n  ssl_session_cache shared:SSL:10m;@" ${web_install_dir}/conf/vhost/${domain}.conf
