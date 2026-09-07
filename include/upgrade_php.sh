@@ -62,19 +62,10 @@ ROLLBACK_EOF
         Download_src
         if [ -e "${file_name}" ]; then
           verify_php_sha256 "${file_name}" "${NEW_php_ver}" || {
-            echo "${CYELLOW}Checksum verification failed, trying GitHub fallback...${CEND}"
+            echo "${CYELLOW}Checksum verification failed, re-downloading from php.net...${CEND}"
             rm -f "${file_name}"
-            src_url="https://github.com/php/php-src/archive/refs/tags/php-${NEW_php_ver}.tar.gz"
+            src_url="https://www.php.net/distributions/${file_name}"
             Download_src
-            if [ -e "${file_name}" ]; then
-              local archive_dir=$(tar -tzf "${file_name}" 2>/dev/null | head -1 | cut -d'/' -f1)
-              if [ -n "${archive_dir}" ] && [ "${archive_dir}" != "php-${NEW_php_ver}" ]; then
-                tar -xzf "${file_name}"
-                mv "${archive_dir}" "php-${NEW_php_ver}"
-                tar -czf "${file_name}" "php-${NEW_php_ver}"
-                rm -rf "php-${NEW_php_ver}"
-              fi
-            fi
           }
         fi
       fi
