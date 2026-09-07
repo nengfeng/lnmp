@@ -187,9 +187,31 @@ Print_web() {
 }
 
 Uninstall_Web() {
-  [ -d "${nginx_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${nginx_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; remove_from_path "${nginx_install_dir}/sbin"; echo "${CMSG}Nginx uninstall completed! ${CEND}"; }
-  [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; remove_from_path "${tengine_install_dir}/sbin"; echo "${CMSG}Tengine uninstall completed! ${CEND}"; }
-  [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; remove_from_path "${openresty_install_dir}/nginx/sbin"; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; }
+  # Nginx: stop+disable service BEFORE removing binary so systemd can't respawn it
+  [ -d "${nginx_install_dir}" ] && {
+    svc_stop nginx > /dev/null 2>&1
+    [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
+    rm -rf "${nginx_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx
+    remove_from_path "${nginx_install_dir}/sbin"
+    echo "${CMSG}Nginx uninstall completed! ${CEND}"
+  }
+  # Tengine
+  [ -d "${tengine_install_dir}" ] && {
+    svc_stop nginx > /dev/null 2>&1
+    [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
+    rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx
+    remove_from_path "${tengine_install_dir}/sbin"
+    echo "${CMSG}Tengine uninstall completed! ${CEND}"
+  }
+  # OpenResty
+  [ -d "${openresty_install_dir}" ] && {
+    svc_stop nginx > /dev/null 2>&1
+    [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
+    rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx
+    remove_from_path "${openresty_install_dir}/nginx/sbin"
+    echo "${CMSG}OpenResty uninstall completed! ${CEND}"
+  }
+  # Fallback: service file may remain if all install dirs were already removed manually
   [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
   # Clean up LuaJIT and lua libraries (no longer needed after web server removal)
   if [ ! -d "${nginx_install_dir}" ] && [ ! -d "${tengine_install_dir}" ] && [ ! -d "${openresty_install_dir}" ]; then
