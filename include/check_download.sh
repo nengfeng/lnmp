@@ -179,8 +179,12 @@ verify_md5_with_retry() {
   while [ "$actual_md5" != "$expected_md5" ]; do
     ((try_count++))
     echo "${CYELLOW}MD5 mismatch, retrying download... (${try_count}/6)${CEND}"
-    wget -c "$download_url" -O "$file_name" 2>/dev/null
-    actual_md5=$(compute_md5 "$file_name")
+    # Remove stale/corrupted file so wget does a fresh download (not resume):
+    # -c resumes on an existing file, so a complete-but-corrupted tarball would
+    # be left untouched and the loop would spin for 6 iterations then die_hard.
+    rm -f "${file_name}"
+    wget "$download_url" -O "${file_name}" 2>/dev/null
+    actual_md5=$(compute_md5 "${file_name}")
     [[ "$actual_md5" == "$expected_md5" ]] || [ "$try_count" -ge 6 ] && break
   done
   
