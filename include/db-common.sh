@@ -446,9 +446,35 @@ setup_mariadb_root() {
   }
   
   # 3. Cleanup
-  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.user WHERE Password='' AND User NOT LIKE 'mariadb.%';"
-  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.db WHERE User='';"
-  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.proxies_priv WHERE Host!='localhost';"
+  # mysql.user became a READ-ONLY VIEW over mysql.global_priv in MariaDB 10.4,
+  # so 'DELETE FROM mysql.user ...' fails with 'not updatable' on every
+  # supported release and the anonymous-account cleanup never worked. Query
+  # the view (SELECT works on both real table and view) and drop users with
+  # DROP USER, which is legal either way. mariadb-install-db 10.4+ normally
+  # creates no anonymous accounts, so this is usually a no-op.
+  local anon_hosts
+  # Select Host only - each output line is then just the host, avoiding
+  # IFS parsing of a possibly-empty first field (mysql -B uses tabs, and a
+  # leading tab is stripped as IFS whitespace, which breaks field reads)
+  anon_hosts=$(${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -N -B -e "SELECT Host FROM mysql.user WHERE User='';" 2>/dev/null)
+  if [ -n "${anon_hosts}" ]; then
+    local au_host
+    while read -r au_host; do
+      [ -z "${au_host}" ] && continue
+      ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DROP USER ''@'${au_host}';" 2>/dev/null || \
+        echo "${CWARNING}Failed to drop anonymous user @${au_host}${CEND}"
+    done <<< "${anon_hosts}"
+  fi
+  # mysql.db is a real table on all supported versions; anonymous grants
+  # would linger there
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.db WHERE User='';" || {
+    echo "${CFAILURE}Failed to clean mysql.db${CEND}"
+    return 1
+  }
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.proxies_priv WHERE Host!='localhost';" || {
+    echo "${CFAILURE}Failed to clean mysql.proxies_priv${CEND}"
+    return 1
+  }
   ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DROP DATABASE IF EXISTS test;"
   ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "RESET MASTER;"
   
