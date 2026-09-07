@@ -244,7 +244,10 @@ setup_mysql_root() {
   }
   
   # 2. Grant privileges to root@'127.0.0.1'
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
+  ${install_dir}/bin/mysql -uroot -hlocalhost -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;" || {
+    echo "${CFAILURE}Failed to grant privileges to root@'127.0.0.1'${CEND}"
+    return 1
+  }
   
   # 3. Set password for root@'localhost'
   ${install_dir}/bin/mysql -uroot -hlocalhost -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
@@ -253,13 +256,20 @@ setup_mysql_root() {
   }
   
   # 4. Grant privileges to root@'localhost'
-  ${install_dir}/bin/mysql -uroot -p"${root_pwd}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'localhost' WITH GRANT OPTION;"
+  ${install_dir}/bin/mysql -uroot -p"${root_pwd}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'localhost' WITH GRANT OPTION;" || {
+    echo "${CFAILURE}Failed to grant privileges to root@'localhost'${CEND}"
+    return 1
+  }
   
   if [[ "${reset_master}" == "yes" ]]; then
-    ${install_dir}/bin/mysql -uroot -p"${root_pwd}" -e "RESET MASTER;"
+    ${install_dir}/bin/mysql -uroot -p"${root_pwd}" -e "RESET MASTER;" || {
+      echo "${CFAILURE}Failed to reset master${CEND}"
+      return 1
+    }
   fi
   
   echo "${CSUCCESS}MySQL root user setup completed${CEND}"
+  return 0
 }
 
 # ============================================
@@ -408,8 +418,14 @@ setup_mariadb_root() {
   fi
   
   # 2. Create root@'127.0.0.1' with same password (using password now)
-  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";"
-  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;"
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";" || {
+    echo "${CFAILURE}Failed to create root@'127.0.0.1' user${CEND}"
+    return 1
+  }
+  ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;" || {
+    echo "${CFAILURE}Failed to grant privileges to root@'127.0.0.1'${CEND}"
+    return 1
+  }
   
   # 3. Cleanup
   ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "DELETE FROM mysql.user WHERE Password='' AND User NOT LIKE 'mariadb.%';"
@@ -419,6 +435,7 @@ setup_mariadb_root() {
   ${install_dir}/bin/${cmd} -uroot -p"${root_pwd}" -e "RESET MASTER;"
   
   echo "${CSUCCESS}MariaDB root user setup completed${CEND}"
+  return 0
 }
 
 # ============================================
@@ -1053,46 +1070,67 @@ install_db_common() {
   fi
 
   # Post-installation validation and configuration
-  if [ -d "${install_dir}/support-files" ]; then
-    # Add tcmalloc to mysqld_safe
-    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so:-libtcmalloc.so}"'@' ${install_dir}/bin/mysqld_safe 2>/dev/null || true
-    # Update password in options.conf
-    local pwd_escaped=$(escape_password "${dbrootpwd}")
-    sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
-    chmod 600 ../options.conf
-    success_msg "${db_type}"
-    # Call cleanup callback
-    ${cleanup_func} ${mysql_ver:-${mariadb_ver}} ${install_method}
-  else
+  if [ ! -d "${install_dir}/support-files" ]; then
     rm -rf ${install_dir}
     fail_msg "${db_type}"
     popd
     return 1
   fi
 
-  setup_db_service ${install_dir} ${data_dir}
+  # Add tcmalloc to mysqld_safe
+  sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so:-libtcmalloc.so}"'@' ${install_dir}/bin/mysqld_safe 2>/dev/null || true
+  # Update password in options.conf
+  local pwd_escaped=$(escape_password "${dbrootpwd}")
+  sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
+  chmod 600 ../options.conf
+  # Call cleanup callback (removes the extracted sources, needs cwd = src)
+  ${cleanup_func} ${mysql_ver:-${mariadb_ver}} ${install_method}
+
+  # Everything below can still fail - the service unit, the data directory
+  # initialisation, the first startup and the root password. Report success
+  # only after all of it succeeded.
+  local rc=0
+  setup_db_service ${install_dir} ${data_dir} || rc=$?
   popd
 
   # Call cnf generation (MySQL uses cnf_func, MariaDB uses generate_my_cnf_mariadb)
-  if [[ "${db_type}" == "mysql" ]]; then
-    ${cnf_func} ${install_dir} ${data_dir}
-  else
-    generate_my_cnf_mariadb ${install_dir} ${data_dir}
+  if [ ${rc} -eq 0 ]; then
+    if [[ "${db_type}" == "mysql" ]]; then
+      ${cnf_func} ${install_dir} ${data_dir} || rc=$?
+    else
+      generate_my_cnf_mariadb ${install_dir} ${data_dir} || rc=$?
+    fi
   fi
-  config_my_cnf_scenario /etc/my.cnf ${server_scenario} ${Mem}
+
+  if [ ${rc} -eq 0 ]; then
+    config_my_cnf_scenario /etc/my.cnf ${server_scenario} ${Mem} || rc=$?
+  fi
 
   # Initialize database
-  eval "${init_cmd}"
+  if [ ${rc} -eq 0 ]; then
+    eval "${init_cmd}" || rc=$?
+  fi
 
-  chown mysql:mysql -R ${data_dir}
-  [ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk}
-  svc_start mysqld
-  add_to_path ${install_dir}/bin
+  if [ ${rc} -eq 0 ]; then
+    chown mysql:mysql -R ${data_dir}
+    [ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk}
+    svc_start mysqld || rc=$?
+  fi
 
   # Setup root password
-  ${root_setup_func} ${install_dir} ${dbrootpwd} ${reset_master:-${root_cmd:-}}
+  if [ ${rc} -eq 0 ]; then
+    add_to_path ${install_dir}/bin
+    ${root_setup_func} ${install_dir} ${dbrootpwd} ${reset_master:-${root_cmd:-}} || rc=$?
+  fi
+
+  if [ ${rc} -ne 0 ]; then
+    fail_msg "${db_type}"
+    return ${rc}
+  fi
 
   post_install_db ${install_dir} ${db_type} ${data_dir}
+  success_msg "${db_type}"
+  return 0
 }
 
 # Usage: post_install_db install_dir db_type data_dir
