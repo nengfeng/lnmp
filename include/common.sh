@@ -226,9 +226,10 @@ input_password() {
 # Escape password for safe use in config files and SQL
 # Usage: escape_password "password"
 # Returns escaped password suitable for sed replacement and SQL
+# '&' is escaped because it expands to the whole match in sed replacements
 escape_password() {
   local pwd="$1"
-  echo "${pwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g; s/\$/\\$/g; s/`/\\`/g; s/"/\\"/g'
+  echo "${pwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g; s/\$/\\$/g; s/`/\\`/g; s/"/\\"/g; s/&/\\&/g'
 }
 
 # Check if a component is already installed, warn and return 1 if so

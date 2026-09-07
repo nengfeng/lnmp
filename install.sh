@@ -169,6 +169,12 @@ parse_args() {
         ;;
       --dbrootpwd)
         dbrootpwd=$2; dbpostgrespwd="${dbrootpwd}"; shift 2
+        case "${dbrootpwd}" in
+          *'+'*|*'|'*|*'&'*)
+            echo "${CWARNING}dbrootpwd cannot contain + or | or & ${CEND}"
+            exit 1
+            ;;
+        esac
         ;;
       --dbinstallmethod)
         dbinstallmethod=$2; shift 2
