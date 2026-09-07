@@ -225,15 +225,37 @@ parse_args "$@"
 # install on failure (the old pipeline never checked the exit code, so a
 # failed MySQL/PHP compile was followed by a bogus "Congratulations").
 # Usage: run_step <step_name> <command...>
+#
+# The step must run in the CURRENT shell, not in a subshell: a pipeline
+# ('cmd | tee') executes cmd in a subshell, so any global variable a step
+# assigns is lost. check_download.sh relies on this (it rewrites boost_ver
+# for MySQL 5.7) and so does mphp.sh (php_install_dir). We therefore
+# redirect the step's stdout/stderr into a FIFO drained by tee, which
+# keeps the step in the current shell while still duplicating the output.
 run_step() {
   local step_name=$1; shift
-  "$@" 2>&1 | tee -a ${current_dir}/install.log
-  local rc=${PIPESTATUS[0]}
+  local rc=0
+  local fifo="${current_dir}/.run_step.$$"
+  rm -f "${fifo}"
+  if mkfifo -m 600 "${fifo}" 2>/dev/null; then
+    tee -a ${current_dir}/install.log < "${fifo}" &
+    local tee_pid=$!
+    "$@" > "${fifo}" 2>&1
+    rc=$?
+    wait ${tee_pid} 2>/dev/null
+    rm -f "${fifo}"
+  else
+    # No FIFO available: fall back to a pipeline. The exit code and the
+    # log still work, variables set by this step are lost.
+    "$@" 2>&1 | tee -a ${current_dir}/install.log
+    rc=${PIPESTATUS[0]}
+  fi
   if [ ${rc} -ne 0 ]; then
     echo
     echo "${CFAILURE}Install ${step_name} failed (exit ${rc})! Aborting. See ${current_dir}/install.log for details. ${CEND}"
     exit ${rc}
   fi
+  return 0
 }
 
 # Check md5sum (only for tarball installations)
@@ -594,8 +616,14 @@ PHP_addons() {
 
 if [[ "${mphp_flag}" == y ]]; then
   . include/mphp.sh
+  main_php_install_dir=${php_install_dir}
+  # Install_MPHP retargets php_install_dir at the extra PHP
+  # (${php_install_dir}${mphp_ver}) so that PHP_addons below installs the
+  # extensions for it. Restore it afterwards: phpMyAdmin, redis and
+  # memcached are installed later and must target the main PHP.
   run_step Install_MPHP Install_MPHP
   PHP_addons
+  php_install_dir=${main_php_install_dir}
 fi
 
 # Ensure web server source tarballs exist, download if missing
