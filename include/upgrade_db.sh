@@ -11,13 +11,13 @@ Upgrade_DB() {
 
   # check db passwd
   while :; do
-    ${db_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "quit" > /dev/null 2>&1
+    ${db_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "quit" > /dev/null 2>&1
     if [ $? -eq 0 ]; then
       break
     else
       echo
       read -e -p "Please input the root password of database: " NEW_dbrootpwd || { echo "${CFAILURE}No interactive terminal available (stdin closed), aborting.${CEND}" && exit 1; }
-      ${db_install_dir}/bin/mysql -uroot -p${NEW_dbrootpwd} -e "quit" >/dev/null 2>&1
+      ${db_install_dir}/bin/mysql -uroot -p"${NEW_dbrootpwd}" -e "quit" >/dev/null 2>&1
       if [ $? -eq 0 ]; then
         dbrootpwd=${NEW_dbrootpwd}
         local pwd_escaped=$(echo "${dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
@@ -30,7 +30,7 @@ Upgrade_DB() {
     fi
   done
 
-  OLD_db_ver_tmp=$(${db_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e 'select version()\G;' | grep version | awk '{print $2}')
+  OLD_db_ver_tmp=$(${db_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e 'select version()\G;' | grep version | awk '{print $2}')
   if [[ -n "$(${db_install_dir}/bin/mysql -V | grep -i MariaDB)" ]]; then
     [[ "${OUTIP_STATE}"x == "China"x ]] && DOWN_ADDR=https://mirrors.tuna.tsinghua.edu.cn/mariadb || DOWN_ADDR=https://archive.mariadb.org
     DB=MariaDB
@@ -45,8 +45,10 @@ Upgrade_DB() {
   echo
   echo "${CSUCCESS}Starting ${DB} backup${CEND}......"
   local DB_backup_file="DB_all_backup_$(date +"%Y%m%d").sql"
-  ${db_install_dir}/bin/mysqldump -uroot -p${dbrootpwd} --opt --all-databases --routines --events > "${DB_backup_file}"
+  ${db_install_dir}/bin/mysqldump -uroot -p"${dbrootpwd}" --opt --all-databases --routines --events > "${DB_backup_file}"
   if [ $? -eq 0 ] && [ -s "${DB_backup_file}" ]; then
+    # Contains every database in plain text - keep it private
+    chmod 600 "${DB_backup_file}"
     echo "${DB} backup success, Backup file: ${MSG}$(pwd)/${DB_backup_file}${CEND}"
   else
     rm -f "${DB_backup_file}"
@@ -144,9 +146,9 @@ Upgrade_DB() {
         return 1
       fi
       svc_restart mysqld
-      ${mariadb_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
-      ${mariadb_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "reset master;" >/dev/null 2>&1
-      ${mariadb_install_dir}/bin/mysql_upgrade -uroot -p${dbrootpwd} >/dev/null 2>&1
+      ${mariadb_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "drop database test;" >/dev/null 2>&1
+      ${mariadb_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "reset master;" >/dev/null 2>&1
+      ${mariadb_install_dir}/bin/mysql_upgrade -uroot -p"${dbrootpwd}" >/dev/null 2>&1
       # Reset root user permissions (including root@'127.0.0.1')
       local root_cmd="mysql"
       [ -x "${mariadb_install_dir}/bin/mariadb" ] && root_cmd="mariadb"
@@ -189,9 +191,9 @@ Upgrade_DB() {
         return 1
       fi
       svc_restart mysqld
-      ${mysql_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "drop database test;" >/dev/null 2>&1
-      ${mysql_install_dir}/bin/mysql -uroot -p${dbrootpwd} -e "reset master;" >/dev/null 2>&1
-      ${mysql_install_dir}/bin/mysql_upgrade -uroot -p${dbrootpwd} >/dev/null 2>&1
+      ${mysql_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "drop database test;" >/dev/null 2>&1
+      ${mysql_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "reset master;" >/dev/null 2>&1
+      ${mysql_install_dir}/bin/mysql_upgrade -uroot -p"${dbrootpwd}" >/dev/null 2>&1
       # Reset root user permissions (including root@'127.0.0.1')
       setup_mysql_root ${mysql_install_dir} ${dbrootpwd}
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
