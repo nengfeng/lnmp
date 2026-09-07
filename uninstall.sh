@@ -231,6 +231,11 @@ Uninstall_MySQL() {
   if [ -d "${db_install_dir}/support-files" ]; then
     svc_stop mysqld > /dev/null 2>&1
     rm -rf "${db_install_dir}" /etc/init.d/mysqld /etc/my.cnf /etc/logrotate.d/mysql*
+    # Remove systemd units so a broken mysqld is not re-triggered on boot
+    [ -e "/lib/systemd/system/mysqld.service" ] && \
+      { svc_disable mysqld > /dev/null 2>&1; rm -f /lib/systemd/system/mysqld.service; }
+    [ -e "/lib/systemd/system/mariadb.service" ] && \
+      { svc_disable mariadb > /dev/null 2>&1; rm -f /lib/systemd/system/mariadb.service; }
     # Remove ld.so.conf.d entries for mysql/mariadb
     rm -f /etc/ld.so.conf.d/*mysql*.conf /etc/ld.so.conf.d/*mariadb*.conf
     id -u mysql >/dev/null 2>&1 ; [ $? -eq 0 ] && userdel mysql
