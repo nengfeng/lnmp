@@ -860,7 +860,14 @@ Del_NGX_Vhost() {
               fi
               /bin/mv "${web_install_dir}/conf/vhost/${domain}.conf" "${web_install_dir}/conf/vhost/${domain}.conf.bak"
               if ${web_install_dir}/sbin/nginx -t; then
+                # The rewrite file is named after the rewrite programme
+                # (e.g. wordpress.conf), not the domain — recover the actual
+                # include target from the vhost conf (still present as .bak)
+                # before it is deleted.
+                local rewrite_conf
+                rewrite_conf=$(grep -oP 'include\s+\K[^;]*rewrite/[^;]+' "${web_install_dir}/conf/vhost/${domain}.conf.bak" 2>/dev/null || true)
                 rm -f "${web_install_dir}/conf/vhost/${domain}.conf.bak"
+                [ -n "${rewrite_conf}" ] && [ -e "${rewrite_conf}" ] && rm -f "${rewrite_conf}"
                 [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f "${web_install_dir}/conf/rewrite/${domain}.conf"
                 [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f "${web_install_dir}/conf/ssl/${domain}".{crt,key,csr}
                 ${web_install_dir}/sbin/nginx -s reload
