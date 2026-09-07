@@ -450,7 +450,7 @@ checkDownload() {
     if [[ "${need_argon2}" == "true" ]]; then
       echo "Download argon2 (OpenSSL < 3.2 or PHP < 8.4)..."
       src_url="https://github.com/P-H-C/phc-winner-argon2/archive/refs/tags/${argon2_ver}.tar.gz"
-      Download_src
+      Download_src "phc-winner-argon2-${argon2_ver}.tar.gz"
     fi
 
     # libsodium (official only)
