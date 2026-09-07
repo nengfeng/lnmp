@@ -4,6 +4,40 @@
 
 . include/common.sh
 
+# Rewrite the --with-ld-opt value in a configure-args string.
+# ld-opt values may contain spaces (e.g. "-L/usr/local/lib -Wl,-u,pcre_version"),
+# so a plain "s@--with-ld-opt=[^ ]*@@" sed truncates at the first space and
+# leaves the tail of the old value behind. Tokenize instead: everything after
+# --with-ld-opt= up to the next --with-*/--add-*/--prefix-*/--user/--group flag
+# belongs to the old value.
+# Usage: set_ld_opt <configure_args> <new_value|empty>
+set_ld_opt() {
+  local args="$1" new_val="$2"
+  local out="" in_val=0
+  local tok
+  for tok in ${args}; do
+    case "${tok}" in
+      --with-ld-opt=*)
+        if [ -n "${new_val}" ]; then
+          out="${out} --with-ld-opt=${new_val}"
+        fi
+        in_val=1
+        ;;
+      --with-*|--add-*|--prefix=*|--user=*|--group=*)
+        out="${out} ${tok}"
+        in_val=0
+        ;;
+      *)
+        if [ "${in_val}" -eq 0 ]; then
+          out="${out} ${tok}"
+        fi
+        # tokens inside the old ld-opt value are dropped
+        ;;
+    esac
+  done
+  echo "${out# }"
+}
+
 # Verified zero-downtime binary swap via USR2/QUIT.
 # Usage: _nginx_hot_swap <active_bin> <backup_bin> <service_name>
 # Assumes new binary already installed at <active_bin>.
@@ -120,13 +154,14 @@ Upgrade_Nginx() {
     nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-[0-9.]\+\(rc[0-9]\+\)\?@lua-nginx-module-${lua_nginx_module_ver}@" | sed "s@--with-openssl=../openssl-[0-9.]\+\(rc[0-9]\+\)\?@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Apply allocator from options.conf
+    # ld-opt values may contain spaces; set_ld_opt tokenizes safely
     if [ -n "${allocator_ldflag}" ]; then
-      nginx_configure_args=$(echo ${nginx_configure_args} | sed "s@--with-ld-opt=[^ ]*@--with-ld-opt=${allocator_ldflag}@")
+      nginx_configure_args=$(set_ld_opt "${nginx_configure_args}" "${allocator_ldflag}")
       if [ -z "$(echo ${nginx_configure_args} | grep -- '--with-ld-opt')" ]; then
         nginx_configure_args="${nginx_configure_args} --with-ld-opt=${allocator_ldflag}"
       fi
     else
-      nginx_configure_args=$(echo ${nginx_configure_args} | sed 's@--with-ld-opt=[^ ]*@@')
+      nginx_configure_args=$(set_ld_opt "${nginx_configure_args}" "")
     fi
 
     # Always ensure lua modules are present in configure args
@@ -304,13 +339,14 @@ Upgrade_Tengine() {
     tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-[0-9.]\+\(rc[0-9]\+\)\?@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Apply allocator from options.conf
+    # ld-opt values may contain spaces; set_ld_opt tokenizes safely
     if [ -n "${allocator_ldflag}" ]; then
-      tengine_configure_args=$(echo ${tengine_configure_args} | sed "s@--with-ld-opt=[^ ]*@--with-ld-opt=${allocator_ldflag}@")
+      tengine_configure_args=$(set_ld_opt "${tengine_configure_args}" "${allocator_ldflag}")
       if [ -z "$(echo ${tengine_configure_args} | grep -- '--with-ld-opt')" ]; then
         tengine_configure_args="${tengine_configure_args} --with-ld-opt=${allocator_ldflag}"
       fi
     else
-      tengine_configure_args=$(echo ${tengine_configure_args} | sed 's@--with-ld-opt=[^ ]*@@')
+      tengine_configure_args=$(set_ld_opt "${tengine_configure_args}" "")
     fi
 
     # Always ensure lua modules are present in configure args
