@@ -345,6 +345,8 @@ Uninstall_MPHP() {
   [ -e "/etc/init.d/php${mphp_ver}-fpm" ] && { svc_stop php${mphp_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${mphp_ver}-fpm; }
   [ -e "/lib/systemd/system/php${mphp_ver}-fpm.service" ] && { svc_stop php${mphp_ver}-fpm > /dev/null 2>&1; svc_disable php${mphp_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${mphp_ver}-fpm.service; }
   [ -e "${php_install_dir}${mphp_ver}" ] && { rm -rf ${php_install_dir}${mphp_ver}; echo "${CMSG}PHP${mphp_ver} uninstall completed! ${CEND}"; }
+  # mphp install added its bin dir to the shared export PATH line
+  remove_from_path "${php_install_dir}${mphp_ver}/bin"
 }
 
 Uninstall_ALLPHP() {
@@ -356,6 +358,7 @@ Uninstall_ALLPHP() {
     [ -e "/etc/init.d/php${php_ver}-fpm" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${php_ver}-fpm; }
     [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; svc_disable php${php_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${php_ver}-fpm.service; }
     [ -e "${php_install_dir}${php_ver}" ] && { rm -rf ${php_install_dir}${php_ver}; echo "${CMSG}PHP${php_ver} uninstall completed! ${CEND}"; }
+    remove_from_path "${php_install_dir}${php_ver}/bin"
   done
   [ -e "${imagick_install_dir}" ] && rm -rf ${imagick_install_dir}
   [ -e "${curl_install_dir}" ] && rm -rf ${curl_install_dir}
