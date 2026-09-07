@@ -10,18 +10,21 @@ DBname=$1
 LogFile=${backup_dir}/db.log
 DumpFile=${backup_dir}/DB_${DBname}_$(date +%Y%m%d_%H%M%S).sql
 NewFile=${backup_dir}/DB_${DBname}_$(date +%Y%m%d_%H%M%S).tgz
-OldFile=${backup_dir}/DB_${DBname}_$(date +%Y%m%d --date="${expired_days} days ago")*.tgz
 
 [ ! -e "${backup_dir}" ] && mkdir -p ${backup_dir}
+# Backups are plain-text copies of the database - keep them private
+chmod 700 ${backup_dir} 2>/dev/null
 
 DB_tmp=$(${db_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -N -B -e "SHOW DATABASES" 2>/dev/null | grep -Fxq "${DBname}" && echo OK)
 [ -z "${DB_tmp}" ] && { echo "[${DBname}] not exist" >> "${LogFile}" ; exit 1 ; }
 
-if [ -n "$(ls ${OldFile} 2>/dev/null)" ]; then
-  rm -f ${OldFile}
-  echo "[${OldFile}] Delete Old File Success" >> ${LogFile}
-else
-  echo "[${OldFile}] Delete Old Backup File" >> ${LogFile}
+# Expire backups by AGE, not by exact calendar date. The old pattern only
+# matched files stamped with the date exactly ${expired_days} days ago, so a
+# skipped day (or a second run on the same day) left files behind forever and
+# the disk filled up.
+if [ "${expired_days}" -gt 0 ] 2>/dev/null; then
+  ExpiredList=$(find "${backup_dir}" -maxdepth 1 -type f -name "DB_${DBname}_*.tgz" -mtime +${expired_days} -print -exec rm -f {} + 2>/dev/null)
+  [ -n "${ExpiredList}" ] && echo "Deleted expired backups: ${ExpiredList}" >> ${LogFile}
 fi
 
 if [ -e "${NewFile}" ]; then
@@ -33,9 +36,18 @@ else
     rm -f "${DumpFile}"
     exit 1
   fi
+  chmod 600 "${DumpFile}"
   pushd "${backup_dir}" > /dev/null
-  tar czf ${NewFile} ${DumpFile##*/} >> ${LogFile} 2>&1
-  echo "[${NewFile}] Backup success ">> ${LogFile}
-  rm -f ${DumpFile}
-  popd > /dev/null
+  if tar czf "${NewFile}" "${DumpFile##*/}" >> ${LogFile} 2>&1 && [ -s "${NewFile}" ]; then
+    chmod 600 "${NewFile}"
+    echo "[${NewFile}] Backup success ">> ${LogFile}
+    rm -f "${DumpFile}"
+    popd > /dev/null
+  else
+    # tar failures used to be written off as success by the following echo
+    echo "[${NewFile}] Backup FAILED (tar error)" >> "${LogFile}"
+    rm -f "${NewFile}" "${DumpFile}"
+    popd > /dev/null
+    exit 1
+  fi
 fi

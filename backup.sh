@@ -14,6 +14,11 @@ pushd "${current_dir}/tools" > /dev/null
 . ../options.conf
 . ../include/color.sh
 [ ! -e "${backup_dir}" ] && mkdir -p "${backup_dir}"
+chmod 700 "${backup_dir}" 2>/dev/null
+
+# Set when any individual backup fails, so backup.sh can report failure
+# to cron/monitoring instead of always exiting 0
+backup_failed=0
 
 # ============================================
 # Helper Functions
@@ -101,7 +106,7 @@ cloud_delete_old() {
 # Usage: db_local_backup
 db_local_backup() {
   for D in $(get_items "${db_name}"); do
-    ./db_bk.sh "${D}"
+    ./db_bk.sh "${D}" || backup_failed=1
   done
 }
 
@@ -109,7 +114,11 @@ db_local_backup() {
 # Usage: db_remote_backup
 db_remote_backup() {
   for D in $(get_items "${db_name}"); do
-    ./db_bk.sh "${D}"
+    # A failed dump must not be queued for transfer
+    if ! ./db_bk.sh "${D}"; then
+      backup_failed=1
+      continue
+    fi
     local DB_GREP DB_FILE
     DB_GREP="DB_${D}_$(date +%Y%m%d)"
     DB_FILE=$(command ls -t "${backup_dir}/${DB_GREP}"* 2>/dev/null | head -1 | xargs -r basename)
@@ -129,11 +138,15 @@ db_cloud_backup() {
   [ -z "${upload_cmd}" ] && return 1
   
   for D in $(get_items "${db_name}"); do
-    ./db_bk.sh "${D}"
+    if ! ./db_bk.sh "${D}"; then
+      backup_failed=1
+      continue
+    fi
     
     local DB_GREP DB_FILE remote_path
     DB_GREP="DB_${D}_$(date +%Y%m%d)"
     DB_FILE=$(command ls -t "${backup_dir}/${DB_GREP}"* 2>/dev/null | head -1 | xargs -r basename)
+    [ -z "${DB_FILE}" ] && { echo "${CFAILURE}No backup file for ${D}, skipping upload${CEND}"; backup_failed=1; continue; }
     remote_path="/$(date +%F)/${DB_FILE}"
     
     # Upload based on cloud type
@@ -173,7 +186,7 @@ db_cloud_backup() {
 # Usage: web_local_backup
 web_local_backup() {
   for W in $(get_items "${website_name}"); do
-    ./website_bk.sh "${W}"
+    ./website_bk.sh "${W}" || backup_failed=1
   done
 }
 
@@ -182,7 +195,10 @@ web_local_backup() {
 web_remote_backup() {
   for W in $(get_items "${website_name}"); do
     if [ "$(du -sm "${wwwroot_dir}/${W}" 2>/dev/null | awk '{print $1}')" -lt 2048 ]; then
-      ./website_bk.sh "${W}"
+      if ! ./website_bk.sh "${W}"; then
+        backup_failed=1
+        continue
+      fi
       local Web_GREP Web_FILE
       Web_GREP="Web_${W}_$(date +%Y%m%d)"
       Web_FILE=$(command ls -t "${backup_dir}/${Web_GREP}"* 2>/dev/null | head -1 | xargs -r basename)
@@ -206,8 +222,13 @@ create_web_archive() {
   
   if [ ! -e "${PUSH_FILE}" ]; then
     pushd "${wwwroot_dir}" > /dev/null
-    tar czf "${PUSH_FILE}" "./${W}"
+    if ! tar czf "${PUSH_FILE}" "./${W}"; then
+      popd > /dev/null
+      echo "${CFAILURE}Failed to archive website ${W}${CEND}"
+      return 1
+    fi
     popd > /dev/null
+    chmod 600 "${PUSH_FILE}"
   fi
   
   echo "${PUSH_FILE}"
@@ -311,3 +332,9 @@ run_backup() {
 for DEST in $(get_items "${backup_destination}"); do
   run_backup "${DEST}"
 done
+
+if [ ${backup_failed} -ne 0 ]; then
+  echo "${CFAILURE}One or more backups failed, check ${backup_dir}/db.log and ${backup_dir}/web.log${CEND}"
+  exit 1
+fi
+exit 0
