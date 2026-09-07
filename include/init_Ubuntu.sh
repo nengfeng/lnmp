@@ -83,7 +83,10 @@ EOF
 # ufw
 if [[ "${firewall_flag}" == 'y' ]]; then
   ufw allow 22/tcp || echo "Warning: Failed to configure ufw for port 22" >&2
-  [ "${ssh_port}" != "22" ] && ufw allow ${ssh_port}/tcp || echo "Warning: Failed to configure ufw for port ${ssh_port}" >&2
+  # See init_Debian.sh: no A&&B||C anti-pattern here either
+  if [ "${ssh_port}" != "22" ]; then
+    ufw allow ${ssh_port}/tcp || echo "Warning: Failed to configure ufw for port ${ssh_port}" >&2
+  fi
   ufw allow 80/tcp || echo "Warning: Failed to configure ufw for port 80" >&2
   ufw allow 443/tcp || echo "Warning: Failed to configure ufw for port 443" >&2
   ufw --force enable || echo "Warning: Failed to enable ufw" >&2
@@ -94,4 +97,5 @@ svc_restart rsyslog || echo "Warning: Failed to restart rsyslog" >&2
 svc_restart ssh || echo "Warning: Failed to restart ssh" >&2
 
 . /etc/profile
-. ~/.bashrc
+# See init_Debian.sh: swallow bashrc's exit status, it must not abort the install
+. ~/.bashrc || true

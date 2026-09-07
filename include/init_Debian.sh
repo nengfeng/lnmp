@@ -86,7 +86,11 @@ has_systemd && systemctl daemon-reload || init q
 # ufw
 if [[ "${firewall_flag}" == 'y' ]]; then
   ufw allow 22/tcp || echo "Warning: Failed to configure ufw for port 22" >&2
-  [ "${ssh_port}" != "22" ] && ufw allow ${ssh_port}/tcp || echo "Warning: Failed to configure ufw for port ${ssh_port}" >&2
+  # Plain if instead of the A&&B||C anti-pattern: that form printed the
+  # "Failed to configure" warning on every run where ssh_port is 22
+  if [ "${ssh_port}" != "22" ]; then
+    ufw allow ${ssh_port}/tcp || echo "Warning: Failed to configure ufw for port ${ssh_port}" >&2
+  fi
   ufw allow 80/tcp || echo "Warning: Failed to configure ufw for port 80" >&2
   ufw allow 443/tcp || echo "Warning: Failed to configure ufw for port 443" >&2
   ufw --force enable || echo "Warning: Failed to enable ufw" >&2
@@ -97,4 +101,7 @@ svc_restart rsyslog || echo "Warning: Failed to restart rsyslog" >&2
 svc_restart ssh || echo "Warning: Failed to restart ssh" >&2
 
 . /etc/profile
-. ~/.bashrc
+# Source bashrc for this session but do NOT let its last command's exit
+# status become the step's status: run_step would abort the whole install
+# over an unrelated line in the user's bashrc
+. ~/.bashrc || true
