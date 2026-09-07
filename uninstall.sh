@@ -142,6 +142,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Remove an install directory from the PATH export in /etc/profile.
+# add_to_path() prepends every prefix on the SAME 'export PATH=' line, so
+# the entry has to be removed by string substitution. Deleting the whole
+# line (':<dir>:d') also dropped the PATH of nginx/php/mysql - i.e.
+# uninstalling nginx made the php and mysql binaries unavailable too.
+# Usage: remove_from_path <dir>
+remove_from_path() {
+  local dir=$1
+  [ -z "${dir}" ] && return 0
+  [ -e /etc/profile ] || return 0
+  sed -i "s@${dir}:@@g" /etc/profile
+}
+
 Uninstall_status() {
   if [ "${quiet_flag}" != 'y' ]; then
     while :; do echo
@@ -174,9 +187,9 @@ Print_web() {
 }
 
 Uninstall_Web() {
-  [ -d "${nginx_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${nginx_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${nginx_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Nginx uninstall completed! ${CEND}"; }
-  [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${tengine_install_dir}/sbin:d" /etc/profile; echo "${CMSG}Tengine uninstall completed! ${CEND}"; }
-  [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; sed -i "\:${openresty_install_dir}/nginx/sbin:d" /etc/profile; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; }
+  [ -d "${nginx_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${nginx_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; remove_from_path "${nginx_install_dir}/sbin"; echo "${CMSG}Nginx uninstall completed! ${CEND}"; }
+  [ -d "${tengine_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${tengine_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; remove_from_path "${tengine_install_dir}/sbin"; echo "${CMSG}Tengine uninstall completed! ${CEND}"; }
+  [ -d "${openresty_install_dir}" ] && { killall nginx > /dev/null 2>&1; rm -rf "${openresty_install_dir}" /etc/init.d/nginx /etc/logrotate.d/nginx; remove_from_path "${openresty_install_dir}/nginx/sbin"; echo "${CMSG}OpenResty uninstall completed! ${CEND}"; }
   [ -e "/lib/systemd/system/nginx.service" ] && { svc_disable nginx > /dev/null 2>&1; rm -f /lib/systemd/system/nginx.service; }
   # Clean up LuaJIT and lua libraries (no longer needed after web server removal)
   if [ ! -d "${nginx_install_dir}" ] && [ ! -d "${tengine_install_dir}" ] && [ ! -d "${openresty_install_dir}" ]; then
@@ -226,7 +239,7 @@ Uninstall_MySQL() {
       [[ "${move_db}" == "y" ]] && /bin/mv "${db_data_dir}" "${db_data_dir}_$(date +%Y%m%d%H)"
     fi
     sed -i 's@^dbrootpwd=.*@dbrootpwd=@' ./options.conf
-    sed -i "\:${db_install_dir}/bin:d" /etc/profile
+    remove_from_path "${db_install_dir}/bin"
     echo "${CMSG}MySQL uninstall completed! ${CEND}"
   fi
 }
@@ -244,7 +257,7 @@ Uninstall_PostgreSQL() {
       [[ "${move_pg}" == "y" ]] && /bin/mv "${pgsql_data_dir}" "${pgsql_data_dir}_$(date +%Y%m%d%H)"
     fi
     sed -i 's@^dbpostgrespwd=.*@dbpostgrespwd=@' ./options.conf
-    sed -i "\:${pgsql_install_dir}/bin:d" /etc/profile
+    remove_from_path "${pgsql_install_dir}/bin"
     echo "${CMSG}PostgreSQL uninstall completed! ${CEND}"
   fi
 }
@@ -263,7 +276,7 @@ Uninstall_MongoDB() {
       [[ "${move_mongo}" == "y" ]] && /bin/mv "${mongo_data_dir}" "${mongo_data_dir}_$(date +%Y%m%d%H)"
     fi
     sed -i 's@^dbmongopwd=.*@dbmongopwd=@' ./options.conf
-    sed -i "\:${mongo_install_dir}/bin:d" /etc/profile
+    remove_from_path "${mongo_install_dir}/bin"
     echo "${CMSG}MongoDB uninstall completed! ${CEND}"
   fi
 }
@@ -298,7 +311,7 @@ Uninstall_PHP() {
   [ -e "/etc/init.d/php-fpm" ] && { svc_stop php-fpm > /dev/null 2>&1; rm -f /etc/init.d/php-fpm /etc/logrotate.d/php-fpm; }
   [ -e "/lib/systemd/system/php-fpm.service" ] && { svc_stop php-fpm > /dev/null 2>&1; svc_disable php-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php-fpm.service; }
   [ -e "${php_install_dir}" ] && { rm -rf ${php_install_dir}; echo "${CMSG}PHP uninstall completed! ${CEND}"; }
-  sed -i "s@${php_install_dir}/bin:@@" /etc/profile
+  remove_from_path "${php_install_dir}/bin"
 }
 
 Uninstall_MPHP() {
@@ -311,7 +324,7 @@ Uninstall_ALLPHP() {
   [ -e "/etc/init.d/php-fpm" ] && { svc_stop php-fpm > /dev/null 2>&1; rm -f /etc/init.d/php-fpm; }
   [ -e "/lib/systemd/system/php-fpm.service" ] && { svc_stop php-fpm > /dev/null 2>&1; svc_disable php-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php-fpm.service; }
   [ -e "${php_install_dir}" ] && { rm -rf ${php_install_dir}; echo "${CMSG}PHP uninstall completed! ${CEND}"; }
-  sed -i "s@${php_install_dir}/bin:@@" /etc/profile
+  remove_from_path "${php_install_dir}/bin"
   for php_ver in 83 84 85; do
     [ -e "/etc/init.d/php${php_ver}-fpm" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${php_ver}-fpm; }
     [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; svc_disable php${php_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${php_ver}-fpm.service; }
