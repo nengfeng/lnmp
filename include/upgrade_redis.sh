@@ -13,8 +13,10 @@ Upgrade_Redis() {
     [ "${redis_flag}" != 'y' ] && read -e -p "Please input upgrade Redis Version(default: ${Latest_redis_ver}): " NEW_redis_ver
     NEW_redis_ver=${NEW_redis_ver:-${Latest_redis_ver}}
     if [ "$NEW_redis_ver" != "$OLD_redis_ver" ]; then
-      [ ! -e "redis-$NEW_redis_ver.tar.gz" ] && wget -c https://download.redis.io/releases/redis-$NEW_redis_ver.tar.gz > /dev/null 2>&1
-      if [ -e "redis-$NEW_redis_ver.tar.gz" ]; then
+      [ ! -s "redis-$NEW_redis_ver.tar.gz" ] && { wget -c "https://download.redis.io/releases/redis-$NEW_redis_ver.tar.gz" > /dev/null 2>&1 || rm -f "redis-$NEW_redis_ver.tar.gz"; }
+      if [ -s "redis-$NEW_redis_ver.tar.gz" ]; then
+        gzip -t "redis-$NEW_redis_ver.tar.gz" 2>/dev/null || \
+          { echo "${CFAILURE}redis-$NEW_redis_ver.tar.gz is corrupted, re-downloading...${CEND}"; rm -f "redis-$NEW_redis_ver.tar.gz"; wget -c "https://download.redis.io/releases/redis-$NEW_redis_ver.tar.gz" > /dev/null 2>&1; }
         echo "Download [${CMSG}redis-$NEW_redis_ver.tar.gz${CEND}] successfully! "
         break
       else
@@ -26,7 +28,7 @@ Upgrade_Redis() {
     fi
   done
 
-  if [ -e "redis-$NEW_redis_ver.tar.gz" ]; then
+  if [ -s "redis-$NEW_redis_ver.tar.gz" ]; then
     echo "[${CMSG}redis-$NEW_redis_ver.tar.gz${CEND}] found"
     if [ "${redis_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."

@@ -17,10 +17,18 @@ Upgrade_DB() {
     else
       echo
       read -e -p "Please input the root password of database: " NEW_dbrootpwd || { echo "${CFAILURE}No interactive terminal available (stdin closed), aborting.${CEND}" && exit 1; }
+      # Same restriction as input_password / --dbrootpwd: these characters
+      # cannot survive the sed-based options.conf rewrite below
+      case "${NEW_dbrootpwd}" in
+        *'+'*|*'|'*|*'&'*)
+          echo "${CWARNING}Database root password cannot contain + or | or &. Please re-enter.${CEND}"
+          continue
+          ;;
+      esac
       ${db_install_dir}/bin/mysql -uroot -p"${NEW_dbrootpwd}" -e "quit" >/dev/null 2>&1
       if [ $? -eq 0 ]; then
         dbrootpwd=${NEW_dbrootpwd}
-        local pwd_escaped=$(echo "${dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
+        local pwd_escaped=$(escape_password "${dbrootpwd}")
         sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
         chmod 600 ../options.conf
         break
@@ -71,11 +79,11 @@ Upgrade_DB() {
       fi
       local db_archive_file=""
       for _f in ${DB_filename}.tar.?z; do
-        [ -f "$_f" ] && db_archive_file="$_f" && break
+        [ -s "$_f" ] && db_archive_file="$_f" && break
       done
-      [ -z "${db_archive_file}" ] && { wget -c ${DB_URL} > /dev/null 2>&1; }
+      [ -z "${db_archive_file}" ] && { wget -c "${DB_URL}" > /dev/null 2>&1 || rm -f "${DB_filename}.tar.gz" "${DB_filename}.tar.xz" 2>/dev/null; }
       for _f in ${DB_filename}.tar.?z; do
-        [ -f "$_f" ] && db_archive_file="$_f" && break
+        [ -s "$_f" ] && db_archive_file="$_f" && break
       done
       if [ -n "${db_archive_file}" ]; then
         echo "Download [${CMSG}${db_archive_file}${CEND}] successfully! "

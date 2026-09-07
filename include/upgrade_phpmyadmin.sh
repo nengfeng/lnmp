@@ -13,8 +13,10 @@ Upgrade_phpMyAdmin() {
     [ "${phpmyadmin_flag}" != 'y' ] && read -e -p "Please input upgrade phpMyAdmin Version(default: ${Latest_phpmyadmin_ver}): " NEW_phpmyadmin_ver
     NEW_phpmyadmin_ver=${NEW_phpmyadmin_ver:-${Latest_phpmyadmin_ver}}
     if [ "${NEW_phpmyadmin_ver}" != "${OLD_phpmyadmin_ver}" ]; then
-      [ ! -e "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" ] && wget -c https://files.phpmyadmin.net/phpMyAdmin/${NEW_phpmyadmin_ver}/phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz > /dev/null 2>&1
-      if [ -e "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" ]; then
+      [ ! -s "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" ] && { wget -c "https://files.phpmyadmin.net/phpMyAdmin/${NEW_phpmyadmin_ver}/phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" > /dev/null 2>&1 || rm -f "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz"; }
+      if [ -s "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" ]; then
+        gzip -t "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" 2>/dev/null || \
+          { echo "${CFAILURE}phpMyAdmin archive is corrupted, re-downloading...${CEND}"; rm -f "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz"; wget -c "https://files.phpmyadmin.net/phpMyAdmin/${NEW_phpmyadmin_ver}/phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" > /dev/null 2>&1; }
         echo "Download [${CMSG}phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz${CEND}] successfully! "
         break
       else
@@ -26,13 +28,22 @@ Upgrade_phpMyAdmin() {
     fi
   done
 
-  if [ -e "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" ]; then
+  if [ -s "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" ]; then
     echo "[${CMSG}phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz${CEND}] found"
     if [ "${phpmyadmin_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."
       char=$(get_char)
     fi
-    tar xzf phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz
+    # Verify extraction BEFORE removing the old installation, so a corrupt
+    # archive cannot leave the site with no phpMyAdmin at all
+    tar xzf phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz || {
+      echo "${CFAILURE}Extraction failed, old installation is intact. ${CEND}"
+      exit 1
+    }
+    [ -d "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages" ] || {
+      echo "${CFAILURE}Extracted archive missing expected directory, old installation is intact. ${CEND}"
+      exit 1
+    }
     rm -rf ${wwwroot_dir}/default/phpMyAdmin
     /bin/mv phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages ${wwwroot_dir}/default/phpMyAdmin
     /bin/cp ${wwwroot_dir}/default/phpMyAdmin/{config.sample.inc.php,config.inc.php}

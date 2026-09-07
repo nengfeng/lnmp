@@ -15,8 +15,10 @@ Upgrade_Memcached() {
     if [ "${NEW_memcached_ver}" != "${OLD_memcached_ver}" ]; then
       # Download from official source (mirror doesn't host memcached)
       DOWN_ADDR=https://www.memcached.org/files
-      [ ! -e "memcached-${NEW_memcached_ver}.tar.gz" ] && wget -c ${DOWN_ADDR}/memcached-${NEW_memcached_ver}.tar.gz > /dev/null 2>&1
-      if [ -e "memcached-${NEW_memcached_ver}.tar.gz" ]; then
+      [ ! -s "memcached-${NEW_memcached_ver}.tar.gz" ] && { wget -c "${DOWN_ADDR}/memcached-${NEW_memcached_ver}.tar.gz" > /dev/null 2>&1 || rm -f "memcached-${NEW_memcached_ver}.tar.gz"; }
+      if [ -s "memcached-${NEW_memcached_ver}.tar.gz" ]; then
+        gzip -t "memcached-${NEW_memcached_ver}.tar.gz" 2>/dev/null || \
+          { echo "${CFAILURE}memcached-${NEW_memcached_ver}.tar.gz is corrupted, re-downloading...${CEND}"; rm -f "memcached-${NEW_memcached_ver}.tar.gz"; wget -c "${DOWN_ADDR}/memcached-${NEW_memcached_ver}.tar.gz" > /dev/null 2>&1; }
         echo "Download [${CMSG}memcached-${NEW_memcached_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -28,7 +30,7 @@ Upgrade_Memcached() {
     fi
   done
 
-  if [ -e "memcached-${NEW_memcached_ver}.tar.gz" ]; then
+  if [ -s "memcached-${NEW_memcached_ver}.tar.gz" ]; then
     echo "[${CMSG}memcached-${NEW_memcached_ver}.tar.gz${CEND}] found"
     if [ "${memcached_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."
