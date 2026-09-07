@@ -20,9 +20,20 @@ Install_PHP() {
   php_with_curl='--with-curl'
 
   create_run_user
-  install_php_deps ${php_ver}
-  install_php_source ${php_ver} ${php_install_dir} ${THREAD}
-  post_install_php ${php_ver} ${php_install_dir} ${Mem} ${server_scenario}
+  if ! install_php_deps ${php_ver}; then
+    echo "${CFAILURE}PHP dependency build failed, aborting PHP installation${CEND}"
+    popd > /dev/null
+    return 1
+  fi
+  if ! install_php_source ${php_ver} ${php_install_dir} ${THREAD}; then
+    popd > /dev/null
+    return 1
+  fi
+  if ! post_install_php ${php_ver} ${php_install_dir} ${Mem} ${server_scenario}; then
+    echo "${CFAILURE}PHP post-install configuration failed${CEND}"
+    popd > /dev/null
+    return 1
+  fi
 
   popd > /dev/null
 }

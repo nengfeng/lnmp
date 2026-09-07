@@ -51,21 +51,21 @@ install_php_deps() {
 
   # curl
   if [ ! -e "${curl_install_dir}/lib/libcurl.la" ]; then
-    tar xzf curl-${curl_ver}.tar.gz
+    tar xzf curl-${curl_ver}.tar.gz || return 1
     pushd curl-${curl_ver} > /dev/null
     [ -e "/usr/local/lib/libnghttp2.so" ] && with_nghttp2='--with-nghttp2=/usr/local'
-    ./configure --prefix=${curl_install_dir} ${php_with_ssl} ${with_nghttp2}
-    compile_and_install
+    ./configure --prefix=${curl_install_dir} ${php_with_ssl} ${with_nghttp2} || { popd > /dev/null; return 1; }
+    compile_and_install || { popd > /dev/null; return 1; }
     popd > /dev/null
     cleanup_src curl-${curl_ver}
   fi
 
   # freetype
   if [ ! -e "${freetype_install_dir}/lib/libfreetype.la" ]; then
-    tar xzf freetype-${freetype_ver}.tar.gz
+    tar xzf freetype-${freetype_ver}.tar.gz || return 1
     pushd freetype-${freetype_ver} > /dev/null
-    ./configure --prefix=${freetype_install_dir} --enable-freetype-config
-    compile_and_install
+    ./configure --prefix=${freetype_install_dir} --enable-freetype-config || { popd > /dev/null; return 1; }
+    compile_and_install || { popd > /dev/null; return 1; }
     ln -sf ${freetype_install_dir}/include/freetype2/* /usr/include/
     [ -d /usr/lib/pkgconfig ] && /bin/cp ${freetype_install_dir}/lib/pkgconfig/freetype2.pc /usr/lib/pkgconfig/
     popd > /dev/null
@@ -76,9 +76,9 @@ install_php_deps() {
   # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip libargon2
   if ! can_use_openssl_argon2 "${php_ver}"; then
     if [ ! -e "/usr/local/lib/pkgconfig/libargon2.pc" ]; then
-      tar xzf phc-winner-argon2-${argon2_ver}.tar.gz
+      tar xzf phc-winner-argon2-${argon2_ver}.tar.gz || return 1
       pushd phc-winner-argon2-${argon2_ver} > /dev/null
-      compile_and_install
+      compile_and_install || { popd > /dev/null; return 1; }
       popd > /dev/null
       cleanup_src phc-winner-argon2-${argon2_ver}
       # Create pkg-config file (argon2 source doesn't include one)
@@ -100,30 +100,30 @@ EOF
 
   # libsodium
   if [ ! -e "/usr/local/lib/libsodium.la" ]; then
-    tar xzf libsodium-${libsodium_ver}.tar.gz
+    tar xzf libsodium-${libsodium_ver}.tar.gz || return 1
     pushd libsodium-${libsodium_ver} > /dev/null
-    ./configure --disable-dependency-tracking --enable-minimal
-    compile_and_install
+    ./configure --disable-dependency-tracking --enable-minimal || { popd > /dev/null; return 1; }
+    compile_and_install || { popd > /dev/null; return 1; }
     popd > /dev/null
     cleanup_src libsodium-${libsodium_ver}
   fi
 
   # libzip
   if [ ! -e "/usr/local/lib/libzip.la" ]; then
-    tar xzf libzip-${libzip_ver}.tar.gz
+    tar xzf libzip-${libzip_ver}.tar.gz || return 1
     pushd libzip-${libzip_ver} > /dev/null
-    ./configure
-    compile_and_install
+    ./configure || { popd > /dev/null; return 1; }
+    compile_and_install || { popd > /dev/null; return 1; }
     popd > /dev/null
     cleanup_src libzip-${libzip_ver}
   fi
 
   # mhash
   if [[ ! -e "/usr/local/include/mhash.h" && ! -e "/usr/include/mhash.h" ]]; then
-    tar xzf mhash-${mhash_ver}.tar.gz
+    tar xzf mhash-${mhash_ver}.tar.gz || return 1
     pushd mhash-${mhash_ver} > /dev/null
-    ./configure
-    compile_and_install
+    ./configure || { popd > /dev/null; return 1; }
+    compile_and_install || { popd > /dev/null; return 1; }
     popd > /dev/null
     cleanup_src mhash-${mhash_ver}
   fi
@@ -341,6 +341,9 @@ setup_php_fpm_service() {
   svc_daemon_reload
   svc_enable php-fpm
   svc_start php-fpm
+  local rc=$?
+  [ ${rc} -ne 0 ] && echo "${CFAILURE}php-fpm failed to start (exit ${rc})${CEND}"
+  return ${rc}
 }
 
 # ============================================
