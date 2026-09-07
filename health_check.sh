@@ -346,3 +346,12 @@ else
 fi
 
 popd > /dev/null
+
+# Exit status has to reflect the result, otherwise cron jobs and monitoring
+# agents always see success and failures go unnoticed.
+#   0 - healthy (warnings only)
+#   1 - at least one check failed
+if [ ${fail_checks} -gt 0 ]; then
+  exit 1
+fi
+exit 0
