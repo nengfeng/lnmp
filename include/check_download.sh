@@ -333,6 +333,25 @@ checkDownload() {
     src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
   fi
 
+  # Lua dependencies (for nginx+tcmalloc/lua or openresty)
+  if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
+    echo "Download luajit2..."
+    src_url="https://github.com/openresty/luajit2/archive/v${luajit2_ver}.tar.gz"
+    Download_src "luajit2-${luajit2_ver}.tar.gz"
+    echo "Download lua-nginx-module..."
+    src_url="https://github.com/openresty/lua-nginx-module/archive/v${lua_nginx_module_ver}.tar.gz"
+    Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+    echo "Download lua-resty-core..."
+    src_url="https://github.com/openresty/lua-resty-core/archive/v${lua_resty_core_ver}.tar.gz"
+    Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+    echo "Download lua-resty-lrucache..."
+    src_url="https://github.com/openresty/lua-resty-lrucache/archive/v${lua_resty_lrucache_ver}.tar.gz"
+    Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+    echo "Download lua-cjson..."
+    src_url="https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz"
+    Download_src "lua-cjson-${lua_cjson_ver}.tar.gz"
+  fi
+
   # ============================================
   # Database downloads
   # ============================================

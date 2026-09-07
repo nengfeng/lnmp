@@ -647,7 +647,8 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
   _dl() {
     local expected="$1" url="$2"
     local fpath="${current_dir}/src/${expected}"
-    [ -f "$fpath" ] && return 0
+    # -s checks non-empty (not just exists): prevents skipping truncated/empty cached files
+    [ -s "$fpath" ] && return 0
     echo "${CWARNING}Missing: $expected, downloading...${CEND}"
     local tmpfile="${current_dir}/src/tmp_${expected##*/}"
     if wget -q -O "$tmpfile" "$url" 2>/dev/null && [ -s "$tmpfile" ]; then
@@ -661,17 +662,13 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
   }
 
   case "${nginx_option}" in
-    1) _dl "nginx-${nginx_ver}.tar.gz" "https://nginx.org/download/nginx-${nginx_ver}.tar.gz" ;;
-    2) _dl "tengine-${tengine_ver}.tar.gz" "https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz" ;;
-    3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" ;;
+    1) _dl "nginx-${nginx_ver}.tar.gz" "https://nginx.org/download/nginx-${nginx_ver}.tar.gz" || exit 1 ;;
+    2) _dl "tengine-${tengine_ver}.tar.gz" "https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz" || exit 1 ;;
+    3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" || exit 1 ;;
   esac
-  _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz"
-  _dl "pcre2-${pcre_ver}.tar.gz" "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz"
-  _dl "luajit2-${luajit2_ver}.tar.gz" "https://github.com/openresty/luajit2/archive/v${luajit2_ver}.tar.gz"
-  _dl "lua-nginx-module-${lua_nginx_module_ver}.tar.gz" "https://github.com/openresty/lua-nginx-module/archive/v${lua_nginx_module_ver}.tar.gz"
-  _dl "lua-resty-core-${lua_resty_core_ver}.tar.gz" "https://github.com/openresty/lua-resty-core/archive/v${lua_resty_core_ver}.tar.gz"
-  _dl "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz" "https://github.com/openresty/lua-resty-lrucache/archive/v${lua_resty_lrucache_ver}.tar.gz"
-  _dl "lua-cjson-${lua_cjson_ver}.tar.gz" "https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz"
+  _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" || exit 1
+  _dl "pcre2-${pcre_ver}.tar.gz" "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" || exit 1
+  # Lua deps are now handled by check_download.sh; these _dl calls are a fallback only.
 fi
 
 # Nginx server
