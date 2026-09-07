@@ -355,12 +355,14 @@ install_php_source() {
   local install_dir=$2
   local threads=$3
   
-  tar xzf php-${php_ver}.tar.gz
-  pushd php-${php_ver} > /dev/null
+  tar xzf php-${php_ver}.tar.gz || { echo "${CFAILURE}Failed to extract php-${php_ver}.tar.gz${CEND}"; return 1; }
+  pushd php-${php_ver} > /dev/null || return 1
   make clean
   export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
   
+  local rc=0
+
   # Build opcache argument
   # PHP 8.5+: opcache is always built into the binary and always loaded; the
   #   --enable-opcache/--disable-opcache configure flags were REMOVED, and
@@ -387,10 +389,16 @@ install_php_source() {
     --enable-sysvsem ${php_with_curl} --enable-mbregex \
     --enable-mbstring ${argon2_arg} --with-sodium=/usr/local --enable-gd ${php_with_openssl} \
     --with-mhash --enable-pcntl --enable-sockets --enable-ftp --enable-intl --with-xsl \
-    --with-gettext --with-zip=/usr/local --enable-soap --disable-debug ${php_modules_options}
-  make -j ${threads}
-  make install
+    --with-gettext --with-zip=/usr/local --enable-soap --disable-debug ${php_modules_options} || rc=$?
+  if [ ${rc} -eq 0 ]; then
+    make -j ${threads} || rc=$?
+  fi
+  if [ ${rc} -eq 0 ]; then
+    make install || rc=$?
+  fi
+  [ ${rc} -ne 0 ] && echo "${CFAILURE}PHP ${php_ver} build failed (exit ${rc})${CEND}"
   popd > /dev/null
+  return ${rc}
 }
 
 # Post-install PHP setup

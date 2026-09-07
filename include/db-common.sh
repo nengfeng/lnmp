@@ -188,10 +188,13 @@ install_mysql_source() {
   local threads=$5
   
   local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
-  tar xzf boost_${boostVersion2}.tar.gz
-  tar xzf mysql-${mysql_ver}.tar.gz
-  pushd mysql-${mysql_ver}
+  # boost is optional here: cmake carries -DDOWNLOAD_BOOST=1 and can fetch it
+  # itself, so a missing tarball is a warning, not a hard failure.
+  tar xzf boost_${boostVersion2}.tar.gz || echo "${CWARNING}Failed to extract boost_${boostVersion2}.tar.gz, relying on cmake -DDOWNLOAD_BOOST=1${CEND}"
+  tar xzf mysql-${mysql_ver}.tar.gz || { echo "${CERROR}Failed to extract mysql-${mysql_ver}.tar.gz${CEND}"; return 1; }
+  pushd mysql-${mysql_ver} > /dev/null || return 1
   [ -e "/usr/bin/cmake3" ] && local CMAKE=cmake3 || local CMAKE=cmake
+  local rc=0
   $CMAKE . -DCMAKE_INSTALL_PREFIX=${install_dir} \
     -DMYSQL_DATADIR=${data_dir} \
     -DDOWNLOAD_BOOST=1 \
@@ -205,10 +208,16 @@ install_mysql_source() {
     -DENABLED_LOCAL_INFILE=1 \
     -DCMAKE_C_COMPILER=/usr/bin/gcc \
     -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
-    -DDEFAULT_CHARSET=utf8mb4
-  make -j ${threads}
-  make install
-  popd
+    -DDEFAULT_CHARSET=utf8mb4 || rc=$?
+  if [ ${rc} -eq 0 ]; then
+    make -j ${threads} || rc=$?
+  fi
+  if [ ${rc} -eq 0 ]; then
+    make install || rc=$?
+  fi
+  [ ${rc} -ne 0 ] && echo "${CERROR}MySQL ${mysql_ver} build failed (exit ${rc})${CEND}"
+  popd > /dev/null
+  return ${rc}
 }
 
 # Cleanup MySQL installation files
@@ -343,9 +352,12 @@ install_mariadb_source() {
   local threads=$5
   
   local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
-  tar xzf boost_${boostVersion2}.tar.gz
-  tar xzf mariadb-${mariadb_ver}.tar.gz
-  pushd mariadb-${mariadb_ver}
+  # boost is optional here: cmake carries -DDOWNLOAD_BOOST=1 and can fetch it
+  # itself, so a missing tarball is a warning, not a hard failure.
+  tar xzf boost_${boostVersion2}.tar.gz || echo "${CWARNING}Failed to extract boost_${boostVersion2}.tar.gz, relying on cmake -DDOWNLOAD_BOOST=1${CEND}"
+  tar xzf mariadb-${mariadb_ver}.tar.gz || { echo "${CERROR}Failed to extract mariadb-${mariadb_ver}.tar.gz${CEND}"; return 1; }
+  pushd mariadb-${mariadb_ver} > /dev/null || return 1
+  local rc=0
   cmake . -DCMAKE_INSTALL_PREFIX=${install_dir} \
     -DMYSQL_DATADIR=${data_dir} \
     -DDOWNLOAD_BOOST=1 \
@@ -362,10 +374,16 @@ install_mariadb_source() {
     -DDEFAULT_CHARSET=utf8mb4 \
     -DDEFAULT_COLLATION=utf8mb4_general_ci \
     -DEXTRA_CHARSETS=all \
-    -DCMAKE_EXE_LINKER_FLAGS="${allocator_ldflag:--ltcmalloc}"
-  make -j ${threads}
-  make install
-  popd
+    -DCMAKE_EXE_LINKER_FLAGS="${allocator_ldflag:--ltcmalloc}" || rc=$?
+  if [ ${rc} -eq 0 ]; then
+    make -j ${threads} || rc=$?
+  fi
+  if [ ${rc} -eq 0 ]; then
+    make install || rc=$?
+  fi
+  [ ${rc} -ne 0 ] && echo "${CERROR}MariaDB ${mariadb_ver} build failed (exit ${rc})${CEND}"
+  popd > /dev/null
+  return ${rc}
 }
 
 # Cleanup MariaDB installation files
@@ -1055,18 +1073,26 @@ install_db_common() {
   [ ! -d "${install_dir}" ] && mkdir -p ${install_dir}
 
   # Installation (binary or source)
+  local install_rc=0
   if [[ "${install_method}" == "1" ]]; then
     if [[ "${db_type}" == "mysql" ]]; then
-      install_mysql_binary ${mysql_ver} ${install_dir}
+      install_mysql_binary ${mysql_ver} ${install_dir} || install_rc=$?
     else
-      install_mariadb_binary ${mariadb_ver} ${install_dir}
+      install_mariadb_binary ${mariadb_ver} ${install_dir} || install_rc=$?
     fi
   elif [[ "${install_method}" == "2" ]]; then
     if [[ "${db_type}" == "mysql" ]]; then
-      install_mysql_source ${mysql_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count}
+      install_mysql_source ${mysql_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count} || install_rc=$?
     else
-      install_mariadb_source ${mariadb_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count}
+      install_mariadb_source ${mariadb_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count} || install_rc=$?
     fi
+  fi
+
+  if [ ${install_rc} -ne 0 ]; then
+    rm -rf ${install_dir}
+    fail_msg "${db_type}"
+    popd
+    return ${install_rc}
   fi
 
   # Post-installation validation and configuration
