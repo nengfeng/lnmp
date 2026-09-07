@@ -443,14 +443,32 @@ download_file() {
             else
               log WARN "Existing file failed verification, re-downloading..."
               rm -f "$filename" "$checksum_file"
-              # 重新下载
-              download_file "$url" "$filename" "$checksum_url" "$checksum_type"
-              popd > /dev/null
-              return $?
+              # Re-download (if-guard: a failure must not trip set -e and
+              # abort the whole script — only this component should fail)
+              if download_file "$url" "$filename" "$checksum_url" "$checksum_type"; then
+                popd > /dev/null
+                return 0
+              else
+                popd > /dev/null
+                return 1
+              fi
             fi
           fi
         else
-          verify_checksum "$filename" "$checksum_file" "$checksum_type" "$filename"
+          # 校验码文件已在：校验失败则删掉重下（原来只告警就放行，坏文件会一路带进编译）
+          if ! verify_checksum "$filename" "$checksum_file" "$checksum_type" "$filename"; then
+            log WARN "Existing file failed checksum verification, re-downloading..."
+            rm -f "$filename" "$checksum_file"
+            # if-guard: a failure must not trip set -e and abort the whole
+            # script — only this component should fail
+            if download_file "$url" "$filename" "$checksum_url" "$checksum_type"; then
+              popd > /dev/null
+              return 0
+            else
+              popd > /dev/null
+              return 1
+            fi
+          fi
         fi
       fi
 
@@ -709,6 +727,11 @@ download_all() {
   
   echo ""
   log INFO "Download completed: Total=$total, Success=$success, Failed=$failed"
+  # explicit if (not '&&' list): safe under set -e on the success path
+  if [ ${failed} -gt 0 ]; then
+    log WARN "${failed} component(s) failed to download"
+    return 1
+  fi
 }
 
 # ============================================
@@ -716,6 +739,7 @@ download_all() {
 # ============================================
 download_common() {
   local mirror_mode=$1
+  local failed=0
   log INFO "Downloading common components (mirror: $mirror_mode)..."
   
   # Web 核心组件
@@ -746,9 +770,15 @@ download_common() {
   )
   
   for comp in "${components[@]}"; do
-    download_component "$comp" "$mirror_mode" || true
+    if ! download_component "$comp" "$mirror_mode"; then
+      failed=$((failed+1))
+    fi
     echo ""
   done
+  if [ ${failed} -gt 0 ]; then
+    log WARN "${failed} component(s) failed to download"
+    return 1
+  fi
 }
 
 # ============================================
@@ -901,20 +931,27 @@ main() {
   # 执行下载
   case "$mode" in
     all)
-      download_all "$mirror_mode"
+      download_all "$mirror_mode" || exit 1
       ;;
     common)
-      download_common "$mirror_mode"
+      download_common "$mirror_mode" || exit 1
       ;;
     select)
       if [ ${#components[@]} -eq 0 ]; then
         show_help
         exit 1
       fi
+      local select_failed=0
       for comp in "${components[@]}"; do
-        download_component "$comp" "$mirror_mode" || true
+        if ! download_component "$comp" "$mirror_mode"; then
+          select_failed=$((select_failed+1))
+        fi
         echo ""
       done
+      if [ ${select_failed} -gt 0 ]; then
+        log WARN "${select_failed} component(s) failed to download"
+        exit 1
+      fi
       ;;
   esac
   

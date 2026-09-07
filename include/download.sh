@@ -64,7 +64,7 @@ Download_src() {
       --progress=bar:force \
       -c \
       -O "${file_name}" \
-      ${src_url} 2>&1 | tee -a ${current_dir}/download.log
+      "${src_url}" 2>&1 | tee -a "${current_dir}/download.log"
     local wget_exit_code=${PIPESTATUS[0]}
     if [ ${wget_exit_code} -eq 0 ]; then
       
