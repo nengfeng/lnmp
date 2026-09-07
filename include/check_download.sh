@@ -200,7 +200,14 @@ verify_pgp_signature() {
   local component=$3
   
   [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
-  ! command -v gpg >/dev/null 2>&1 && return 1
+  # gpg is installed by installDeps, which runs AFTER checkDownload, and this
+  # project never imports any upstream public key. Both cases therefore mean
+  # "could not check", not "bad file": they must warn and skip. Only a
+  # genuinely BAD signature (gpg exit status 1) may stop the install.
+  if ! command -v gpg >/dev/null 2>&1; then
+    echo "${CYELLOW}gpg not available, skipping ${component} PGP check${CEND}"
+    return 0
+  fi
   
   echo "Downloading ${component} PGP signature..."
   
@@ -218,7 +225,9 @@ verify_pgp_signature() {
     echo "${CFAILURE}${component} PGP signature is BAD (file may be tampered)${CEND}"
     return 1
   else
-    echo "${CYELLOW}${component} PGP signature could not be checked (key not imported?)${CEND}"
+    # gpg exits 2 (and above) when it could not check at all - e.g. the
+    # signer's public key is not in the keyring. That is a skipped check.
+    echo "${CYELLOW}${component} PGP signature could not be checked (key not imported?), skipping${CEND}"
     return 0
   fi
 }
