@@ -145,7 +145,7 @@ generate_php_ini() {
   local php_dir=$1
   
   sed -i "s@^memory_limit.*@memory_limit = ${Memory_limit}M@" ${php_dir}/etc/php.ini
-  sed -i 's@^output_buffering =@output_buffering = On\noutput_buffering =@' ${php_dir}/etc/php.ini
+  sed -i 's@^output_buffering = 4096@output_buffering = On@' ${php_dir}/etc/php.ini
   sed -i 's@^short_open_tag = Off@short_open_tag = On@' ${php_dir}/etc/php.ini
   sed -i 's@^expose_php = On@expose_php = Off@' ${php_dir}/etc/php.ini
   sed -i 's@^request_order.*@request_order = "CGP"@' ${php_dir}/etc/php.ini
