@@ -497,6 +497,14 @@ case "${php_option}" in
   2) php_ver_to_use="${php84_ver}" ;;
   3) php_ver_to_use="${php85_ver}" ;;
 esac
+# Multi-PHP secondary version
+if [ -n "${mphp_ver}" ]; then
+  case "${mphp_ver}" in
+    83) mphp_php_ver="${php83_ver}" ;;
+    84) mphp_php_ver="${php84_ver}" ;;
+    85) mphp_php_ver="${php85_ver}" ;;
+  esac
+fi
 
 [[ "${armplatform}" == "y" ]] && dbinstallmethod=2
 # PostgreSQL non-interactive defaults (interactive menu sets these at runtime)

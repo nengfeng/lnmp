@@ -476,6 +476,14 @@ checkDownload() {
     Download_src
     verify_php_sha256 "$file_name" "$php_ver_to_use" || die_hard "Checksum verification failed for ${file_name}"
   fi
+  # Multi-PHP: also download the secondary PHP source if requested
+  if [ -n "${mphp_php_ver}" ]; then
+    echo "Download php-${mphp_php_ver} (multi-PHP)..."
+    local file_name="php-${mphp_php_ver}.tar.gz"
+    src_url="https://www.php.net/distributions/php-${mphp_php_ver}.tar.gz"
+    Download_src
+    verify_php_sha256 "$file_name" "${mphp_php_ver}" || die_hard "Checksum verification failed for ${file_name}"
+  fi
 
   # APCU (PECL - official only)
   if [[ "${phpcache_option}" == "2" ]]; then
