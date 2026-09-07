@@ -30,7 +30,8 @@ Upgrade_PHP() {
   fi
 
   # 验证备份完整性
-  if [ ! -f "${BACKUP_DIR}/php/bin/php" ]; then
+  local backup_php_dir="${BACKUP_DIR}/$(basename "${php_install_dir}")"
+  if [ ! -f "${backup_php_dir}/bin/php" ]; then
     echo "${CFAILURE}Backup verification failed! Aborting upgrade.${CEND}"
     rm -rf "${BACKUP_DIR}"
     exit 1
@@ -43,7 +44,7 @@ Upgrade_PHP() {
 echo "Rolling back PHP..."
 svc_stop php-fpm
 rm -rf "${php_install_dir}"
-cp -a "${BACKUP_DIR}/php" "${php_install_dir}"
+cp -a "${backup_php_dir}" "${php_install_dir}"
 svc_start php-fpm
 echo "PHP rolled back successfully"
 ROLLBACK_EOF
@@ -133,11 +134,11 @@ ROLLBACK_EOF
     if ! "${php_install_dir}/bin/php" -v > /dev/null 2>&1; then
       echo "${CFAILURE}Installation verification failed! Rolling back...${CEND}"
       rm -rf "${php_install_dir}"
-      cp -a "${BACKUP_DIR}/php" "${php_install_dir}"
+      cp -a "${backup_php_dir}" "${php_install_dir}"
       svc_start php-fpm
       exit 1
     fi
-    
+
     # 验证服务是否正常
     echo "Starting php-fpm..."
     svc_start php-fpm
@@ -145,7 +146,7 @@ ROLLBACK_EOF
     if ! svc_is_active php-fpm; then
       echo "${CWARNING}php-fpm failed to start! Rolling back...${CEND}"
       rm -rf "${php_install_dir}"
-      cp -a "${BACKUP_DIR}/php" "${php_install_dir}"
+      cp -a "${backup_php_dir}" "${php_install_dir}"
       svc_start php-fpm
       exit 1
     fi
