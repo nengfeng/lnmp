@@ -152,7 +152,7 @@ Upgrade_DB() {
       # Reset root user permissions (including root@'127.0.0.1')
       local root_cmd="mysql"
       [ -x "${mariadb_install_dir}/bin/mariadb" ] && root_cmd="mariadb"
-      setup_mariadb_root ${mariadb_install_dir} ${dbrootpwd} ${root_cmd}
+      setup_mariadb_root ${mariadb_install_dir} ${dbrootpwd} ${root_cmd} y
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
     elif [[ "${DB}" == MySQL ]]; then
       rm -rf ${DB_filename}
@@ -195,7 +195,7 @@ Upgrade_DB() {
       ${mysql_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "reset master;" >/dev/null 2>&1
       ${mysql_install_dir}/bin/mysql_upgrade -uroot -p"${dbrootpwd}" >/dev/null 2>&1
       # Reset root user permissions (including root@'127.0.0.1')
-      setup_mysql_root ${mysql_install_dir} ${dbrootpwd}
+      setup_mysql_root ${mysql_install_dir} ${dbrootpwd} "" y
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
     fi
 }

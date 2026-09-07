@@ -235,35 +235,41 @@ cleanup_mysql_files() {
 }
 
 # Setup MySQL root user
-# Usage: setup_mysql_root install_dir root_password [reset_master]
+# Usage: setup_mysql_root install_dir root_password [reset_master] [use_password]
+#   use_password: 'y' = authenticate with password (for post-restore upgrade);
+#                 empty = connect without password (fresh install after --initialize-insecure)
 setup_mysql_root() {
   local install_dir=$1
   local root_pwd=$(echo "$2" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g; s/\$/\\$/g; s/`/\\`/g; s/"/\\"/g')
   local reset_master=${3:-no}
-  
+  local use_password=${4:-}
+
   # Wait for database to be ready
   wait_for_db_ready ${install_dir} || return 1
-  
+
   # MySQL 8.0 uses --initialize-insecure which creates root@localhost with empty password
-  
+  # When use_password=y (post-upgrade-restore), root already has a password set
+  local auth_opts="-uroot -hlocalhost"
+  [ "${use_password}" == "y" ] && auth_opts="-uroot -p\"${root_pwd}\" -hlocalhost"
+
   # 1. Create root@'127.0.0.1'
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";" || {
+  ${install_dir}/bin/mysql ${auth_opts} -e "CREATE USER IF NOT EXISTS root@'127.0.0.1' IDENTIFIED BY \"${root_pwd}\";" || {
     echo "${CFAILURE}Failed to create root@'127.0.0.1' user${CEND}"
     return 1
   }
-  
+
   # 2. Grant privileges to root@'127.0.0.1'
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;" || {
+  ${install_dir}/bin/mysql ${auth_opts} -e "GRANT ALL PRIVILEGES ON *.* TO root@'127.0.0.1' WITH GRANT OPTION;" || {
     echo "${CFAILURE}Failed to grant privileges to root@'127.0.0.1'${CEND}"
     return 1
   }
-  
+
   # 3. Set password for root@'localhost'
-  ${install_dir}/bin/mysql -uroot -hlocalhost -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
+  ${install_dir}/bin/mysql ${auth_opts} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" || {
     echo "${CFAILURE}Failed to set root@localhost password${CEND}"
     return 1
   }
-  
+
   # 4. Grant privileges to root@'localhost'
   ${install_dir}/bin/mysql -uroot -p"${root_pwd}" -e "GRANT ALL PRIVILEGES ON *.* TO root@'localhost' WITH GRANT OPTION;" || {
     echo "${CFAILURE}Failed to grant privileges to root@'localhost'${CEND}"
@@ -401,29 +407,34 @@ cleanup_mariadb_files() {
 }
 
 # Setup MariaDB root user
-# Usage: setup_mariadb_root install_dir root_password [cmd_name]
+# Usage: setup_mariadb_root install_dir root_password [cmd_name] [use_password]
 # cmd_name: 'mariadb' (default) or 'mysql' for older versions
+# use_password: 'y' = authenticate with password (post-restore upgrade); empty = unix_socket/no-password (fresh install)
 setup_mariadb_root() {
   local install_dir=$1
   local root_pwd=$(echo "$2" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g; s/\$/\\$/g; s/`/\\`/g; s/"/\\"/g')
   local cmd=${3:-mariadb}
+  local use_password=${4:-}
 
   # Wait for database to be ready
   wait_for_db_ready ${install_dir} || return 1
 
   # Use ALTER USER syntax (compatible with MariaDB 10.11+ and 11.x)
-  # Note: MariaDB 10.4+ uses unix_socket auth by default, so root can connect without password
-  
+  # Note: MariaDB 10.4+ uses unix_socket auth by default, so root can connect without password (fresh install)
+  # During upgrade after data restore, root already has a password — must authenticate
+  local pw_auth=""
+  [ "${use_password}" == "y" ] && pw_auth="-p\"${root_pwd}\""
+
   # 1. Set password for root@'localhost' (this user already exists after mysql_install_db)
   local password_set=0
-  
+
   # Try ALTER USER first
-  if ${install_dir}/bin/${cmd} -uroot -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" 2>/dev/null; then
+  if ${install_dir}/bin/${cmd} -uroot ${pw_auth} -e "ALTER USER root@'localhost' IDENTIFIED BY \"${root_pwd}\";" 2>/dev/null; then
     password_set=1
     echo "${CMSG}root@localhost password set via ALTER USER${CEND}"
   else
     # Fallback to SET PASSWORD
-    if ${install_dir}/bin/${cmd} -uroot -e "SET PASSWORD FOR root@'localhost' = PASSWORD(\"${root_pwd}\");" 2>/dev/null; then
+    if ${install_dir}/bin/${cmd} -uroot ${pw_auth} -e "SET PASSWORD FOR root@'localhost' = PASSWORD(\"${root_pwd}\");" 2>/dev/null; then
       password_set=1
       echo "${CMSG}root@localhost password set via SET PASSWORD${CEND}"
     fi
