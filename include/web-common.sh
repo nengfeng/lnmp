@@ -248,9 +248,12 @@ install_web_server() {
       pushd ngx_brotli/deps/brotli > /dev/null
       mkdir -p out
       pushd out > /dev/null
+      # -m64 is x86-64 only; skip on ARM (upgrade_web.sh uses the same guard)
+      local brotli_arch=""
+      [[ "${armplatform}" != 'y' ]] && brotli_arch="-m64 "
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_C_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
-        -DCMAKE_CXX_FLAGS="-Ofast -m64 -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+        -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
       cmake --build . --config Release --target brotlienc
       popd > /dev/null
