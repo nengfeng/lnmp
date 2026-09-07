@@ -91,14 +91,14 @@ Upgrade_DB() {
 
   local db_archive_file=""
   for _f in ${DB_filename}.tar.?z; do
-    [ -f "$_f" ] && db_archive_file="$_f" && break
+    [ -s "$_f" ] && db_archive_file="$_f" && break
   done
   if [ -z "${db_archive_file}" ]; then
     echo "Downloading ${CMSG}${DB_URL}${CEND}......"
     wget -c ${DB_URL} > /dev/null 2>&1
   fi
   for _f in ${DB_filename}.tar.?z; do
-    [ -f "$_f" ] && db_archive_file="$_f" && break
+    [ -s "$_f" ] && db_archive_file="$_f" && break
   done
 
   if [ -z "${db_archive_file}" ]; then

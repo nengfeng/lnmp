@@ -104,8 +104,11 @@ Upgrade_Nginx() {
     [ "${nginx_flag}" != 'y' ] && read -e -p "Please input upgrade Nginx Version(default: ${Latest_nginx_ver}): " NEW_nginx_ver
     NEW_nginx_ver=${NEW_nginx_ver:-${Latest_nginx_ver}}
     if [ "${NEW_nginx_ver}" != "${OLD_nginx_ver}" ] || [ "${nginx_flag}" = 'y' ]; then
-      [ ! -e "nginx-${NEW_nginx_ver}.tar.gz" ] && wget -c https://nginx.org/download/nginx-${NEW_nginx_ver}.tar.gz > /dev/null 2>&1
-      if [ -e "nginx-${NEW_nginx_ver}.tar.gz" ]; then
+      [ ! -s "nginx-${NEW_nginx_ver}.tar.gz" ] && { wget -c https://nginx.org/download/nginx-${NEW_nginx_ver}.tar.gz > /dev/null 2>&1 || rm -f "nginx-${NEW_nginx_ver}.tar.gz"; }
+      if [ -s "nginx-${NEW_nginx_ver}.tar.gz" ]; then
+        # Integrity check: reject truncated/corrupted archives before tar
+        gzip -t "nginx-${NEW_nginx_ver}.tar.gz" 2>/dev/null || \
+          { echo "${CFAILURE}nginx-${NEW_nginx_ver}.tar.gz is corrupted, re-downloading...${CEND}"; rm -f "nginx-${NEW_nginx_ver}.tar.gz"; wget -c https://nginx.org/download/nginx-${NEW_nginx_ver}.tar.gz > /dev/null 2>&1; }
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
         src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
@@ -141,7 +144,7 @@ Upgrade_Nginx() {
     fi
   done
 
-  if [ -e "nginx-${NEW_nginx_ver}.tar.gz" ]; then
+  if [ -s "nginx-${NEW_nginx_ver}.tar.gz" ]; then
     echo "[${CMSG}nginx-${NEW_nginx_ver}.tar.gz${CEND}] found"
     if [ "${nginx_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."
@@ -292,8 +295,10 @@ Upgrade_Tengine() {
     [ "${tengine_flag}" != 'y' ] && read -e -p "Please input upgrade Tengine Version(default: ${Latest_tengine_ver}): " NEW_tengine_ver
     NEW_tengine_ver=${NEW_tengine_ver:-${Latest_tengine_ver}}
     if [ "${NEW_tengine_ver}" != "${OLD_tengine_ver}" ] || [ "${tengine_flag}" = 'y' ]; then
-      [ ! -e "tengine-${NEW_tengine_ver}.tar.gz" ] && wget -c https://tengine.taobao.org/download/tengine-${NEW_tengine_ver}.tar.gz > /dev/null 2>&1
-      if [ -e "tengine-${NEW_tengine_ver}.tar.gz" ]; then
+      [ ! -s "tengine-${NEW_tengine_ver}.tar.gz" ] && { wget -c https://tengine.taobao.org/download/tengine-${NEW_tengine_ver}.tar.gz > /dev/null 2>&1 || rm -f "tengine-${NEW_tengine_ver}.tar.gz"; }
+      if [ -s "tengine-${NEW_tengine_ver}.tar.gz" ]; then
+        gzip -t "tengine-${NEW_tengine_ver}.tar.gz" 2>/dev/null || \
+          { echo "${CFAILURE}tengine-${NEW_tengine_ver}.tar.gz is corrupted, re-downloading...${CEND}"; rm -f "tengine-${NEW_tengine_ver}.tar.gz"; wget -c https://tengine.taobao.org/download/tengine-${NEW_tengine_ver}.tar.gz > /dev/null 2>&1; }
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
         src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
@@ -323,7 +328,7 @@ Upgrade_Tengine() {
     fi
   done
 
-  if [ -e "tengine-${NEW_tengine_ver}.tar.gz" ]; then
+  if [ -s "tengine-${NEW_tengine_ver}.tar.gz" ]; then
     echo "[${CMSG}tengine-${NEW_tengine_ver}.tar.gz${CEND}] found"
     if [ "${tengine_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."
@@ -470,8 +475,10 @@ Upgrade_OpenResty() {
     [ "${openresty_flag}" != 'y' ] && read -e -p "Please input upgrade OpenResty Version(default: ${Latest_openresty_ver}): " NEW_openresty_ver
     NEW_openresty_ver=${NEW_openresty_ver:-${Latest_openresty_ver}}
     if [ "${NEW_openresty_ver}" != "${OLD_openresty_ver}" ] || [ "${openresty_flag}" = 'y' ]; then
-      [ ! -e "openresty-${NEW_openresty_ver}.tar.gz" ] && wget -c https://openresty.org/download/openresty-${NEW_openresty_ver}.tar.gz > /dev/null 2>&1
-      if [ -e "openresty-${NEW_openresty_ver}.tar.gz" ]; then
+      [ ! -s "openresty-${NEW_openresty_ver}.tar.gz" ] && { wget -c https://openresty.org/download/openresty-${NEW_openresty_ver}.tar.gz > /dev/null 2>&1 || rm -f "openresty-${NEW_openresty_ver}.tar.gz"; }
+      if [ -s "openresty-${NEW_openresty_ver}.tar.gz" ]; then
+        gzip -t "openresty-${NEW_openresty_ver}.tar.gz" 2>/dev/null || \
+          { echo "${CFAILURE}openresty-${NEW_openresty_ver}.tar.gz is corrupted, re-downloading...${CEND}"; rm -f "openresty-${NEW_openresty_ver}.tar.gz"; wget -c https://openresty.org/download/openresty-${NEW_openresty_ver}.tar.gz > /dev/null 2>&1; }
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
         src_url="https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz" && Download_src "lua-cjson-${lua_cjson_ver}.tar.gz"
@@ -498,7 +505,7 @@ Upgrade_OpenResty() {
     fi
   done
 
-  if [ -e "openresty-${NEW_openresty_ver}.tar.gz" ]; then
+  if [ -s "openresty-${NEW_openresty_ver}.tar.gz" ]; then
     echo "[${CMSG}openresty-${NEW_openresty_ver}.tar.gz${CEND}] found"
     if [ "${openresty_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."
