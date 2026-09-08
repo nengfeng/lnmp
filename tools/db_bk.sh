@@ -8,8 +8,12 @@
 
 DBname=$1
 LogFile=${backup_dir}/db.log
-DumpFile=${backup_dir}/DB_${DBname}_$(date +%Y%m%d_%H%M%S).sql
-NewFile=${backup_dir}/DB_${DBname}_$(date +%Y%m%d_%H%M%S).tgz
+# One timestamp for both names: two separate $(date) calls can cross a
+# second boundary, giving the .sql and .tgz different names, which makes
+# the "[ -e NewFile ]" guard and the tar step disagree about the filename
+Ts=$(date +%Y%m%d_%H%M%S)
+DumpFile=${backup_dir}/DB_${DBname}_${Ts}.sql
+NewFile=${backup_dir}/DB_${DBname}_${Ts}.tgz
 
 [ ! -e "${backup_dir}" ] && mkdir -p ${backup_dir}
 # Backups are plain-text copies of the database - keep them private
