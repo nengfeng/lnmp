@@ -45,14 +45,36 @@ can_use_openssl_argon2() {
 # Usage: install_php_deps [php_ver]
 #   php_ver: PHP version string (e.g., "8.3.20", "8.4.10")
 #   PHP 8.4+ uses OpenSSL built-in Argon2, no libargon2 needed
+
+# Extract a source tarball and enter the resulting directory, failing with a
+# clear, actionable message instead of a confusing later error. Needed
+# because upgrades on older installs (or pre-downloads) may be missing
+# some dependency tarballs in src/.
+# Usage: enter_src_dir <component> <tarball> <dir>
+enter_src_dir() {
+  local component=$1 tarball=$2 dir=$3
+  if [ ! -s "${tarball}" ]; then
+    echo "${CERROR}[${component}] ${tarball} is missing or empty in src/. Run './download_sources.sh ${component}' (or './check_download.sh') and retry.${CEND}"
+    return 1
+  fi
+  if ! tar xzf "${tarball}"; then
+    echo "${CERROR}[${component}] failed to extract ${tarball} (corrupt or truncated) — delete it and re-download${CEND}"
+    return 1
+  fi
+  if ! pushd "${dir}" > /dev/null; then
+    echo "${CERROR}[${component}] extraction of ${tarball} did not produce ${dir}/${CEND}"
+    return 1
+  fi
+  return 0
+}
+
 install_php_deps() {
   local php_ver=${1:-}
   pushd ${current_dir}/src > /dev/null
 
   # curl
   if [ ! -e "${curl_install_dir}/lib/libcurl.la" ]; then
-    tar xzf curl-${curl_ver}.tar.gz || return 1
-    pushd curl-${curl_ver} > /dev/null
+    enter_src_dir curl "curl-${curl_ver}.tar.gz" "curl-${curl_ver}" || return 1
     [ -e "/usr/local/lib/libnghttp2.so" ] && with_nghttp2='--with-nghttp2=/usr/local'
     ./configure --prefix=${curl_install_dir} ${php_with_ssl} ${with_nghttp2} || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }
@@ -62,8 +84,7 @@ install_php_deps() {
 
   # freetype
   if [ ! -e "${freetype_install_dir}/lib/libfreetype.la" ]; then
-    tar xzf freetype-${freetype_ver}.tar.gz || return 1
-    pushd freetype-${freetype_ver} > /dev/null
+    enter_src_dir freetype "freetype-${freetype_ver}.tar.gz" "freetype-${freetype_ver}" || return 1
     ./configure --prefix=${freetype_install_dir} --enable-freetype-config || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }
     ln -sf ${freetype_install_dir}/include/freetype2/* /usr/include/
@@ -76,8 +97,7 @@ install_php_deps() {
   # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip libargon2
   if ! can_use_openssl_argon2 "${php_ver}"; then
     if [ ! -e "/usr/local/lib/pkgconfig/libargon2.pc" ]; then
-      tar xzf phc-winner-argon2-${argon2_ver}.tar.gz || return 1
-      pushd phc-winner-argon2-${argon2_ver} > /dev/null
+      enter_src_dir argon2 "phc-winner-argon2-${argon2_ver}.tar.gz" "phc-winner-argon2-${argon2_ver}" || return 1
       compile_and_install || { popd > /dev/null; return 1; }
       popd > /dev/null
       cleanup_src phc-winner-argon2-${argon2_ver}
@@ -100,8 +120,7 @@ EOF
 
   # libsodium
   if [ ! -e "/usr/local/lib/libsodium.la" ]; then
-    tar xzf libsodium-${libsodium_ver}.tar.gz || return 1
-    pushd libsodium-${libsodium_ver} > /dev/null
+    enter_src_dir libsodium "libsodium-${libsodium_ver}.tar.gz" "libsodium-${libsodium_ver}" || return 1
     ./configure --disable-dependency-tracking --enable-minimal || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }
     popd > /dev/null
@@ -110,8 +129,7 @@ EOF
 
   # libzip
   if [ ! -e "/usr/local/lib/libzip.la" ]; then
-    tar xzf libzip-${libzip_ver}.tar.gz || return 1
-    pushd libzip-${libzip_ver} > /dev/null
+    enter_src_dir libzip "libzip-${libzip_ver}.tar.gz" "libzip-${libzip_ver}" || return 1
     ./configure || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }
     popd > /dev/null
@@ -120,8 +138,7 @@ EOF
 
   # mhash
   if [[ ! -e "/usr/local/include/mhash.h" && ! -e "/usr/include/mhash.h" ]]; then
-    tar xzf mhash-${mhash_ver}.tar.gz || return 1
-    pushd mhash-${mhash_ver} > /dev/null
+    enter_src_dir mhash "mhash-${mhash_ver}.tar.gz" "mhash-${mhash_ver}" || return 1
     ./configure || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }
     popd > /dev/null
