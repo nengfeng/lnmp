@@ -34,18 +34,30 @@ install_security_updates() {
   # deb822 format: convert 'Types: deb' + 'URIs/Suites' blocks into one-line
   if [ ! -s ${tmp_list} ] && ls /etc/apt/sources.list.d/*.sources > /dev/null 2>&1; then
     awk '
-      FNR == 1 && inblock && isdeb { print "deb " types " " uris " " suites " " comps }
+      FNR == 1 {
+        # flush a pending block from the previous file, then reset state:
+        # without the reset, isdeb/types from file N leak into file N+1
+        # and its non-security blocks get emitted too
+        if (inblock && isdeb && types) print types " " uris " " suites " " comps
+        inblock=0; isdeb=0; types=""; uris=""; suites=""; comps=""
+      }
       /^[[:space:]]*#/ { next }
-      /^[[:space:]]*$/ { if (inblock && isdeb) { print "deb " types " " uris " " suites " " comps }; inblock=0; isdeb=0; next }
+      /^[[:space:]]*$/ { if (inblock && isdeb && types) { print types " " uris " " suites " " comps }; inblock=0; isdeb=0; types=""; uris=""; suites=""; comps=""; next }
       /^[^[:space:]]/ { inblock=1 }
       inblock {
-        if ($1 == "Types:") types=$2
-        if ($1 == "URIs:") uris=$2
-        if ($1 == "Suites:") suites=$2
-        if ($1 == "Components:") comps=$2
-        if (suites ~ /security|-security/) isdeb=1
+        # keep the full value (suites/components may hold several words);
+        # the value itself is the deb/deb-src keyword and must not be
+        # prefixed with a second "deb" when emitting the one-line entry
+        if ($1 == "Types:")      { types = $0;  sub(/^[^[:space:]]+[[:space:]]+/, "", types) }
+        if ($1 == "URIs:")      { uris = $0;   sub(/^[^[:space:]]+[[:space:]]+/, "", uris) }
+        if ($1 == "Suites:")    { suites = $0; sub(/^[^[:space:]]+[[:space:]]+/, "", suites) }
+        if ($1 == "Components:") { comps = $0;  sub(/^[^[:space:]]+[[:space:]]+/, "", comps) }
+        # "security" may live in the suite name (Debian: bookworm-security)
+        # or in the URI (Ubuntu deb822: http://security.ubuntu.com/ with
+        # Suites: noble-updates) — check both
+        if (suites ~ /security/ || uris ~ /security/) isdeb=1
       }
-      END { if (inblock && isdeb) print "deb " types " " uris " " suites " " comps }
+      END { if (inblock && isdeb && types) print types " " uris " " suites " " comps }
     ' /etc/apt/sources.list.d/*.sources >> ${tmp_list} 2>/dev/null
   fi
 
