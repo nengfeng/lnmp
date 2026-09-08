@@ -6,5 +6,6 @@
 . include/mysql.sh
 
 Install_MySQL80() {
-  Install_MySQL "${mysql80_ver}" "generate_my_cnf_mysql80" "yes"
+  # source builds pin the older boost; binary installs ignore it
+  Install_MySQL "${mysql80_ver}" "generate_my_cnf_mysql80" "yes" "${boost_oldver}"
 }

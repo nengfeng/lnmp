@@ -361,11 +361,14 @@ checkDownload() {
   # ============================================
   if [[ "${db_option}" =~ ^[1-8]$ ]]; then
     if [[ "${db_option}" =~ ^[2-7]$ ]] && [[ "${dbinstallmethod}" == "2" ]]; then
-      [[ "${db_option}" =~ ^[2-7]$ ]] && boost_ver=${boost_oldver}
+      # MySQL 8.4/8.0 and MariaDB source builds pin the older boost.
+      # Download it explicitly — installers receive their boost version as an
+      # argument (Install_MySQL/Install_MariaDB), so no global rewrite needed.
       echo "Download boost..."
-      boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
-      src_url="https://downloads.sourceforge.net/project/boost/boost/${boost_ver}/boost_${boostVersion2}.tar.gz"
-      Download_src
+      local boost_dl_ver=${boost_oldver}
+      local boostVersion2_dl=$(echo ${boost_dl_ver} | awk -F. '{print $1"_"$2"_"$3}')
+      src_url="https://downloads.sourceforge.net/project/boost/boost/${boost_dl_ver}/boost_${boostVersion2_dl}.tar.gz"
+      Download_src "boost_${boostVersion2_dl}.tar.gz"
     fi
 
     case "${db_option}" in

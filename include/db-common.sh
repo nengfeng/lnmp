@@ -221,11 +221,14 @@ install_mysql_source() {
 }
 
 # Cleanup MySQL installation files
-# Usage: cleanup_mysql_files mysql_ver install_method
+# Usage: cleanup_mysql_files mysql_ver install_method [boost_ver]
 cleanup_mysql_files() {
   local mysql_ver=$1
   local method=$2
-  
+  # boost version actually extracted by install_mysql_source; fall back to the
+  # versions.txt global when the caller (old path) does not pass one
+  local boost_ver=${3:-${boost_ver}}
+
   if [[ "${method}" == "1" ]]; then
     rm -rf mysql-${mysql_ver}-*-$SYS_ARCH_M
   elif [[ "${method}" == "2" ]]; then
@@ -395,15 +398,17 @@ install_mariadb_source() {
 }
 
 # Cleanup MariaDB installation files
-# Usage: cleanup_mariadb_files mariadb_ver install_method
+# Usage: cleanup_mariadb_files mariadb_ver install_method [boost_ver]
 cleanup_mariadb_files() {
   local mariadb_ver=$1
   local method=$2
-  
+  # MariaDB source builds always pin boost_oldver (see Install_MariaDB)
+  local boost_ver=${3:-${boost_oldver}}
+
   if [[ "${method}" == "1" ]]; then
     rm -rf mariadb-${mariadb_ver}-linux-systemd-$SYS_ARCH_M
   elif [[ "${method}" == "2" ]]; then
-    local boostVersion2=$(echo ${boost_oldver} | awk -F. '{print $1"_"$2"_"$3}')
+    local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
     rm -rf mariadb-${mariadb_ver} boost_${boostVersion2}
   fi
 }
@@ -1149,8 +1154,9 @@ install_db_common() {
   local pwd_escaped=$(escape_password "${dbrootpwd}")
   sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
   chmod 600 ../options.conf
-  # Call cleanup callback (removes the extracted sources, needs cwd = src)
-  ${cleanup_func} ${mysql_ver:-${mariadb_ver}} ${install_method}
+  # Call cleanup callback (removes the extracted sources, needs cwd = src);
+  # pass the boost version actually used so cleanup removes the right dir
+  ${cleanup_func} ${mysql_ver:-${mariadb_ver}} ${install_method} ${boost_ver}
 
   # Everything below can still fail - the service unit, the data directory
   # initialisation, the first startup and the root password. Report success
