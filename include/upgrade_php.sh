@@ -56,11 +56,11 @@ ROLLBACK_EOF
     NEW_php_ver=${NEW_php_ver:-${Latest_php_ver}}
     if [[ "${NEW_php_ver%.*}" == "${OLD_php_ver%.*}" ]]; then
       local file_name="php-${NEW_php_ver}.tar.gz"
-      if [ ! -e "${file_name}" ]; then
+      if [ ! -s "${file_name}" ]; then
         echo "Downloading PHP ${NEW_php_ver}..."
         src_url="https://www.php.net/distributions/${file_name}"
         Download_src
-        if [ -e "${file_name}" ]; then
+        if [ -s "${file_name}" ]; then
           verify_php_sha256 "${file_name}" "${NEW_php_ver}" || {
             echo "${CYELLOW}Checksum verification failed, re-downloading from php.net...${CEND}"
             rm -f "${file_name}"
@@ -68,8 +68,27 @@ ROLLBACK_EOF
             Download_src
           }
         fi
+      else
+        # A cached archive must be verified too, otherwise a truncated or
+        # corrupted tarball from an earlier interrupted run would skip the
+        # checksum entirely. On mismatch, delete it and fall through to a
+        # fresh download.
+        if ! verify_php_sha256 "${file_name}" "${NEW_php_ver}"; then
+          echo "${CYELLOW}Cached ${file_name} failed checksum verification, re-downloading...${CEND}"
+          rm -f "${file_name}"
+          src_url="https://www.php.net/distributions/${file_name}"
+          Download_src
+          if [ -s "${file_name}" ]; then
+            verify_php_sha256 "${file_name}" "${NEW_php_ver}" || {
+              echo "${CYELLOW}Checksum still failing after re-download, re-downloading from php.net...${CEND}"
+              rm -f "${file_name}"
+              src_url="https://www.php.net/distributions/${file_name}"
+              Download_src
+            }
+          fi
+        fi
       fi
-      if [ -e "${file_name}" ]; then
+      if [ -s "${file_name}" ]; then
         echo "Download [${CMSG}${file_name}${CEND}] successfully! "
       else
         echo "${CWARNING}PHP version does not exist or download failed! ${CEND}"
@@ -81,13 +100,16 @@ ROLLBACK_EOF
     fi
   done
 
-  if [ -e "php-${NEW_php_ver}.tar.gz" ]; then
+  if [ -s "php-${NEW_php_ver}.tar.gz" ]; then
     echo "[${CMSG}php-${NEW_php_ver}.tar.gz${CEND}] found"
     if [ "${php_flag}" != 'y' ]; then
       echo "Press Ctrl+c to cancel or Press any key to continue..."
       char=$(get_char)
     fi
-    tar xzf php-${NEW_php_ver}.tar.gz
+    if ! tar xzf php-${NEW_php_ver}.tar.gz; then
+      echo "${CFAILURE}Extract failed: php-${NEW_php_ver}.tar.gz is corrupted or truncated. Upgrade aborted, nothing was changed.${CEND}"
+      exit 1
+    fi
     pushd php-${NEW_php_ver}
     if [ -e ext/openssl/openssl.c ] && ! grep -Eqi '^#ifdef RSA_SSLV23_PADDING' ext/openssl/openssl.c; then
       sed -i '/OPENSSL_SSLV23_PADDING/i#ifdef RSA_SSLV23_PADDING' ext/openssl/openssl.c

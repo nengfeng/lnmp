@@ -103,7 +103,7 @@ Upgrade_DB() {
   done
   if [ -z "${db_archive_file}" ]; then
     echo "Downloading ${CMSG}${DB_URL}${CEND}......"
-    wget -c ${DB_URL} > /dev/null 2>&1
+    wget -c "${DB_URL}" > /dev/null 2>&1 || rm -f "${DB_filename}.tar.gz" "${DB_filename}.tar.xz" 2>/dev/null
   fi
   for _f in ${DB_filename}.tar.?z; do
     [ -s "$_f" ] && db_archive_file="$_f" && break
