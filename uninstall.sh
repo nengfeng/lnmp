@@ -468,15 +468,13 @@ Print_phpMyAdmin() {
 }
 
 Uninstall_phpMyAdmin() {
+  # phpMyAdmin is a re-downloadable web app, not user data — the
+  # timestamped-backup treatment is reserved for the DB data directories.
+  # Deleting it is the correct "uninstall" semantics; the global uninstall
+  # confirmation (Uninstall_status) already guards against accidental runs.
   if [ -d "${wwwroot_dir}/default/phpMyAdmin" ]; then
-    # README promises data dirs are renamed to a timestamped backup, never deleted
-    if [ "${quiet_flag}" == 'y' ]; then
-      /bin/mv "${wwwroot_dir}/default/phpMyAdmin" "${wwwroot_dir}/default/phpMyAdmin_$(date +%Y%m%d%H)"
-      echo "${CMSG}phpMyAdmin moved to backup (phpMyAdmin_$(date +%Y%m%d%H))${CEND}"
-    else
-      read -e -p "Move ${wwwroot_dir}/default/phpMyAdmin to ${wwwroot_dir}/default/phpMyAdmin_bak? (y/n): " move_pma
-      [[ "${move_pma}" == "y" ]] && /bin/mv "${wwwroot_dir}/default/phpMyAdmin" "${wwwroot_dir}/default/phpMyAdmin_$(date +%Y%m%d%H)"
-    fi
+    /bin/rm -rf "${wwwroot_dir}/default/phpMyAdmin"
+    echo "${CMSG}phpMyAdmin uninstall completed!${CEND}"
   fi
 }
 
