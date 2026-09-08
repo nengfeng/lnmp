@@ -304,6 +304,11 @@ check_latest "curl" "$curl_ver" \
   "https://curl.se/download.html" \
   '[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1" curl_ver
 
+# --- freetype (PHP GD dependency; official source on savannah) ---
+check_latest "freetype" "$freetype_ver" \
+  "https://download.savannah.gnu.org/releases/freetype/" \
+  'freetype-\K[0-9]+\.[0-9]+\.[0-9]+(?=\.tar\.gz)' "sort -V | tail -1" freetype_ver
+
 # --- libsodium (web scraping) ---
 libsodium_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   "https://github.com/jedisct1/libsodium/releases" 2>/dev/null | \
