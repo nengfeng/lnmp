@@ -227,6 +227,11 @@ parse_args() {
 
 parse_args "$@"
 
+# Documented default (see --help): opcode cache = Zend OPcache. Without this,
+# a non-interactive run without --phpcache_option left phpcache_option empty,
+# which on PHP 8.5 writes opcache.enable=0 (built-in opcache off by default).
+phpcache_option=${phpcache_option:-1}
+
 # Run an install step with logging to install.log and abort the whole
 # install on failure (the old pipeline never checked the exit code, so a
 # failed MySQL/PHP compile was followed by a bogus "Congratulations").
@@ -414,12 +419,29 @@ if [[ ${ARG_NUM} == 0 ]]; then
     fi
 
     # PHP opcode cache
-    confirm "Do you want to install opcode cache of the PHP?" phpcache_flag y
-    if [[ "${phpcache_flag}" == y ]]; then
-      echo 'Please select a opcode cache of the PHP:'
-      printf "%b" "	${CMSG}1${CEND}. Install Zend OPcache\n"
-      printf "%b" "	${CMSG}2${CEND}. Install APCU\n"
-      select_number "Please input a number" phpcache_option 1 2 1
+    if [[ "${php_option}" == "3" ]]; then
+      # PHP 8.5 has Zend OPcache built in: nothing to compile or install,
+      # it is toggled via opcache.enable in php.d/02-opcache.ini. Skip the
+      # selection menu and just tell the user what happens.
+      phpcache_flag=y
+      if [[ "${phpcache_option}" == "1" ]]; then
+        echo "${CMSG}PHP 8.5 includes Zend OPcache built-in - no extra install step; it is enabled by default (opcache.enable=1 in php.d/02-opcache.ini).${CEND}"
+      else
+        echo "${CMSG}PHP 8.5 includes Zend OPcache built-in; APCU will be installed and the built-in opcache disabled via php.d/02-opcache.ini.${CEND}"
+      fi
+    else
+      confirm "Do you want to install opcode cache of the PHP?" phpcache_flag y
+      if [[ "${phpcache_flag}" == y ]]; then
+        echo 'Please select a opcode cache of the PHP:'
+        printf "%b" "	${CMSG}1${CEND}. Install Zend OPcache\n"
+        printf "%b" "	${CMSG}2${CEND}. Install APCU\n"
+        select_number "Please input a number" phpcache_option 1 2 1
+      else
+        # user declined: keep the global default (1) from forcing
+        # --enable-opcache / the opcache ini into a PHP build the user
+        # explicitly asked to have no opcode cache
+        phpcache_option=
+      fi
     fi
 
     # PHP extensions
