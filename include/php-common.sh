@@ -153,10 +153,22 @@ EOF
   fi
 
   # libzip
-  if [ ! -e "/usr/local/lib/libzip.la" ]; then
+  # libzip >= 1.11 ships only a CMake build system (no autotools ./configure),
+  # so build with CMake. Keep it minimal (zlib only) so libzip.so has no
+  # runtime dependency on system OpenSSL/zstd/bzip2/lzma.
+  if [ ! -e "/usr/local/lib/libzip.so" ] && [ ! -e "/usr/local/lib/libzip.la" ]; then
     enter_src_dir libzip "libzip-${libzip_ver}.tar.gz" "libzip-${libzip_ver}" || return 1
-    ./configure || { popd > /dev/null; return 1; }
-    compile_and_install || { popd > /dev/null; return 1; }
+    cmake -S . -B build \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DBUILD_SHARED_LIBS=ON \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DENABLE_OPENSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_GNUTLS=OFF \
+      -DENABLE_COMMONCRYPTO=OFF -DENABLE_WINDOWS_CRYPTO=OFF \
+      -DENABLE_BZIP2=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF \
+      -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_OSSFUZZ=OFF \
+      -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF || { popd > /dev/null; return 1; }
+    make -C build -j ${THREAD} || { popd > /dev/null; return 1; }
+    cmake --install build || { popd > /dev/null; return 1; }
     popd > /dev/null
     cleanup_src libzip-${libzip_ver}
   fi
