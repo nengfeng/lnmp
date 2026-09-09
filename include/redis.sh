@@ -6,7 +6,18 @@ Install_redis_server() {
   pushd ${current_dir}/src > /dev/null
   tar xzf redis-${redis_ver}.tar.gz
   pushd redis-${redis_ver} > /dev/null
-  compile_check
+  # Redis 8+ bundles the Redis Stack modules and its default 'make' builds them
+  # too, which pulls in toolchains this installer neither provisions nor needs
+  # (Rust/cargo for redisearch; a readies-local python3 for redisjson /
+  # redistimeseries). Install_redis_server only installs the core redis-server
+  # + redis.conf (it never copies or loadmodule's the module .so files), so
+  # build core-only when the module-aware build system (scripts/build.sh) is
+  # present; fall back to a plain make for classic Redis.
+  if [ -f scripts/build.sh ]; then
+    compile_check "build core"
+  else
+    compile_check
+  fi
   if [ -f "src/redis-server" ]; then
     mkdir -p ${redis_install_dir}/{bin,etc,var}
     /bin/cp src/{redis-benchmark,redis-check-aof,redis-check-rdb,redis-cli,redis-sentinel,redis-server} ${redis_install_dir}/bin/

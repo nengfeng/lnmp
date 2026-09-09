@@ -37,7 +37,14 @@ Upgrade_Redis() {
     tar xzf redis-$NEW_redis_ver.tar.gz
     pushd redis-$NEW_redis_ver
     make clean
-    compile_check
+    # Redis 8+ default make also builds the bundled Stack modules (needs cargo /
+    # a readies python3); only the core server is used here, so build core-only
+    # when the module-aware build system is present.
+    if [ -f scripts/build.sh ]; then
+      compile_check "build core"
+    else
+      compile_check
+    fi
 
     if [ -f "src/redis-server" ]; then
       echo "Restarting Redis..."
