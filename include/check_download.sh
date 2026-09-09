@@ -472,6 +472,14 @@ checkDownload() {
     src_url_fallback=""
     src_expected_dir=""
 
+    # freetype 2.14+ builds a 'dlg' git submodule (subprojects/dlg) that plain
+    # source tarballs do not embed. Pre-download the pinned dlg archive so the
+    # build can populate it, even when offline.
+    if [[ "${freetype_ver}" =~ ^2\.(1[4-9]|[2-9][0-9])\. ]]; then
+      src_url="https://github.com/nyorain/dlg/archive/${freetype_dlg_sha}.tar.gz"
+      Download_src "freetype-dlg-${freetype_dlg_sha}.tar.gz"
+    fi
+
     # argon2 (GitHub) - only needed when can't use OpenSSL built-in Argon2
     # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip
     # php_option: 1=8.3, 2=8.4, 3=8.5 | mphp_ver: 83, 84, 85

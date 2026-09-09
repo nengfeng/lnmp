@@ -36,6 +36,10 @@ libmcrypt_ver=2.5.8
 mcrypt_ver=2.6.8
 mhash_ver=0.9.9.9
 freetype_ver=2.14.3
+# pinned commit of freetype's 'dlg' submodule (subprojects/dlg) required to
+# build freetype 2.14+ from a plain source tarball; re-derive when freetype_ver
+# bumps: github.com/freetype/freetype/contents/subprojects/dlg?ref=<tag>
+freetype_dlg_sha=395ccad2c1e0daae535c4d20bb0a3f2424648e17
 icu4c_ver=63_1
 libsodium_ver=1.0.22
 libzip_ver=1.11.4

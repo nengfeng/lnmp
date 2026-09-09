@@ -85,6 +85,22 @@ install_php_deps() {
   # freetype
   if [ ! -e "${freetype_install_dir}/lib/libfreetype.la" ]; then
     enter_src_dir freetype "freetype-${freetype_ver}.tar.gz" "freetype-${freetype_ver}" || return 1
+    # freetype 2.14+ builds a 'subprojects/dlg' git submodule that a plain source
+    # tarball leaves empty, so make's copy_submodule target fails ("cp: cannot
+    # stat subprojects/dlg/include/dlg/output.h"). Populate it from the
+    # pre-downloaded pinned dlg archive, or fetch it inline if absent.
+    if [[ "${freetype_ver}" =~ ^2\.(1[4-9]|[2-9][0-9])\. ]] && [ ! -f subprojects/dlg/include/dlg/output.h ]; then
+      local dlg_pkg="${current_dir}/src/freetype-dlg-${freetype_dlg_sha}.tar.gz"
+      if [ ! -s "${dlg_pkg}" ]; then
+        echo "${CWARNING}freetype-dlg archive not in src/, fetching pinned dlg ${freetype_dlg_sha:0:8}...${CEND}"
+        wget -q --timeout=30 --tries=3 -O "${dlg_pkg}" \
+          "https://github.com/nyorain/dlg/archive/${freetype_dlg_sha}.tar.gz" || {
+          echo "${CERROR}Could not fetch freetype 'dlg' submodule${CEND}"; popd > /dev/null; return 1; }
+      fi
+      mkdir -p subprojects/dlg
+      tar -xzf "${dlg_pkg}" -C subprojects/dlg --strip-components=1 || { popd > /dev/null; return 1; }
+      echo "[freetype] populated subprojects/dlg from dlg ${freetype_dlg_sha:0:8}"
+    fi
     ./configure --prefix=${freetype_install_dir} --enable-freetype-config || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }
     ln -sf ${freetype_install_dir}/include/freetype2/* /usr/include/
