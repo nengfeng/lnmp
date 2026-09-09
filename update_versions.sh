@@ -294,7 +294,15 @@ for php_major in "8.3" "8.4" "8.5"; do
       up_to_date=$((up_to_date + 1))
     fi
   else
-    results="${results}⚠️  PHP ${php_major}: 无法获取\n"
+    # Distinguish "the feed fetch itself failed" from "the feed is fine but has
+    # no stable tag for this branch". tags.atom only lists a few most-recent
+    # stable tags, so an EOL/maintenance branch (e.g. PHP 8.3) drops off it and
+    # yields no match even though the fetch succeeded.
+    if [ -z "$php_atom" ]; then
+      results="${results}⚠️  PHP ${php_major}: 无法获取 (tags.atom 抓取失败/为空，请检查网络)\n"
+    else
+      results="${results}⚠️  PHP ${php_major}: 无法获取 (官方 tags.atom 无该版本稳定 tag：feed 仅列最近少量 tag，此分支多已 EOL/维护期、近期无新发布)\n"
+    fi
     check_failed=$((check_failed + 1))
   fi
 done
