@@ -301,6 +301,12 @@ install_web_server() {
     rm -rf ${install_dir}
     fail_msg "${server_type}"
   fi
+
+  # Undo the 'pushd ${src_name}' at the top of the build so this function is
+  # CWD-neutral. Without it the caller's single 'popd' only returns to src/,
+  # not the repo root, and the next relative '. include/xxx.sh' source in
+  # install.sh fails with "No such file or directory".
+  popd > /dev/null
 }
 
 # Post-install web server setup
