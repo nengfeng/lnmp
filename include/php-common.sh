@@ -101,6 +101,15 @@ install_php_deps() {
       tar -xzf "${dlg_pkg}" -C subprojects/dlg --strip-components=1 || { popd > /dev/null; return 1; }
       echo "[freetype] populated subprojects/dlg from dlg ${freetype_dlg_sha:0:8}"
     fi
+    # A GitHub git-archive of freetype ships only the build templates
+    # (builds/unix/configure.raw), not the generated autotools scripts, so the
+    # mkbuild's 'cd builds/unix; ./configure' fails with "not found". Regenerate
+    # them with autogen.sh when the tree lacks the generated configure.
+    # Needs autoconf/automake/libtool (see check_sw.sh).
+    if [ ! -f builds/unix/configure ] && [ -f autogen.sh ]; then
+      echo "${CMSG}freetype tree lacks generated builds/unix/configure (git source); running autogen.sh...${CEND}"
+      ./autogen.sh || { popd > /dev/null; return 1; }
+    fi
     ./configure --prefix=${freetype_install_dir} --enable-freetype-config || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }
     ln -sf ${freetype_install_dir}/include/freetype2/* /usr/include/
