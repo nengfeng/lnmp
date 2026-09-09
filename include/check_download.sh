@@ -548,7 +548,11 @@ checkDownload() {
   if [[ "${pecl_imagick}" == 1 ]]; then
     echo "Download ImageMagick..."
     local imagemagick_filename="ImageMagick-${imagemagick_ver}.tar.gz"
-    wget --tries=6 -c -O "${imagemagick_filename}" "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${imagemagick_ver}.tar.gz" || die_hard "Failed to download ImageMagick ${imagemagick_ver} from GitHub"
+    # Use Download_src (not bare wget) so an existing complete file is reused
+    # instead of being re-fetched on every run; the GitHub tag archive unpacks
+    # to ImageMagick-${ver}, which is exactly the dir the build step expects.
+    src_url="https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${imagemagick_ver}.tar.gz"
+    Download_src "${imagemagick_filename}"
     echo "Download imagick..."
     src_url="https://pecl.php.net/get/imagick-${imagick_ver}.tgz"
     Download_src
