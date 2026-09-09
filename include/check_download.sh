@@ -251,6 +251,13 @@ download_openssl() {
 checkDownload() {
   pushd ${current_dir}/src > /dev/null
 
+  # Per-component download fallback is off by default; individual blocks that
+  # support a mirror/failover source set these right before their Download_src
+  # call and clear them right after so the values do not leak into the next
+  # component's download.
+  local src_url_fallback=""
+  local src_expected_dir=""
+
   # Mirror detection
   if [[ "${MIRROR_MODE}" == "china" ]]; then
     USE_CHINA_MIRROR="y"
@@ -457,9 +464,13 @@ checkDownload() {
     Download_src
     verify_pgp_signature "curl-${curl_ver}.tar.gz" "https://curl.se/download/curl-${curl_ver}.tar.gz.asc" "Curl" || die_hard "PGP signature verification failed for curl-${curl_ver}.tar.gz"
 
-    # freetype (official only)
+    # freetype (official only, with GitHub fallback if savannah is down)
     src_url="https://download.savannah.gnu.org/releases/freetype/freetype-${freetype_ver}.tar.gz"
+    src_url_fallback="https://github.com/freetype/freetype/archive/refs/tags/VER-${freetype_ver//./-}.tar.gz"
+    src_expected_dir="freetype-${freetype_ver}"
     Download_src
+    src_url_fallback=""
+    src_expected_dir=""
 
     # argon2 (GitHub) - only needed when can't use OpenSSL built-in Argon2
     # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip
