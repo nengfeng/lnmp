@@ -16,6 +16,7 @@ pushd ${current_dir} > /dev/null
 . ./options.conf
 . ./include/color.sh
 . ./include/check_dir.sh
+. ./include/common.sh
 [ ! -d "${db_install_dir}" ] && { echo "${CFAILURE}Database is not installed on your system! ${CEND}"; exit 1; }
 
 Show_Help() {
@@ -45,6 +46,15 @@ while [ $# -gt 0 ]; do
         echo "${CFAILURE}Password cannot contain single quotes (') or backslashes (\\)${CEND}"
         exit 1
       fi
+      # Same sed hazards the interactive path guards against: a '+' terminates
+      # the 's+...+...+' used to write options.conf below, and '&'/'|' are
+      # replacement/match specials. Reject the whole + | & set here too.
+      case "${New_dbrootpwd}" in
+        *'+'*|*'|'*|*'&'*)
+          echo "${CFAILURE}Password cannot contain + or | or &${CEND}"
+          exit 1
+          ;;
+      esac
       password_flag=y
       ;;
     --)
@@ -71,7 +81,7 @@ Input_dbrootpwd() {
 }
 
 Reset_Interaction_dbrootpwd() {
-  local pwd_escaped=$(echo "${New_dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
+  local pwd_escaped=$(escape_password "${New_dbrootpwd}")
   ${db_install_dir}/bin/mysqladmin -uroot -p"${dbrootpwd}" password "${New_dbrootpwd}" -h localhost > /dev/null 2>&1
   status_Localhost=$(echo $?)
   ${db_install_dir}/bin/mysqladmin -uroot -p"${dbrootpwd}" password "${New_dbrootpwd}" -h 127.0.0.1 > /dev/null 2>&1
@@ -113,7 +123,7 @@ Reset_force_dbrootpwd() {
   # FLUSH PRIVILEGES reloads the grant tables, enabling ALTER USER
   # (official recipe for skip-grant-tables mode)
   echo "${CMSG}Setting new password...${CEND}"
-  local escaped_pwd=$(echo "${New_dbrootpwd}" | sed 's/\\/\\\\/g; s/'\''/\\'\''/g')
+  local escaped_pwd=$(escape_password "${New_dbrootpwd}")
   local reset_ok=n rc_127=0
   ${db_install_dir}/bin/mysql -uroot -hlocalhost << EOF 2>/dev/null
 FLUSH PRIVILEGES;
