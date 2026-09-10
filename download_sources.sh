@@ -206,7 +206,7 @@ get_version() {
     boost)          ver=${VERSIONS[boost_ver]} ;;
     boost-old)      ver=${VERSIONS[boost_oldver]} ;;
     lua-nginx-module) ver=${VERSIONS[lua_nginx_module_ver]} ;;
-    ngx-devel-kit)  ver="0.3.3" ;;
+    ngx-devel-kit)  ver=${VERSIONS[ngx_devel_kit_ver]} ;;
     luajit2)        ver=${VERSIONS[luajit2_ver]} ;;
     lua-resty-core) ver=${VERSIONS[lua_resty_core_ver]} ;;
     lua-resty-lrucache) ver=${VERSIONS[lua_resty_lrucache_ver]} ;;
