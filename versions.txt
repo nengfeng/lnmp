@@ -40,7 +40,7 @@ freetype_ver=2.14.3
 # build freetype 2.14+ from a plain source tarball; re-derive when freetype_ver
 # bumps: github.com/freetype/freetype/contents/subprojects/dlg?ref=<tag>
 freetype_dlg_sha=395ccad2c1e0daae535c4d20bb0a3f2424648e17
-icu4c_ver=63_1
+icu4c_ver=78.3
 libsodium_ver=1.0.22
 libzip_ver=1.11.4
 argon2_ver=20190702

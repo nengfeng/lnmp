@@ -196,7 +196,7 @@ installDepsUbuntu() {
 installDepsBySrc() {
   pushd ${current_dir}/src > /dev/null
   if ! command -v icu-config > /dev/null 2>&1 || icu-config --version | grep '^3.' || [[ "${Ubuntu_ver}" == "20" ]]; then
-    tar xzf icu4c-${icu4c_ver}-src.tgz || { popd > /dev/null; return 1; }
+    tar xzf icu4c-${icu4c_ver}-sources.tgz || { popd > /dev/null; return 1; }
     pushd icu/source > /dev/null
     ./configure --prefix=/usr/local || { popd > /dev/null; return 1; }
     compile_and_install || { popd > /dev/null; return 1; }

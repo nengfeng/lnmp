@@ -273,7 +273,7 @@ checkDownload() {
   # icu (GitHub only)
   if ! command -v icu-config >/dev/null 2>&1 || icu-config --version | grep '^3.' || [[ "${Ubuntu_ver}" == "20" ]]; then
     echo "Download icu..."
-    src_url="https://github.com/unicode-org/icu/releases/download/release-${icu4c_ver/_/-}/icu4c-${icu4c_ver}-src.tgz"
+    src_url="https://github.com/unicode-org/icu/releases/download/release-${icu4c_ver}/icu4c-${icu4c_ver}-sources.tgz"
     Download_src
   fi
 
