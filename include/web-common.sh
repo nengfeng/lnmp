@@ -185,7 +185,7 @@ install_web_server() {
   if [ ! -e "/usr/local/lib/libluajit-5.1.so" ] || [ ! -f "/usr/local/include/luajit-2.1/luajit.h" ]; then
     _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}" || fail_msg "${server_type}"
     pushd "luajit2-${luajit2_ver}" > /dev/null
-    make -j$(nproc) && make install
+    make -j$(nproc) && make install || fail_msg "LuaJIT"
     popd > /dev/null
     rm -rf "luajit2-${luajit2_ver}"
     ldconfig
