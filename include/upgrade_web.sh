@@ -180,7 +180,6 @@ Upgrade_Nginx() {
 
     # Build LuaJIT if not present
     if [ ! -e "/usr/local/lib/libluajit-5.1.so" ]; then
-      ${current_dir}/upgrade.sh --script > /dev/null
       src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
       tar xzf "luajit2-${luajit2_ver}.tar.gz"
       pushd "luajit2-${luajit2_ver}"
@@ -367,7 +366,6 @@ Upgrade_Tengine() {
 
     # Build LuaJIT and install lua deps if not present
     if [ ! -e "/usr/local/lib/libluajit-5.1.so" ]; then
-      ${current_dir}/upgrade.sh --script > /dev/null
       src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
       tar xzf "luajit2-${luajit2_ver}.tar.gz"
       pushd "luajit2-${luajit2_ver}"
