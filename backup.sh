@@ -193,18 +193,28 @@ web_local_backup() {
 # Backup website to remote server
 # Usage: web_remote_backup
 web_remote_backup() {
+  local web_max_mb="${web_archive_max_mb:-1024}"
+  local W size_mb Web_GREP Web_FILE
   for W in $(get_items "${website_name}"); do
-    if [ "$(du -sm "${wwwroot_dir}/${W}" 2>/dev/null | awk '{print $1}')" -lt 2048 ]; then
+    size_mb=$(du -sm "${wwwroot_dir}/${W}" 2>/dev/null | awk '{print $1}')
+    if [ -n "${size_mb}" ] && [ "${size_mb}" -lt "${web_max_mb}" ]; then
+      # Small/medium site: archive it, then push just that archive
       if ! ./website_bk.sh "${W}"; then
         backup_failed=1
         continue
       fi
-      local Web_GREP Web_FILE
       Web_GREP="Web_${W}_$(date +%Y%m%d)"
       Web_FILE=$(command ls -t "${backup_dir}/${Web_GREP}"* 2>/dev/null | head -1 | xargs -r basename)
-      echo "file:::${backup_dir}/${Web_FILE} ${backup_dir} push" >> config_backup.txt
-      echo "com:::[ -e \"${backup_dir}/${Web_FILE}\" ] && rm -rf ${backup_dir}/Web_${W}_$(date +%Y%m%d --date="${expired_days} days ago")_*.tgz" >> config_backup.txt
+      if [ -n "${Web_FILE}" ]; then
+        echo "file:::${backup_dir}/${Web_FILE} ${backup_dir} push" >> config_backup.txt
+        echo "com:::[ -e \"${backup_dir}/${Web_FILE}\" ] && rm -rf ${backup_dir}/Web_${W}_$(date +%Y%m%d --date="${expired_days} days ago")_*.tgz" >> config_backup.txt
+      else
+        # No archive artifact: push this site's own raw directory, NEVER the
+        # whole backup dir (which would leak every DB / other-site backup).
+        echo "file:::${wwwroot_dir}/${W} ${backup_dir} push" >> config_backup.txt
+      fi
     else
+      # Large site (or unknown size): push the raw site directory directly
       echo "file:::${wwwroot_dir}/${W} ${backup_dir} push" >> config_backup.txt
     fi
   done

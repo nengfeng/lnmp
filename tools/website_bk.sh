@@ -12,7 +12,7 @@ NewFile=${backup_dir}/Web_${WebSite}_$(date +%Y%m%d_%H).tgz
 chmod 700 ${backup_dir} 2>/dev/null
 [ ! -e "${wwwroot_dir}/${WebSite}" ] && { echo "[${wwwroot_dir}/${WebSite}] not exist" >> ${LogFile} ;  exit 1 ; }
 
-if [ "$(du -sm "${wwwroot_dir}/${WebSite}" | awk '{print $1}')" -lt 1024 ]; then
+if [ "$(du -sm "${wwwroot_dir}/${WebSite}" | awk '{print $1}')" -lt "${web_archive_max_mb:-1024}" ]; then
   # Expire backups by AGE, not by exact calendar date - see db_bk.sh
   if [ "${expired_days}" -gt 0 ] 2>/dev/null; then
     ExpiredList=$(find "${backup_dir}" -maxdepth 1 -type f -name "Web_${WebSite}_*.tgz" -mtime +${expired_days} -print -exec rm -f {} + 2>/dev/null)
