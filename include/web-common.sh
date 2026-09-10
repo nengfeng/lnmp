@@ -183,7 +183,7 @@ install_web_server() {
   # Build LuaJIT first (required by lua-nginx-module)
   # Rebuild if either library or headers are missing (partial uninstall)
   if [ ! -e "/usr/local/lib/libluajit-5.1.so" ] || [ ! -f "/usr/local/include/luajit-2.1/luajit.h" ]; then
-    _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}"
+    _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}" || fail_msg "${server_type}"
     pushd "luajit2-${luajit2_ver}" > /dev/null
     make -j$(nproc) && make install
     popd > /dev/null
@@ -195,14 +195,14 @@ install_web_server() {
   export LUAJIT_LIB=/usr/local/lib
   export LUAJIT_INC=/usr/local/include/luajit-2.1
 
-  _extract_tar "pcre2-${pcre_ver}.tar.gz"
-  _extract_tar "${src_name}.tar.gz"
-  _extract_tar "openssl-${openssl_ver}.tar.gz"
-  _extract_tar "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+  _extract_tar "pcre2-${pcre_ver}.tar.gz" || fail_msg "${server_type}"
+  _extract_tar "${src_name}.tar.gz" || fail_msg "${server_type}"
+  _extract_tar "openssl-${openssl_ver}.tar.gz" || fail_msg "${server_type}"
+  _extract_tar "lua-nginx-module-${lua_nginx_module_ver}.tar.gz" || fail_msg "${server_type}"
 
   # Install lua-resty-core (pure Lua library)
   if [ ! -e "/usr/local/lib/lua/5.1/resty/core.lua" ]; then
-    _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+    _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz" || fail_msg "${server_type}"
     pushd "lua-resty-core-${lua_resty_core_ver}" > /dev/null
     make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
     popd > /dev/null
@@ -215,7 +215,7 @@ install_web_server() {
   fi
   # Install lua-resty-lrucache (pure Lua library)
   if [ ! -e "/usr/local/lib/lua/5.1/resty/lrucache.lua" ]; then
-    _extract_tar "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+    _extract_tar "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz" || fail_msg "${server_type}"
     pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}" > /dev/null
     make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
     popd > /dev/null
@@ -223,7 +223,7 @@ install_web_server() {
   fi
   # Build lua-cjson (Lua C module for JSON support)
   if [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ]; then
-    _extract_tar "lua-cjson-${lua_cjson_ver}.tar.gz"
+    _extract_tar "lua-cjson-${lua_cjson_ver}.tar.gz" || fail_msg "${server_type}"
     pushd "lua-cjson-${lua_cjson_ver}" > /dev/null
     sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
     make -j$(nproc) && make install
