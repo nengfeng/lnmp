@@ -163,9 +163,21 @@ do
   IP_init=$(expr $IP_init + 50)
 done
 
+# Wait for every backgrounded per-host transfer to finish before reporting.
+# Previously this was fire-and-forget with an unconditional 'exit 0', so
+# callers could not tell whether the offsite push actually succeeded.
+wait
+
+# thread.sh writes '...Try Out All Password Failed' to logs/<IP>.log when a
+# push fails; an unreachable remote is recorded in ipnologin.txt (today).
+# Surface either as a non-zero exit so backup.sh can mark the backup failed.
+MABS_FAILED=0
+grep -q 'Try Out All Password Failed' logs/*.log 2>/dev/null && MABS_FAILED=1
+grep -q "$(date +%F)" ipnologin.txt 2>/dev/null && MABS_FAILED=1
+
 ENDDATETIME=$(date "+%F %T")
 
 echo "$BEGINDATETIME -- $ENDDATETIME"
 echo "$0 $* --excutes over!"
 
-exit 0
+exit ${MABS_FAILED}

@@ -297,6 +297,13 @@ run_backup() {
       [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_remote_backup
       [ -n "$(echo "${backup_content}" | grep -ow 'web')" ] && web_remote_backup
       ./mabs.sh -c config_backup.txt -T -1 | tee -a mabs.log
+      # mabs.sh now exits non-zero when a remote push fails or a remote is
+      # unreachable; without checking PIPESTATUS[0], tee would mask that and a
+      # failed offsite backup would be reported as a success.
+      if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+        echo "${CWARNING}Remote backup push had failures - see mabs.log, ${current_dir}/tools/logs/ and ${current_dir}/tools/ipnologin.txt${CEND}"
+        backup_failed=1
+      fi
       ;;
     oss)
       [ -n "$(echo "${backup_content}" | grep -ow 'db')" ] && db_cloud_backup oss "${oss_bucket}"
