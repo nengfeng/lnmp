@@ -13,8 +13,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      # Pin a shellcheck version so the calibrated .shellcheckrc stays reproducible.
+      - name: Install shellcheck 0.10.0
+        run: |
+          set -euo pipefail
+          VER=0.10.0
+          curl -sSL -o sc.tar.xz "https://github.com/koalaman/shellcheck/releases/download/v${VER}/shellcheck-v${VER}.linux.x86_64.tar.xz"
+          tar xJf sc.tar.xz
+          sudo install -m 0755 "shellcheck-v${VER}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
 
       # 1. Every shell script must parse
       - name: Bash syntax check
@@ -25,9 +32,10 @@ jobs:
           done
           exit $rc
 
-      # 2. shellcheck at error severity (calibrated exclusions in .shellcheckrc)
+      # 2. shellcheck at ERROR severity (calibrated exclusions in .shellcheckrc).
+      #    No -x/-s: the scripts are #!/bin/bash, so shellcheck auto-detects bash.
       - name: Shellcheck
-        run: shellcheck -x bash -S error $(find . -name '*.sh' -not -path './src/*')
+        run: shellcheck -S error $(find . -name '*.sh' -not -path './src/*')
 
       # 3. Anti-regression static checks (swallowed exits, unguarded extractions, CWD balance)
       - name: Static checks
