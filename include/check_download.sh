@@ -289,7 +289,7 @@ checkDownload() {
 
   # Memory allocator (tcmalloc / jemalloc)
   if [[ ${nginx_option} =~ ^[1-3]$ ]] || [[ "${db_option}" =~ ^[1-8]$ ]]; then
-    case "${allocator_option:-2}" in
+    case "${allocator_option:-3}" in
       2)
         echo "Download tcmalloc (gperftools)..."
         src_url="https://github.com/gperftools/gperftools/releases/download/gperftools-${tcmalloc_ver}/gperftools-${tcmalloc_ver}.tar.gz"

@@ -389,7 +389,7 @@ install_mariadb_source() {
     -DDEFAULT_CHARSET=utf8mb4 \
     -DDEFAULT_COLLATION=utf8mb4_general_ci \
     -DEXTRA_CHARSETS=all \
-    -DCMAKE_EXE_LINKER_FLAGS="${allocator_ldflag--ltcmalloc}" || rc=$?
+    -DCMAKE_EXE_LINKER_FLAGS="${allocator_ldflag--ljemalloc}" || rc=$?
   if [ ${rc} -eq 0 ]; then
     make -j ${threads} || rc=$?
   fi

@@ -56,7 +56,7 @@ get_mirror_url() {
 # Must be called after options.conf is sourced
 # Usage: init_allocator
 init_allocator() {
-  allocator_option=${allocator_option:-2}
+  allocator_option=${allocator_option:-3}
   case "${allocator_option}" in
     1)
       allocator_ldflag=""
@@ -74,10 +74,10 @@ init_allocator() {
       allocator_name="jemalloc"
       ;;
     *)
-      allocator_ldflag="-ltcmalloc"
-      allocator_so="libtcmalloc.so"
-      allocator_name="tcmalloc"
-      allocator_option=2
+      allocator_ldflag="-ljemalloc"
+      allocator_so="libjemalloc.so"
+      allocator_name="jemalloc"
+      allocator_option=3
       ;;
   esac
 }
