@@ -1,0 +1,38 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  lint:
+    name: Shell static analysis + offline logic tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      # 1. Every shell script must parse
+      - name: Bash syntax check
+        run: |
+          rc=0
+          for f in $(find . -name '*.sh' -not -path './src/*'); do
+            bash -n "$f" || { echo "syntax error: $f"; rc=1; }
+          done
+          exit $rc
+
+      # 2. shellcheck at error severity (calibrated exclusions in .shellcheckrc)
+      - name: Shellcheck
+        run: shellcheck -x bash -S error $(find . -name '*.sh' -not -path './src/*')
+
+      # 3. Anti-regression static checks (swallowed exits, unguarded extractions, CWD balance)
+      - name: Static checks
+        run: bash tools/lint/static_checks.sh
+
+      # 4. Offline logic tests (stubbed, no network / no build)
+      - name: Offline logic tests
+        run: bash tools/test_offline.sh

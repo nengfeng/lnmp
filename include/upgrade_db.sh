@@ -206,4 +206,5 @@ Upgrade_DB() {
       setup_mysql_root ${mysql_install_dir} ${dbrootpwd} "" y
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
     fi
+  popd > /dev/null
 }
