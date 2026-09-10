@@ -6,9 +6,12 @@
 SYS_ARCH_M=$(uname -m)
 
 # Purge distro MySQL/MariaDB packages that conflict with our own installs.
+# Only when installing our own MySQL/MariaDB (db_option 1-7). PostgreSQL
+# (db_option 8) coexists fine with the distro's MySQL/MariaDB, so it must NOT
+# trigger this purge or a pre-existing DB gets wiped.
 # Usage: purge_conflicting_db_packages
 purge_conflicting_db_packages() {
-  if [[ "${db_option}" =~ ^[1-8]$ ]]; then
+  if [[ "${db_option}" =~ ^[1-7]$ ]]; then
     local pkgList="mysql-client mysql-server mysql-common mariadb-client mariadb-server mariadb-common"
     local Package
     for Package in ${pkgList}; do
