@@ -348,7 +348,11 @@ install_mariadb_binary() {
   local safe_script="${install_dir}/bin/mariadbd-safe"
   [ ! -f "${safe_script}" ] && safe_script="${install_dir}/bin/mysqld_safe"
   if [ -f "${safe_script}" ]; then
-    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so:-libtcmalloc.so}"'@' ${safe_script}
+    # Preload the allocator .so only when one is selected; allocator_option=1
+    # ("none") leaves allocator_so empty, so skip the injection for that case.
+    if [ -n "${allocator_so}" ]; then
+      sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so}"'@' ${safe_script}
+    fi
     sed -i "s@/usr/local/mysql@${install_dir}@g" ${safe_script}
   fi
 }
@@ -385,7 +389,7 @@ install_mariadb_source() {
     -DDEFAULT_CHARSET=utf8mb4 \
     -DDEFAULT_COLLATION=utf8mb4_general_ci \
     -DEXTRA_CHARSETS=all \
-    -DCMAKE_EXE_LINKER_FLAGS="${allocator_ldflag:--ltcmalloc}" || rc=$?
+    -DCMAKE_EXE_LINKER_FLAGS="${allocator_ldflag--ltcmalloc}" || rc=$?
   if [ ${rc} -eq 0 ]; then
     make -j ${threads} || rc=$?
   fi
@@ -1148,8 +1152,11 @@ install_db_common() {
     return 1
   fi
 
-  # Add tcmalloc to mysqld_safe
-  sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so:-libtcmalloc.so}"'@' ${install_dir}/bin/mysqld_safe 2>/dev/null || true
+  # Preload the allocator .so into mysqld_safe (skipped when allocator_option=1
+  # "none" left allocator_so empty).
+  if [ -n "${allocator_so}" ]; then
+    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so}"'@' ${install_dir}/bin/mysqld_safe 2>/dev/null || true
+  fi
   # Update password in options.conf
   local pwd_escaped=$(escape_password "${dbrootpwd}")
   sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
