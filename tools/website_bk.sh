@@ -35,8 +35,13 @@ if [ "$(du -sm "${wwwroot_dir}/${WebSite}" | awk '{print $1}')" -lt 1024 ]; then
     fi
   fi
 else
-  # Site is too large to archive: sync its files into the backup dir instead
-  rsync -crazP --delete ${wwwroot_dir}/${WebSite} ${backup_dir} || {
+  # Site is too large to archive: keep a synced mirror under its own subdir
+  # (${backup_dir}/${WebSite}). Both paths carry a trailing slash so
+  # --delete is scoped to the site's mirror only - it must NEVER prune the
+  # shared ${backup_dir}, which also holds DB_*.tgz and other Web_* archives.
+  site_mirror="${backup_dir}/${WebSite}"
+  mkdir -p "${site_mirror}"
+  rsync -crazP --delete "${wwwroot_dir}/${WebSite}/" "${site_mirror}/" || {
     echo "[${wwwroot_dir}/${WebSite}] rsync backup FAILED" >> "${LogFile}"
     exit 1
   }
