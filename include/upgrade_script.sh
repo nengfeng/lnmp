@@ -14,8 +14,19 @@ Upgrade_Script() {
     # new tree is verified good (a failed download previously deleted
     # options.conf via the EXIT trap and still reported success)
     wget -qc "https://github.com/nengfeng/lnmp/archive/main.tar.gz" -O "${UPGRADE_TMP_DIR}/lnmp.tar.gz"
-    if [ ! -s "${UPGRADE_TMP_DIR}/lnmp.tar.gz" ] || ! tar xzf "${UPGRADE_TMP_DIR}/lnmp.tar.gz" -C "${UPGRADE_TMP_DIR}/" || [ ! -d "${UPGRADE_TMP_DIR}/lnmp" ]; then
+    if [ ! -s "${UPGRADE_TMP_DIR}/lnmp.tar.gz" ] || ! tar xzf "${UPGRADE_TMP_DIR}/lnmp.tar.gz" -C "${UPGRADE_TMP_DIR}/"; then
       echo "${CFAILURE}LNMP upgrade failed: could not download or extract the package. Your files were not modified.${CEND}"
+      popd > /dev/null
+      return 1
+    fi
+
+    # GitHub branch archives extract to a single top-level dir named <repo>-<ref>
+    # (here 'lnmp-main'), NOT 'lnmp'. Detect it rather than hardcoding, so a
+    # future repo/ref rename can't break the overlay; verify it looks like a
+    # real tree before touching any user files.
+    new_root=$(find "${UPGRADE_TMP_DIR}" -mindepth 1 -maxdepth 1 -type d -print -quit)
+    if [ -z "${new_root}" ] || [ ! -f "${new_root}/install.sh" ] || [ ! -f "${new_root}/options.conf" ]; then
+      echo "${CFAILURE}LNMP upgrade failed: could not locate the extracted tree. Your files were not modified.${CEND}"
       popd > /dev/null
       return 1
     fi
@@ -31,11 +42,11 @@ Upgrade_Script() {
     grep -vE '^#|^$' ./options.conf | while IFS='=' read -r Key Value; do
       [[ "${Key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
       [ -z "${Key}" ] && continue
-      grep -v "^${Key}=" "${UPGRADE_TMP_DIR}/lnmp/options.conf" > "${UPGRADE_TMP_DIR}/lnmp/options.conf.new" 2>/dev/null \
-        && mv "${UPGRADE_TMP_DIR}/lnmp/options.conf.new" "${UPGRADE_TMP_DIR}/lnmp/options.conf"
-      printf '%s\n' "${Key}=${Value}" >> "${UPGRADE_TMP_DIR}/lnmp/options.conf"
+      grep -v "^${Key}=" "${new_root}/options.conf" > "${new_root}/options.conf.new" 2>/dev/null \
+        && mv "${new_root}/options.conf.new" "${new_root}/options.conf"
+      printf '%s\n' "${Key}=${Value}" >> "${new_root}/options.conf"
     done
-    /bin/cp -R "${UPGRADE_TMP_DIR}/lnmp/"* "${current_dir}/"
+    /bin/cp -R "${new_root}/"* "${current_dir}/"
     rm -rf "${UPGRADE_TMP_DIR}"
     trap - EXIT
     [[ "${ois_flag}" == "n" ]] && rm -f ss.sh LICENSE README.md
