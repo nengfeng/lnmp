@@ -305,8 +305,6 @@ setup_mysql_logrotate() {
   local datadir=$1
   local installdir=$2
   cat > /etc/logrotate.d/mysql << EOF
-${datadir}/*-error.log
-${datadir}/*-slow.log
 ${datadir}/*.log {
   daily
   rotate 7
