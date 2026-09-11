@@ -789,6 +789,38 @@ fi
 if [[ ${nginx_option} =~ ^[1-3]$ ]]; then
   printf "%b" "\n$(printf "%-32s" "Index URL:")${CMSG}http://${IPADDR}/${CEND}\n"
 fi
+
+# Security notice: the debug/diagnostic/management tools below are publicly
+# reachable on the default site by default. In production, delete the debug
+# files and relocate phpMyAdmin so they are not reachable from the Internet.
+_debug_panels=()
+for _p in phpinfo.php ocp.php xprober.php apc.php; do
+  if [ -e "${wwwroot_dir}/default/${_p}" ]; then _debug_panels+=("${_p}"); fi
+done
+if [ -d "${wwwroot_dir}/default/webgrind" ]; then _debug_panels+=("webgrind"); fi
+if [ "${#_debug_panels[@]}" -gt 0 ] || [ "${phpmyadmin_flag}" == y ]; then
+  echo
+  echo "${CWARNING}==============================================================${CEND}"
+  echo "${CWARNING}  SECURITY NOTICE - clean up publicly reachable debug tools${CEND}"
+  echo "${CWARNING}==============================================================${CEND}"
+  if [ "${#_debug_panels[@]}" -gt 0 ]; then
+    echo "  These debug/diagnostic files were created and are publicly reachable:"
+    for _p in "${_debug_panels[@]}"; do echo "    - ${wwwroot_dir}/default/${_p}"; done
+    echo "  In production, delete them (keep only what your application needs):"
+    _rmargs=""
+    for _p in "${_debug_panels[@]}"; do _rmargs="${_rmargs} ${wwwroot_dir}/default/${_p}"; done
+    echo "    rm -rf${_rmargs}"
+  fi
+  if [ "${phpmyadmin_flag}" == y ]; then
+    echo "  phpMyAdmin is installed and publicly reachable at:"
+    echo "    ${wwwroot_dir}/default/phpMyAdmin   ( http://${IPADDR}/phpMyAdmin )"
+    echo "  Rename it to a non-default name, or move it out of the web root, and move it back only when you need it:"
+    echo "    mv ${wwwroot_dir}/default/phpMyAdmin ${wwwroot_dir}/default/PHPMA.bak   # hide"
+    echo "    mv ${wwwroot_dir}/default/PHPMA.bak   ${wwwroot_dir}/default/phpMyAdmin # restore"
+  fi
+  echo
+fi
+
 if [[ ${ARG_NUM} == 0 ]]; then
   echo "${CMSG}Please restart the server and see if the services start up fine.${CEND}"
   confirm "Do you want to restart OS?" reboot_flag n
