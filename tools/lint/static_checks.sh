@@ -59,5 +59,28 @@ awk '
 ' $FILES
 echo "  (advisory only: early-return paths skew the naive per-function count)"
 
+echo "== 5. package names proven absent must not reappear [HARD] =="
+# Each of these aborted the ENTIRE dependency stage while it was present, and
+# each was verified against the archives (Debian madison / packages.ubuntu.com):
+#   libidn12-dev               - shipped by no Debian or Ubuntu release (libidn-dev is)
+#   software-properties-common - unused here, and Debian 13 (trixie) dropped it
+#   sysv-rc (Ubuntu only)      - shipped by no Ubuntu release; Debian still has it
+# Only the package-list assignment lines are inspected, so the explanatory
+# comments (which do name these packages) cannot trip the check.
+debian_pkgs=$(sed -n '/^installDepsDebian/,/^}/p' include/check_sw.sh | grep -E '^[[:space:]]*(local )?(pkgCommon|pkgExtra)=')
+ubuntu_pkgs=$(sed -n '/^installDepsUbuntu/,/^}/p' include/check_sw.sh | grep -E '^[[:space:]]*(local )?(pkgCommon|pkgExtra)=')
+absent_ok=1
+for n in libidn12-dev software-properties-common; do
+  if echo "${debian_pkgs}${ubuntu_pkgs}" | grep -qw -- "$n"; then
+    echo "  include/check_sw.sh: '$n' is not shipped by any supported release"
+    absent_ok=0
+  fi
+done
+if echo "${ubuntu_pkgs}" | grep -qw -- 'sysv-rc'; then
+  echo "  include/check_sw.sh: 'sysv-rc' does not exist on Ubuntu (init-system-helpers provides update-rc.d)"
+  absent_ok=0
+fi
+[ "$absent_ok" -eq 1 ] && echo "  OK" || FAIL=1
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then echo "STATIC CHECKS: PASS"; exit 0; else echo "STATIC CHECKS: FAIL"; exit 1; fi
