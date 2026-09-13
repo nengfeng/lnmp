@@ -80,15 +80,15 @@ install_security_updates() {
 # Two distinct failures, both reported in one pass instead of one package per
 # CI round:
 #   - a name this release does not ship (rename/removal) would abort the whole
-#     list, so check the index first, name EVERY unknown package and stop
-#     before touching dpkg;
+#     list, so check the index first (pkg_exists), name EVERY unknown package
+#     and stop before touching dpkg;
 #   - a name that exists but cannot be installed (unmet dependency, conflict,
 #     held package) keeps apt's own error line, which is the actionable part.
 # Usage: apt_install_packages [pkg...]
 apt_install_packages() {
   local Package unknown="" err
   for Package in "$@"; do
-    apt-cache show "${Package}" > /dev/null 2>&1 || unknown="${unknown} ${Package}"
+    pkg_exists "${Package}" || unknown="${unknown} ${Package}"
   done
   if [ -n "${unknown}" ]; then
     echo "${CFAILURE}Not available on this release:${unknown}${CEND}"
@@ -108,6 +108,26 @@ apt_install_packages() {
   return 0
 }
 
+# True when the archive ships a real package named exactly like this.
+#
+# 'apt-cache show' alone is NOT an existence test. For a name that exists only
+# as a virtual package -- no package carries the name, other packages merely
+# Provide it -- apt-cache prints "N: ... as it is purely virtual" / "N: No
+# packages found" and still EXITS 0. Ubuntu 24.04 is exactly that case: the
+# archive has no package named libaio1, only libaio1t64 which Provides it, so
+# the old test declared libaio1 installable and apt aborted the dependency
+# stage with "E: Package 'libaio1' has no installation candidate".
+# Matching the stanza's own Package field against the requested name tells a
+# real package from a purely virtual one on every apt version: a real name
+# always prints 'Package: <name>', a virtual one at most the provider's stanza.
+# A purely virtual name is reported rather than guessed at -- the list should
+# name the real package, and the one-pass message says which.
+# Must run after 'apt-get update': it queries the package index.
+# Usage: pkg_exists <name>
+pkg_exists() {
+  apt-cache show "$1" 2> /dev/null | grep -Fqx "Package: $1"
+}
+
 # Resolve a package name to what this release actually ships.
 #
 # Names drift across releases, and a single unknown name aborts the whole
@@ -115,15 +135,17 @@ apt_install_packages() {
 # 64-bit time_t transition, which renamed runtime libraries on Debian 13 /
 # Ubuntu 24.04+ by appending "t64" -- and the old name was *removed*, not
 # kept as an alias: libaio1 -> libaio1t64, libglib2.0-0 -> libglib2.0-0t64.
+# The removal is invisible to 'apt-cache show', which keeps answering for the
+# old name as long as the new package Provides it -- hence pkg_exists above.
 # Renames that do not follow this pattern (libidn12-dev -> libidn-dev) are
 # handled explicitly in the per-release lists.
 #
 # Must run after 'apt-get update': it queries the package index.
 # Usage: resolve_pkg_name <name>
 resolve_pkg_name() {
-  if apt-cache show "$1" > /dev/null 2>&1; then
+  if pkg_exists "$1"; then
     echo "$1"
-  elif apt-cache show "$1t64" > /dev/null 2>&1; then
+  elif pkg_exists "$1t64"; then
     echo "$1t64"
   else
     # Unknown under both names: hand back the original so the apt error
