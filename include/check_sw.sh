@@ -75,15 +75,32 @@ install_security_updates() {
   rm -f ${tmp_list}
 }
 
-# Install a package list, aborting on the first package that cannot be
-# installed (the old per-package loop swallowed every failure silently and
-# left builds without their headers).
+# Install a package list.
+#
+# Two distinct failures, both reported in one pass instead of one package per
+# CI round:
+#   - a name this release does not ship (rename/removal) would abort the whole
+#     list, so check the index first, name EVERY unknown package and stop
+#     before touching dpkg;
+#   - a name that exists but cannot be installed (unmet dependency, conflict,
+#     held package) keeps apt's own error line, which is the actionable part.
 # Usage: apt_install_packages [pkg...]
 apt_install_packages() {
-  local Package failed=0
+  local Package unknown="" err
   for Package in "$@"; do
-    if ! apt-get --no-install-recommends -y install "${Package}" > /dev/null 2>&1; then
+    apt-cache show "${Package}" > /dev/null 2>&1 || unknown="${unknown} ${Package}"
+  done
+  if [ -n "${unknown}" ]; then
+    echo "${CFAILURE}Not available on this release:${unknown}${CEND}"
+    echo "${CFAILURE}Add the replacement to the per-release list (or resolve_pkg_name) in include/check_sw.sh${CEND}"
+    return 1
+  fi
+
+  local failed=0
+  for Package in "$@"; do
+    if ! err=$(apt-get --no-install-recommends -y install "${Package}" 2>&1); then
       echo "${CFAILURE}Failed to install required package: ${Package}${CEND}"
+      echo "${err}" | grep -E '^E:' | tail -n 3 || true
       failed=1
     fi
   done

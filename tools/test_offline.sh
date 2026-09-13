@@ -79,6 +79,21 @@ if _extract_tar "nonexistent-1.0.tar.gz"; then ko "missing tarball should fail";
 mkdir -p goodpkg-1.0; echo hi > goodpkg-1.0/f.txt; tar czf goodpkg-1.0.tar.gz -C "$current_dir/src" goodpkg-1.0; rm -rf goodpkg-1.0
 if _extract_tar "goodpkg-1.0.tar.gz"; then [ -d goodpkg-1.0 ] && ok "present tarball extracts ok" || ko "extracted dir missing"; else ko "present tarball should succeed"; fi
 
+echo "== apt_install_packages (unknown-name diagnostics) =="
+# A name this release does not ship must be reported BEFORE apt is asked to
+# install anything, and every unknown name must appear in that one message --
+# otherwise a distro release that drops N packages costs N CI rounds.
+KNOWN=" libzip-dev "
+APTGET_LOG="$work/aptget.log"
+rm -f "$APTGET_LOG"
+apt-get(){ echo "$*" >> "$APTGET_LOG"; return 0; }
+out="$(apt_install_packages libzip-dev ghostpkg 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && ok "unknown package fails the list" || ko "unknown package did not fail"
+case "$out" in *ghostpkg*) ok "the unknown name is reported" ;; *) ko "unknown name missing from output [$out]" ;; esac
+[ ! -s "$APTGET_LOG" ] && ok "no install attempted while a name is unknown" || ko "apt-get ran despite an unknown name"
+out="$(apt_install_packages libzip-dev 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && ok "all-known list installs cleanly" || ko "known-only list failed [$out]"
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }
