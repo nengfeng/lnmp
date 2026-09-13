@@ -110,18 +110,29 @@ apt_install_packages() {
 
 # True when the archive ships a real package named exactly like this.
 #
-# 'apt-cache show' alone is NOT an existence test. For a name that exists only
-# as a virtual package -- no package carries the name, other packages merely
-# Provide it -- apt-cache prints "N: ... as it is purely virtual" / "N: No
-# packages found" and still EXITS 0. Ubuntu 24.04 is exactly that case: the
-# archive has no package named libaio1, only libaio1t64 which Provides it, so
-# the old test declared libaio1 installable and apt aborted the dependency
-# stage with "E: Package 'libaio1' has no installation candidate".
-# Matching the stanza's own Package field against the requested name tells a
-# real package from a purely virtual one on every apt version: a real name
-# always prints 'Package: <name>', a virtual one at most the provider's stanza.
-# A purely virtual name is reported rather than guessed at -- the list should
-# name the real package, and the one-pass message says which.
+# 'apt-cache show' is NOT an existence test -- not its output, not its exit
+# code. A name that no package carries is still answered for, and still exits
+# 0, in two distinct situations:
+#   - another package Provides it (a true virtual package). On Ubuntu 24.04
+#     libglib2.0-0 is gone from the archive, but libglib2.0-0t64 still says
+#     "Provides: libglib2.0-0", so apt-cache prints the provider's stanza;
+#   - another package merely refers to it in a dependency, apt's wording
+#     being "referred to by another package". multiverse's libodpic4 still
+#     says "Recommends: libaio1" although nothing in the archive is called
+#     libaio1 -- a dangling reference left by the 64-bit time_t rename. apt
+#     files the name as a virtual package with no version and exits 0 with
+#     only an N: notice on stderr.
+# Only a name that nothing at all mentions makes apt-cache exit non-zero.
+# (apt 2.7.14, the version noble ships: private-show.cc:409-414 chooses Error
+#  vs Notice, private-cacheset.cc:133-186 synthesises the placeholder Pkg.)
+# Requiring the stanza's own Package field to equal the requested name tells a
+# real package from either case on every apt version: a real name prints
+# "Package: <name>", a provider's stanza does not, and a bare reference prints
+# no stanza at all. This is what the old test missed, so it declared libaio1
+# installable and apt aborted the dependency stage with
+# "E: Package 'libaio1' has no installation candidate".
+# A missing name is reported rather than guessed at -- the list should name the
+# real package, and the one-pass message says which.
 # Must run after 'apt-get update': it queries the package index.
 # Usage: pkg_exists <name>
 pkg_exists() {
@@ -135,8 +146,10 @@ pkg_exists() {
 # 64-bit time_t transition, which renamed runtime libraries on Debian 13 /
 # Ubuntu 24.04+ by appending "t64" -- and the old name was *removed*, not
 # kept as an alias: libaio1 -> libaio1t64, libglib2.0-0 -> libglib2.0-0t64.
-# The removal is invisible to 'apt-cache show', which keeps answering for the
-# old name as long as the new package Provides it -- hence pkg_exists above.
+# The removal is invisible to 'apt-cache show': the t64 package does not always
+# Provide the old name (libglib2.0-0t64 does, libaio1t64 does not), so the
+# resolve cannot lean on Provides -- it tries the "t64" suffix itself, and
+# pkg_exists above is what separates a real package from a lingering reference.
 # Renames that do not follow this pattern (libidn12-dev -> libidn-dev) are
 # handled explicitly in the per-release lists.
 #

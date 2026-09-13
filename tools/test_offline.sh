@@ -62,33 +62,41 @@ esc="$(escape_password 'a&b')"
 
 echo "== resolve_pkg_name / pkg_exists (t64 renames) =="
 # Emulate the apt index faithfully; this distinction is exactly what killed the
-# Ubuntu 24.04 preflight:
-#   REAL     -- packages the release actually ships. 'apt-cache show' prints a
-#               'Package: <name>' stanza and exits 0.
-#   PROVIDED -- names no package carries any more; another package only
-#               Provides them (the t64 rename deleted the old name). apt-cache
-#               STILL exits 0 here -- it prints the PROVIDER's stanza -- so exit
-#               status is useless as an existence test, and apt-get then dies
-#               with "no installation candidate". The old stub returned 1 for
-#               this case, which is why every test passed while the distro run
-#               failed.
+# Ubuntu 24.04 preflight. 'apt-cache show' exits 0 for a name no package
+# carries, in two different ways -- so neither its output nor its exit code is
+# an existence test:
+#   REAL     -- the release ships it: stdout is the 'Package: <name>' stanza.
+#   PROVIDED -- gone from the archive, but another package still Provides it
+#               (libglib2.0-0t64 does exactly this for libglib2.0-0). apt-cache
+#               prints the PROVIDER's stanza and exits 0, then apt-get dies
+#               with "no installation candidate".
+#   REFERRED -- gone from the archive with no provider at all, only a stale
+#               dependency mention (multiverse libodpic4 still Recommends
+#               libaio1, left dangling by the t64 rename). apt-cache finds no
+#               stanza, prints only an N: notice on stderr and exits 0.
+# The old stub returned 1 for the last two cases, which is why every test
+# passed while the distro run failed.
 REAL=" libaio1t64 libglib2.0-0t64 libncurses6 libidn-dev libaio-dev "
-PROVIDED=" libaio1 libglib2.0-0 "
+PROVIDED=" libglib2.0-0 "
+REFERRED=" libaio1 "
 apt-cache(){
   [ "$1" = "show" ] || return 1
   case " ${REAL} " in *" $2 "*) echo "Package: $2"; return 0 ;; esac
   case " ${PROVIDED} " in *" $2 "*) echo "Package: ${2}t64"; echo "Provides: $2"; return 0 ;; esac
+  case " ${REFERRED} " in *" $2 "*) return 0 ;; esac   # exit 0, no stdout stanza
   return 1
 }
 pkg_exists libaio1t64 && ok "a package the release ships exists" || ko "real package not found"
-if pkg_exists libaio1; then ko "a purely virtual name was treated as an existing package"; else ok "a purely virtual name is not an existing package"; fi
+if pkg_exists libglib2.0-0; then ko "a provided-only name was treated as an existing package"; else ok "a provided-only name is not an existing package"; fi
+if pkg_exists libaio1; then ko "a merely-referenced name was treated as an existing package"; else ok "a merely-referenced name is not an existing package"; fi
 if pkg_exists absent-pkg; then ko "an absent name was treated as existing"; else ok "an absent name is not an existing package"; fi
-[ "$(resolve_pkg_name libaio1)" = "libaio1t64" ] && ok "virtual-only old name resolves to its t64 name" || ko "t64 rename not resolved (got $(resolve_pkg_name libaio1))"
-[ "$(resolve_pkg_name libglib2.0-0)" = "libglib2.0-0t64" ] && ok "libglib2.0-0 resolves to its t64 name" || ko "libglib2.0-0 t64 rename not resolved"
+[ "$(resolve_pkg_name libaio1)" = "libaio1t64" ] && ok "referenced-only old name resolves to its t64 name" || ko "t64 rename not resolved (got $(resolve_pkg_name libaio1))"
+[ "$(resolve_pkg_name libglib2.0-0)" = "libglib2.0-0t64" ] && ok "provided-only old name resolves to its t64 name" || ko "libglib2.0-0 t64 rename not resolved"
 [ "$(resolve_pkg_name libncurses6)" = "libncurses6" ] && ok "name shipped as-is is not rewritten" || ko "unchanged name was rewritten"
 [ "$(resolve_pkg_name absent-pkg)" = "absent-pkg" ] && ok "unknown name is passed through so apt reports it" || ko "unknown name was rewritten"
 REAL=" libaio1 libglib2.0-0 libidn-dev "
 PROVIDED=""
+REFERRED=""
 [ "$(resolve_pkg_name libaio1)" = "libaio1" ] && ok "pre-t64 release keeps the original name" || ko "old name was rewritten on a pre-t64 release"
 
 echo "== _extract_tar =="
@@ -102,10 +110,11 @@ echo "== apt_install_packages (unknown-name diagnostics) =="
 # A name this release does not ship must be reported BEFORE apt is asked to
 # install anything, and every unknown name must appear in that one message --
 # otherwise a distro release that drops N packages costs N CI rounds.
-# A purely virtual name counts as "not shipped": apt would die on it with
-# "no installation candidate", so the pre-check has to catch it up front.
+# A merely-referenced name counts as "not shipped": apt-cache answers it and
+# exits 0, but apt-get would die on it with "no installation candidate", so the
+# pre-check has to catch it up front.
 REAL=" libzip-dev "
-PROVIDED=" libaio1 "
+REFERRED=" libaio1 "
 APTGET_LOG="$work/aptget.log"
 rm -f "$APTGET_LOG"
 apt-get(){ echo "$*" >> "$APTGET_LOG"; return 0; }
@@ -114,9 +123,9 @@ out="$(apt_install_packages libzip-dev ghostpkg 2>&1)"; rc=$?
 case "$out" in *ghostpkg*) ok "the unknown name is reported" ;; *) ko "unknown name missing from output [$out]" ;; esac
 [ ! -s "$APTGET_LOG" ] && ok "no install attempted while a name is unknown" || ko "apt-get ran despite an unknown name"
 out="$(apt_install_packages libzip-dev libaio1 2>&1)"; rc=$?
-[ "$rc" -ne 0 ] && ok "virtual-only name fails the list" || ko "virtual-only name was accepted"
-case "$out" in *libaio1*) ok "virtual-only name is reported before apt runs" ;; *) ko "virtual-only name missing from output [$out]" ;; esac
-[ ! -s "$APTGET_LOG" ] && ok "no install attempted for a virtual-only name" || ko "apt-get ran despite a virtual-only name"
+[ "$rc" -ne 0 ] && ok "merely-referenced name fails the list" || ko "merely-referenced name was accepted"
+case "$out" in *libaio1*) ok "merely-referenced name is reported before apt runs" ;; *) ko "merely-referenced name missing from output [$out]" ;; esac
+[ ! -s "$APTGET_LOG" ] && ok "no install attempted for a merely-referenced name" || ko "apt-get ran despite a merely-referenced name"
 out="$(apt_install_packages libzip-dev 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && ok "all-known list installs cleanly" || ko "known-only list failed [$out]"
 
