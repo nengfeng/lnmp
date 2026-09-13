@@ -91,6 +91,30 @@ apt_install_packages() {
   return 0
 }
 
+# Resolve a package name to what this release actually ships.
+#
+# Names drift across releases, and a single unknown name aborts the whole
+# dependency stage (apt_install_packages returns 1). The big one is the
+# 64-bit time_t transition, which renamed runtime libraries on Debian 13 /
+# Ubuntu 24.04+ by appending "t64" -- and the old name was *removed*, not
+# kept as an alias: libaio1 -> libaio1t64, libglib2.0-0 -> libglib2.0-0t64.
+# Renames that do not follow this pattern (libidn12-dev -> libidn-dev) are
+# handled explicitly in the per-release lists.
+#
+# Must run after 'apt-get update': it queries the package index.
+# Usage: resolve_pkg_name <name>
+resolve_pkg_name() {
+  if apt-cache show "$1" > /dev/null 2>&1; then
+    echo "$1"
+  elif apt-cache show "$1t64" > /dev/null 2>&1; then
+    echo "$1t64"
+  else
+    # Unknown under both names: hand back the original so the apt error
+    # names the package that actually broke.
+    echo "$1"
+  fi
+}
+
 installDepsDebian() {
   echo "${CMSG}Removing the conflicting packages...${CEND}"
   purge_conflicting_db_packages
@@ -110,21 +134,31 @@ installDepsDebian() {
   #   libc-client2007e-dev: gone in Debian 12+ (no uw-imap in the archive)
   #   libncurses5 -> libncurses6, libidn11 -> libidn12 (Debian 12+)
   #   libcurl3-gnutls: gone in Debian 12+ (libcurl4 covers it)
-  #   libglib2.0-dev keeps working via the transitional name
+  #   libidn12-dev does not exist anywhere: the libidn dev package is the
+  #     unversioned libidn-dev in Debian 12+ (libidn12 is the runtime name)
   local pkgExtra=""
   case "${Debian_ver}" in
     9|10|11)
       pkgExtra="libncurses5 libncurses5-dev libidn11 libidn11-dev libcurl3-gnutls libc-client2007e-dev"
       ;;
     12|13)
-      pkgExtra="libncurses6 libncurses-dev libidn12 libidn12-dev"
+      pkgExtra="libncurses6 libncurses-dev libidn12 libidn-dev"
       ;;
     *)
       die_hard "Your system Debian ${Debian_ver} are not supported!"
       ;;
   esac
 
-  apt_install_packages ${pkgCommon} ${pkgExtra} || return 1
+  # Normalise each name for this release before installing: an unhandled
+  # t64 rename would otherwise abort the whole list (see resolve_pkg_name)
+  local pkg rpkg
+  local resolved=()
+  for pkg in ${pkgCommon} ${pkgExtra}; do
+    rpkg=$(resolve_pkg_name "${pkg}")
+    [ "${rpkg}" != "${pkg}" ] && echo "${CMSG}Package renamed on this release: ${pkg} -> ${rpkg}${CEND}"
+    resolved+=("${rpkg}")
+  done
+  apt_install_packages "${resolved[@]}" || return 1
 
   # libaio time64 transition (Debian 13+): package installs libaio.so.1t64
   # but MySQL binaries expect libaio.so.1
@@ -153,14 +187,19 @@ installDepsUbuntu() {
   install_security_updates || return 1
 
   # Packages common to Ubuntu 16-24
-  local pkgCommon="libperl-dev debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev libsqlite3-dev bison patch vim zip unzip tmux htop bc dc expect libexpat1-dev rsyslog libonig-dev libtirpc-dev libnss3 rsync git lsof lrzsz chrony psmisc wget sysv-rc apt-transport-https ca-certificates software-properties-common gnupg ufw libmaxminddb-dev"
+  local pkgCommon="libperl-dev debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev libsqlite3-dev bison patch vim zip unzip tmux htop bc dc expect libexpat1-dev rsyslog libonig-dev libtirpc-dev libnss3 rsync git lsof lrzsz chrony psmisc wget apt-transport-https ca-certificates software-properties-common gnupg ufw libmaxminddb-dev"
 
   # Per-release renames/removals:
   #   libpng12*/libpng3/libjpeg8: gone since Ubuntu 18 (libpng-dev/libjpeg-dev)
   #   libcloog-ppl1: never existed on Ubuntu 22+
   #   libncurses5 -> libncurses6, libidn11 -> libidn12 (Ubuntu 22+)
+  #   libidn12-dev does not exist anywhere: the libidn dev package is the
+  #     unversioned libidn-dev in 22.04+ (libidn12 is the runtime name)
   #   libcurl3-gnutls/libcurl4-gnutls-dev: folded into libcurl4 (22+)
   #   libc-client2007e-dev: not in Ubuntu 20.04+ archives
+  #   sysv-rc: does not exist in ANY Ubuntu release (verified against the
+  #     archive); update-rc.d ships in init-system-helpers, which is
+  #     priority: required and therefore always present. Do not re-add it.
   local pkgExtra=""
   case "${Ubuntu_ver}" in
     16|18)
@@ -170,14 +209,23 @@ installDepsUbuntu() {
       pkgExtra="libncurses5 libncurses5-dev libidn11 libidn11-dev libcurl3-gnutls libcurl4-gnutls-dev libcurl4-openssl-dev"
       ;;
     22|24)
-      pkgExtra="libncurses6 libncurses-dev libidn12 libidn12-dev libcurl4-openssl-dev"
+      pkgExtra="libncurses6 libncurses-dev libidn12 libidn-dev libcurl4-openssl-dev"
       ;;
     *)
       die_hard "Your system Ubuntu ${Ubuntu_ver} are not supported!"
       ;;
   esac
 
-  apt_install_packages ${pkgCommon} ${pkgExtra} || return 1
+  # Normalise each name for this release before installing: an unhandled
+  # t64 rename would otherwise abort the whole list (see resolve_pkg_name)
+  local pkg rpkg
+  local resolved=()
+  for pkg in ${pkgCommon} ${pkgExtra}; do
+    rpkg=$(resolve_pkg_name "${pkg}")
+    [ "${rpkg}" != "${pkg}" ] && echo "${CMSG}Package renamed on this release: ${pkg} -> ${rpkg}${CEND}"
+    resolved+=("${rpkg}")
+  done
+  apt_install_packages "${resolved[@]}" || return 1
 
   # libaio time64 transition (Ubuntu 24.04+): package installs libaio.so.1t64
   # but MySQL binaries expect libaio.so.1

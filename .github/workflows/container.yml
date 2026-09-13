@@ -19,9 +19,10 @@ jobs:
         include:
           - image: debian:12
           - image: ubuntu:22.04
-          # Newer/re-rolled distros are exercised but non-blocking until the
-          # t64 package renames are handled (e.g. libaio1 -> libaio1t64 on
-          # Ubuntu 24.04 / Debian 13). Flip experimental off once fixed.
+          # Newer/re-rolled distros ship the t64-renamed runtime libraries
+          # (libaio1 -> libaio1t64, libglib2.0-0 -> libglib2.0-0t64). Those
+          # are now resolved at runtime by resolve_pkg_name(), so these two
+          # are kept non-blocking for one more run to confirm, then flipped.
           - image: debian:13
             experimental: true
           - image: ubuntu:24.04
@@ -35,3 +36,15 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/work" -w /work "${{ matrix.image }}" \
             bash tools/container/preflight.sh
+
+      # The job log already prints the tail of install.log on failure; the
+      # artifact preserves the full transcript for follow-up analysis.
+      - name: Upload installer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-logs-${{ strategy.job-index }}
+          path: |
+            install.log
+            preflight-install.log
+          if-no-files-found: ignore
