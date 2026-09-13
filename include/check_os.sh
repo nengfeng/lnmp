@@ -45,10 +45,17 @@ if [ ${Debian_ver} -lt 9 >/dev/null 2>&1 ] || [ ${Ubuntu_ver} -lt 16 >/dev/null 
   die_hard "Does not support this OS, Please install Debian 9+,Ubuntu 16+"
 fi
 
-command -v gcc > /dev/null 2>&1 || $PM -y install gcc
-gcc_ver=$(gcc -dumpversion | awk -F. '{print $1}')
+# Probe gcc defensively: on a minimal image it is absent AND the package index
+# is still empty at this point (the dependency stage runs 'apt-get update'
+# later), so the install attempt fails. That must not abort the run --
+# build-essential brings gcc in during that stage -- and an unknown version
+# simply skips the redis downgrade below.
+command -v gcc > /dev/null 2>&1 || $PM -y install gcc > /dev/null 2>&1
+gcc_ver=$(gcc -dumpversion 2>/dev/null | awk -F. '{print $1}')
 
-[ ${gcc_ver} -lt 5 >/dev/null 2>&1 ] && redis_ver=6.2.14
+if [ -n "${gcc_ver}" ] && [ "${gcc_ver}" -lt 5 ] 2>/dev/null; then
+  redis_ver=6.2.14
+fi
 
 if uname -m | grep -Eqi "arm|aarch64"; then
   armplatform="y"

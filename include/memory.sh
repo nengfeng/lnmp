@@ -4,8 +4,14 @@
 
 export LANG=en_US.UTF-8
 export LANGUAGE=en_US:en
-Mem=$(free -m | awk '/Mem:/{print $2}')
-Swap=$(free -m | awk '/Swap:/{print $2}')
+# Read memory from /proc/meminfo rather than 'free': this file runs before the
+# dependency stage installs procps, and a missing 'free' made both values empty
+# -- which the arithmetic below reads as 0, i.e. the <=640M profile and
+# THREAD=1 (single-threaded builds) on an arbitrarily large machine.
+Mem=$(awk '/^MemTotal:/{print int($2/1024)}' /proc/meminfo 2>/dev/null)
+Swap=$(awk '/^SwapTotal:/{print int($2/1024)}' /proc/meminfo 2>/dev/null)
+Mem=${Mem:-512}
+Swap=${Swap:-0}
 
 if [[ "${Mem}" -le 640 ]]; then
   Mem_level=512M

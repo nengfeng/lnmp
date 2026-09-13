@@ -11,7 +11,10 @@ set -o pipefail
 # Record start time
 startTime=$(date +%s)
 
-clear
+# 'clear' needs TERM and prints a warning without one (CI, cron, containers)
+if [ -n "${TERM}" ]; then
+  clear
+fi
 printf "
 #######################################################################
 #                              Install                                #
@@ -508,6 +511,10 @@ setup_web_directory_permissions
 # install wget gcc curl
 if [ ! -e "${HOME}/.lnmp" ]; then
   downloadDepsSrc=1
+  # Keep debconf from picking an interactive frontend: without this it warns and
+  # walks Dialog -> Readline -> Teletype in CI/containers, and can block an
+  # unattended install on a real box.
+  export DEBIAN_FRONTEND=noninteractive
   apt-get -y update > /dev/null
   apt-get -y install wget gcc curl > /dev/null
 fi
