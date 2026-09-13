@@ -128,7 +128,7 @@ installDepsDebian() {
   install_security_updates || return 1
 
   # Packages common to Debian 9-13
-  local pkgCommon="debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl libcurl4-openssl-dev e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev bison re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev locales patch vim zip unzip tmux htop bc dc expect libexpat1-dev libonig-dev libtirpc-dev rsync git lsof lrzsz rsyslog cron logrotate chrony libsqlite3-dev psmisc wget sysv-rc apt-transport-https ca-certificates software-properties-common gnupg ufw libmaxminddb-dev"
+  local pkgCommon="debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl libcurl4-openssl-dev e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev bison re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev locales patch vim zip unzip tmux htop bc dc expect libexpat1-dev libonig-dev libtirpc-dev rsync git lsof lrzsz rsyslog cron logrotate chrony libsqlite3-dev psmisc wget sysv-rc apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
 
   # Per-release renames/removals:
   #   libc-client2007e-dev: gone in Debian 12+ (no uw-imap in the archive)
@@ -136,6 +136,11 @@ installDepsDebian() {
   #   libcurl3-gnutls: gone in Debian 12+ (libcurl4 covers it)
   #   libidn12-dev does not exist anywhere: the libidn dev package is the
   #     unversioned libidn-dev in Debian 12+ (libidn12 is the runtime name)
+  #   software-properties-common: NOT requested -- nothing in this repo calls
+  #     add-apt-repository, and Debian 13 (trixie) dropped the package, so
+  #     asking for it aborted the whole list there
+  #   procps: health_check.sh reads 'free'; memory.sh cannot depend on it
+  #     (it runs before this stage) and parses /proc/meminfo instead
   local pkgExtra=""
   case "${Debian_ver}" in
     9|10|11)
@@ -187,7 +192,7 @@ installDepsUbuntu() {
   install_security_updates || return 1
 
   # Packages common to Ubuntu 16-24
-  local pkgCommon="libperl-dev debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev libsqlite3-dev bison patch vim zip unzip tmux htop bc dc expect libexpat1-dev rsyslog libonig-dev libtirpc-dev libnss3 rsync git lsof lrzsz chrony psmisc wget apt-transport-https ca-certificates software-properties-common gnupg ufw libmaxminddb-dev"
+  local pkgCommon="libperl-dev debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev libsqlite3-dev bison patch vim zip unzip tmux htop bc dc expect libexpat1-dev rsyslog libonig-dev libtirpc-dev libnss3 rsync git lsof lrzsz chrony psmisc wget apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
 
   # Per-release renames/removals:
   #   libpng12*/libpng3/libjpeg8: gone since Ubuntu 18 (libpng-dev/libjpeg-dev)
@@ -200,6 +205,10 @@ installDepsUbuntu() {
   #   sysv-rc: does not exist in ANY Ubuntu release (verified against the
   #     archive); update-rc.d ships in init-system-helpers, which is
   #     priority: required and therefore always present. Do not re-add it.
+  #   software-properties-common: dropped from the common list -- nothing in
+  #     this repo calls add-apt-repository, and Debian 13 already removed the
+  #     package, so keeping it here is pure drift risk
+  #   procps: health_check.sh reads 'free'
   local pkgExtra=""
   case "${Ubuntu_ver}" in
     16|18)
