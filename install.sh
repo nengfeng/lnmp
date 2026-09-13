@@ -39,6 +39,7 @@ dbpostgrespwd=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16)
 dbinstallmethod=1
 pgsqlinstallmethod=1
 pgsql_ver=""
+preflight_flag=n
 
 version() {
   echo "version: 1.1"
@@ -71,6 +72,11 @@ Show_Help() {
   --firewall                  Enable firewall
   --md5sum                    Check md5sum
   --reboot                    Restart the server after installation
+  --preflight                 Validate this distro can satisfy the installer's
+                              dependencies (apt package resolution) and exit
+                              without downloading or compiling anything.
+                              Not read-only: it installs the dependency
+                              packages. Intended for CI/dry runs.
   "
 }
 ARG_NUM=$#
@@ -211,6 +217,9 @@ parse_args() {
         ;;
       --md5sum)
         md5sum_flag=y; shift 1
+        ;;
+      --preflight)
+        preflight_flag=y; shift 1
         ;;
       --reboot)
         reboot_flag=y; shift 1
@@ -531,7 +540,9 @@ fi
 [[ "${armplatform}" == "y" ]] && dbinstallmethod=2
 # PostgreSQL non-interactive defaults (interactive menu sets these at runtime)
 [[ "${db_option}" == 8 && -z "${pgsql_ver}" ]] && pgsql_ver=${pgsql18_ver}
-run_step checkDownload checkDownload
+# --preflight only validates that this distro can satisfy the dependencies;
+# skip every download so the run never touches the network beyond apt.
+[[ "${preflight_flag}" == y ]] || run_step checkDownload checkDownload
 
 # get OS Memory
 . ./include/memory.sh
@@ -542,15 +553,29 @@ if [ ! -e "${HOME}/.lnmp" ]; then
   case "${Family}" in
     "debian")
       run_step installDepsDebian installDepsDebian
-      run_step include/init_Debian.sh . include/init_Debian.sh
+      # Preflight stops at the dependency stage: the init scripts mutate the
+      # running system (ufw/sysctl/limits) and are out of scope for a
+      # resolve-only run, and installDepsBySrc needs downloaded tarballs.
+      [[ "${preflight_flag}" == y ]] || run_step include/init_Debian.sh . include/init_Debian.sh
       ;;
     "ubuntu")
       run_step installDepsUbuntu installDepsUbuntu
-      run_step include/init_Ubuntu.sh . include/init_Ubuntu.sh
+      [[ "${preflight_flag}" == y ]] || run_step include/init_Ubuntu.sh . include/init_Ubuntu.sh
       ;;
   esac
+  if [[ "${preflight_flag}" == y ]]; then
+    echo "${CSUCCESS}Preflight OK: dependency packages resolved and installed on ${Family}.${CEND}"
+    exit 0
+  fi
   # Install dependencies from source package
   run_step installDepsBySrc installDepsBySrc
+fi
+
+# Preflight on an already-initialised host (~/.lnmp present) has nothing left
+# to resolve here; report success instead of falling through to a real install.
+if [[ "${preflight_flag}" == y ]]; then
+  echo "${CSUCCESS}Preflight OK: dependencies already present (~/.lnmp), nothing to do.${CEND}"
+  exit 0
 fi
 
 # start Time

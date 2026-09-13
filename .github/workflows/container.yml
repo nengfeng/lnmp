@@ -1,0 +1,37 @@
+name: Container preflight
+
+# Layer 1 of the container test net: prove that the installer's dependency
+# stage actually resolves on each supported distro (catches package renames
+# and removals that static analysis cannot see). Fast: no download, no compile.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  preflight:
+    name: preflight (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: debian:12
+          - image: ubuntu:22.04
+          # Newer/re-rolled distros are exercised but non-blocking until the
+          # t64 package renames are handled (e.g. libaio1 -> libaio1t64 on
+          # Ubuntu 24.04 / Debian 13). Flip experimental off once fixed.
+          - image: debian:13
+            experimental: true
+          - image: ubuntu:24.04
+            experimental: true
+    continue-on-error: ${{ matrix.experimental == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preflight in ${{ matrix.image }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work "${{ matrix.image }}" \
+            bash tools/container/preflight.sh
