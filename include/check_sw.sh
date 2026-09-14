@@ -77,66 +77,87 @@ install_security_updates() {
 
 # Install a package list.
 #
-# Two distinct failures, both reported in one pass instead of one package per
-# CI round:
-#   - a name this release does not ship (rename/removal) would abort the whole
-#     list, so check the index first (pkg_exists), name EVERY unknown package
-#     and stop before touching dpkg;
-#   - a name that exists but cannot be installed (unmet dependency, conflict,
-#     held package) keeps apt's own error line, which is the actionable part.
+# apt decides. The apt-cache pre-check is ADVISORY only: it names every package
+# apt-cache could not find, so the whole list surfaces in one run instead of
+# costing one CI round per name -- but it must never veto the install.
+# apt-cache is a heuristic view of the index, and on Debian 13 it answered "no
+# such package" for five names the archive definitely ships (libxml2,
+# libxml2-dev, libevent-dev, libxslt1-dev, rsync -- each verified to carry its
+# own Package: stanza in trixie/main). Believing it turned a perfectly
+# installable dependency list into a red run, so only apt-get's own exit status
+# fails this function now; a genuinely absent name still fails, with apt's own
+# E: line naming it.
 # Usage: apt_install_packages [pkg...]
 apt_install_packages() {
-  local Package unknown="" err
+  local Package suspect="" err failed=0
   for Package in "$@"; do
-    pkg_exists "${Package}" || unknown="${unknown} ${Package}"
+    pkg_exists "${Package}" || suspect="${suspect} ${Package}"
   done
-  if [ -n "${unknown}" ]; then
-    echo "${CFAILURE}Not available on this release:${unknown}${CEND}"
-    echo "${CFAILURE}Add the replacement to the per-release list (or resolve_pkg_name) in include/check_sw.sh${CEND}"
-    return 1
-  fi
+  [ -n "${suspect}" ] && echo "${CWARNING}apt-cache does not list:${suspect} -- letting apt decide${CEND}"
 
-  local failed=0
   for Package in "$@"; do
     if ! err=$(apt-get --no-install-recommends -y install "${Package}" 2>&1); then
       echo "${CFAILURE}Failed to install required package: ${Package}${CEND}"
-      echo "${err}" | grep -E '^E:' | tail -n 3 || true
+      printf '%s\n' "${err}" | grep -E '^E:' | tail -n 3 || true
       failed=1
     fi
   done
-  [ ${failed} -ne 0 ] && return 1
+
+  if [ ${failed} -ne 0 ]; then
+    # Only reachable when apt really could not install something: surface what
+    # the index actually holds, so a broken apt-cache cannot masquerade as a
+    # per-release rename. Both counts should be large on a healthy index.
+    echo "${CWARNING}--- apt index ---${CEND}"
+    echo "  apt-cache pkgnames: $(apt-cache pkgnames 2> /dev/null | wc -l)"
+    echo "  Packages lists    : $(ls /var/lib/apt/lists/*Packages* 2> /dev/null | wc -l)"
+    for Package in ${suspect}; do
+      echo "  ${Package}:"
+      apt-cache policy "${Package}" 2>&1 | sed -n '1,4{s/^/    /;p}'
+    done
+    return 1
+  fi
   return 0
 }
 
 # True when the archive ships a real package named exactly like this.
 #
-# 'apt-cache show' is NOT an existence test -- not its output, not its exit
-# code. A name that no package carries is still answered for, and still exits
-# 0, in two distinct situations:
-#   - another package Provides it (a true virtual package). On Ubuntu 24.04
-#     libglib2.0-0 is gone from the archive, but libglib2.0-0t64 still says
-#     "Provides: libglib2.0-0", so apt-cache prints the provider's stanza;
-#   - another package merely refers to it in a dependency, apt's wording
-#     being "referred to by another package". multiverse's libodpic4 still
-#     says "Recommends: libaio1" although nothing in the archive is called
-#     libaio1 -- a dangling reference left by the 64-bit time_t rename. apt
-#     files the name as a virtual package with no version and exits 0 with
-#     only an N: notice on stderr.
-# Only a name that nothing at all mentions makes apt-cache exit non-zero.
-# (apt 2.7.14, the version noble ships: private-show.cc:409-414 chooses Error
-#  vs Notice, private-cacheset.cc:133-186 synthesises the placeholder Pkg.)
-# Requiring the stanza's own Package field to equal the requested name tells a
-# real package from either case on every apt version: a real name prints
-# "Package: <name>", a provider's stanza does not, and a bare reference prints
-# no stanza at all. This is what the old test missed, so it declared libaio1
-# installable and apt aborted the dependency stage with
-# "E: Package 'libaio1' has no installation candidate".
-# A missing name is reported rather than guessed at -- the list should name the
-# real package, and the one-pass message says which.
+# 'apt-cache show' answers for names the archive does not ship, so neither its
+# output nor its exit code is an existence test -- and it is wrong in both
+# directions:
+#   - a name that only appears in some other package's dependency gets a
+#     version-less placeholder entry (apt's wording: "referred to by another
+#     package"). apt-cache finds no version for it, files it under virtualPkgs
+#     and exits 0 with only an N: notice on stderr. Ubuntu 24.04 ships no
+#     libaio1, but multiverse's libodpic4 still says "Recommends: libaio1" -- a
+#     dangling reference the 64-bit time_t rename left behind -- so the old
+#     exit-code test called it installable and apt aborted the dependency stage
+#     with "E: Package 'libaio1' has no installation candidate".
+#   - a name another package Provides may still be answerable even though no
+#     package carries it: Debian 13 ships libglib2.0-0t64, which says
+#     "Provides: libglib2.0-0".
+# So neither the presence of output nor the exit code alone decides it: only a
+# stanza whose own Package field equals the requested name proves the archive
+# ships that package.
+# (apt 2.7.14, what noble ships: private-show.cc:409-414 chooses Error vs
+#  Notice; private-cacheset.cc:133-186 synthesises the placeholder Pkg.)
+#
+# Even so this is a heuristic, not a contract: apt-cache has also been observed
+# answering "no such package" for names the archive definitely ships (the
+# debian:13 preflight failed on five of them, each verified to carry its own
+# Package: stanza in trixie/main). A miss must therefore never be the sole
+# reason a run fails -- apt_install_packages reports it and lets apt-get decide.
+#
+# No 'grep -q' on purpose: it stops at the first match and closes the pipe while
+# apt-cache is still writing, and 'set -o pipefail' (install.sh:9) would then
+# surface apt-cache's SIGPIPE (141) as a *missing* package. Capture the stanzas
+# first, so apt-cache never writes into a pipeline this function may abandon.
 # Must run after 'apt-get update': it queries the package index.
 # Usage: pkg_exists <name>
 pkg_exists() {
-  apt-cache show "$1" 2> /dev/null | grep -Fqx "Package: $1"
+  local stanzas
+  stanzas=$(apt-cache show "$1" 2> /dev/null)
+  [ -n "${stanzas}" ] || return 1
+  printf '%s\n' "${stanzas}" | grep -Fx "Package: $1" > /dev/null
 }
 
 # Resolve a package name to what this release actually ships.

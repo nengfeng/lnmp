@@ -61,21 +61,25 @@ esc="$(escape_password 'a&b')"
 [ "$esc" = 'a\&b' ] && ok "'&' is escaped for sed replacement" || ko "escape_password did not escape & (got [$esc])"
 
 echo "== resolve_pkg_name / pkg_exists (t64 renames) =="
-# Emulate the apt index faithfully; this distinction is exactly what killed the
-# Ubuntu 24.04 preflight. 'apt-cache show' exits 0 for a name no package
-# carries, in two different ways -- so neither its output nor its exit code is
-# an existence test:
+# Emulate the apt index faithfully; this is the distinction that killed the
+# Ubuntu 24.04 preflight and, later, the debian:13 one. 'apt-cache show' answers
+# for names the archive does not ship, and it is wrong in both directions:
 #   REAL     -- the release ships it: stdout is the 'Package: <name>' stanza.
 #   PROVIDED -- gone from the archive, but another package still Provides it
-#               (libglib2.0-0t64 does exactly this for libglib2.0-0). apt-cache
-#               prints the PROVIDER's stanza and exits 0, then apt-get dies
-#               with "no installation candidate".
-#   REFERRED -- gone from the archive with no provider at all, only a stale
-#               dependency mention (multiverse libodpic4 still Recommends
-#               libaio1, left dangling by the t64 rename). apt-cache finds no
-#               stanza, prints only an N: notice on stderr and exits 0.
-# The old stub returned 1 for the last two cases, which is why every test
-# passed while the distro run failed.
+#               (libglib2.0-0t64 does for libglib2.0-0). Modeled as the hardest
+#               false positive: the PROVIDER's stanza is printed and apt-cache
+#               exits 0. (The debian:13 CI log shows the real thing is even
+#               easier -- the rename to libglib2.0-0t64 fired under the old
+#               exit-code test, so there no stanza is printed at all and the
+#               exit is non-zero. Either way the requested name must not match.)
+#   REFERRED -- gone, with no provider, only a stale dependency mention
+#               (multiverse libodpic4 still Recommends libaio1). apt gets a
+#               version-less placeholder, prints only an N: notice on stderr and
+#               EXITS 0 -- which is how the old test passed libaio1 on Ubuntu
+#               24.04 and let apt-get be the one to catch it.
+# Neither the exit code nor the presence of *a* stanza decides it; only the
+# requested name's own Package field does. The pre-2ee3e02 stub returned 1 for
+# the last two cases, which is why every test passed while the distro run died.
 REAL=" libaio1t64 libglib2.0-0t64 libncurses6 libidn-dev libaio-dev "
 PROVIDED=" libglib2.0-0 "
 REFERRED=" libaio1 "
@@ -87,7 +91,7 @@ apt-cache(){
   return 1
 }
 pkg_exists libaio1t64 && ok "a package the release ships exists" || ko "real package not found"
-if pkg_exists libglib2.0-0; then ko "a provided-only name was treated as an existing package"; else ok "a provided-only name is not an existing package"; fi
+if pkg_exists libglib2.0-0; then ko "a provider's stanza was taken for the requested package"; else ok "a provided-only name is not an existing package"; fi
 if pkg_exists libaio1; then ko "a merely-referenced name was treated as an existing package"; else ok "a merely-referenced name is not an existing package"; fi
 if pkg_exists absent-pkg; then ko "an absent name was treated as existing"; else ok "an absent name is not an existing package"; fi
 [ "$(resolve_pkg_name libaio1)" = "libaio1t64" ] && ok "referenced-only old name resolves to its t64 name" || ko "t64 rename not resolved (got $(resolve_pkg_name libaio1))"
@@ -106,28 +110,38 @@ if _extract_tar "nonexistent-1.0.tar.gz"; then ko "missing tarball should fail";
 mkdir -p goodpkg-1.0; echo hi > goodpkg-1.0/f.txt; tar czf goodpkg-1.0.tar.gz -C "$current_dir/src" goodpkg-1.0; rm -rf goodpkg-1.0
 if _extract_tar "goodpkg-1.0.tar.gz"; then [ -d goodpkg-1.0 ] && ok "present tarball extracts ok" || ko "extracted dir missing"; else ko "present tarball should succeed"; fi
 
-echo "== apt_install_packages (unknown-name diagnostics) =="
-# A name this release does not ship must be reported BEFORE apt is asked to
-# install anything, and every unknown name must appear in that one message --
-# otherwise a distro release that drops N packages costs N CI rounds.
-# A merely-referenced name counts as "not shipped": apt-cache answers it and
-# exits 0, but apt-get would die on it with "no installation candidate", so the
-# pre-check has to catch it up front.
+echo "== apt_install_packages (apt decides, apt-cache is advisory) =="
+# apt-cache has answered "no such package" for names the archive really ships
+# (Debian 13: libxml2, libxml2-dev, libevent-dev, libxslt1-dev, rsync), so the
+# pre-check must not be able to fail the list. It only reports what apt-cache
+# missed; apt-get's exit status decides. A package apt truly cannot install
+# still fails the list, with apt's own error line naming it.
 REAL=" libzip-dev "
 REFERRED=" libaio1 "
 APTGET_LOG="$work/aptget.log"
 rm -f "$APTGET_LOG"
-apt-get(){ echo "$*" >> "$APTGET_LOG"; return 0; }
-out="$(apt_install_packages libzip-dev ghostpkg 2>&1)"; rc=$?
-[ "$rc" -ne 0 ] && ok "unknown package fails the list" || ko "unknown package did not fail"
-case "$out" in *ghostpkg*) ok "the unknown name is reported" ;; *) ko "unknown name missing from output [$out]" ;; esac
-[ ! -s "$APTGET_LOG" ] && ok "no install attempted while a name is unknown" || ko "apt-get ran despite an unknown name"
-out="$(apt_install_packages libzip-dev libaio1 2>&1)"; rc=$?
-[ "$rc" -ne 0 ] && ok "merely-referenced name fails the list" || ko "merely-referenced name was accepted"
-case "$out" in *libaio1*) ok "merely-referenced name is reported before apt runs" ;; *) ko "merely-referenced name missing from output [$out]" ;; esac
-[ ! -s "$APTGET_LOG" ] && ok "no install attempted for a merely-referenced name" || ko "apt-get ran despite a merely-referenced name"
+apt-cache(){
+  [ "$1" = "show" ] || return 1
+  case " ${REAL} " in *" $2 "*) echo "Package: $2"; return 0 ;; esac
+  case " ${REFERRED} " in *" $2 "*) return 0 ;; esac   # exit 0, no stdout stanza
+  return 1
+}
+apt-get(){
+  echo "$*" >> "$APTGET_LOG"
+  case " $* " in *" ghostpkg "*) echo "E: Unable to locate package ghostpkg" >&2; return 100 ;; esac
+  return 0
+}
 out="$(apt_install_packages libzip-dev 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] && ok "all-known list installs cleanly" || ko "known-only list failed [$out]"
+case "$out" in *"apt-cache does not list"*) ko "clean list raised a false advisory [$out]" ;; *) ok "clean list raises no advisory" ;; esac
+out="$(apt_install_packages libaio1 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && ok "an apt-cache miss alone cannot fail the list" || ko "apt-cache miss failed the list [$out]"
+case "$out" in *libaio1*) ok "the missed name is still surfaced for the log" ;; *) ko "missed name not reported [$out]" ;; esac
+out="$(apt_install_packages ghostpkg 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && ok "a package apt cannot install fails the list" || ko "apt failure was accepted"
+case "$out" in *"E: Unable to locate package ghostpkg"*) ok "apt's own error names the failing package" ;; *) ko "apt error missing [$out]" ;; esac
+out="$(apt_install_packages libzip-dev ghostpkg 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && ok "a mixed list still fails on the apt failure" || ko "mixed list passed despite an apt failure"
 
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
