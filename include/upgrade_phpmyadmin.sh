@@ -17,6 +17,14 @@ Upgrade_phpMyAdmin() {
       if [ -s "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" ]; then
         gzip -t "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" 2>/dev/null || \
           { echo "${CFAILURE}phpMyAdmin archive is corrupted, re-downloading...${CEND}"; rm -f "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz"; wget -c "https://files.phpmyadmin.net/phpMyAdmin/${NEW_phpmyadmin_ver}/phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" > /dev/null 2>&1; }
+        # Re-verify what the re-download produced: without this a second corrupt
+        # archive was still announced as a successful download and only blew up
+        # later, at extraction time.
+        if ! gzip -t "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz" 2>/dev/null; then
+          rm -f "phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz"
+          echo "${CWARNING}phpMyAdmin-${NEW_phpmyadmin_ver} is still corrupt, please try again! ${CEND}"
+          continue
+        fi
         echo "Download [${CMSG}phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages.tar.gz${CEND}] successfully! "
         break
       else

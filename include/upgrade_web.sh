@@ -109,6 +109,14 @@ Upgrade_Nginx() {
         # Integrity check: reject truncated/corrupted archives before tar
         gzip -t "nginx-${NEW_nginx_ver}.tar.gz" 2>/dev/null || \
           { echo "${CFAILURE}nginx-${NEW_nginx_ver}.tar.gz is corrupted, re-downloading...${CEND}"; rm -f "nginx-${NEW_nginx_ver}.tar.gz"; wget -c https://nginx.org/download/nginx-${NEW_nginx_ver}.tar.gz > /dev/null 2>&1; }
+        # Re-verify what the re-download produced: without this a second corrupt
+        # archive was still announced as a successful download and only blew up
+        # later, at extraction time.
+        if ! gzip -t "nginx-${NEW_nginx_ver}.tar.gz" 2>/dev/null; then
+          rm -f "nginx-${NEW_nginx_ver}.tar.gz"
+          echo "${CWARNING}nginx-${NEW_nginx_ver}.tar.gz is still corrupt, please try again! ${CEND}"
+          continue
+        fi
         src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
         src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
         src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"

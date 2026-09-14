@@ -255,7 +255,10 @@ install_web_server() {
         -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
-      cmake --build . --config Release --target brotlienc
+      # The brotli static library is required by --add-module=../ngx_brotli in the
+      # configure call below; failing here names the culprit instead of letting it
+      # surface as an unrelated nginx link error.
+      cmake --build . --config Release --target brotlienc || fail_msg "ngx_brotli"
       popd > /dev/null
       popd > /dev/null
     fi
@@ -288,9 +291,15 @@ install_web_server() {
     --add-module=../ngx_brotli \
     --with-ld-opt="${allocator_ldflag--ljemalloc} ${extra_ld_opt}" ${nginx_modules_options}
   
-  compile_and_install
+  # A failed build has to abort right here: the check below only looks for
+  # nginx.conf afterwards, and on a rebuild that file is already there from the
+  # previous install, so a broken compile used to be reported as a success.
+  compile_and_install || {
+    rm -rf ${install_dir}
+    fail_msg "${server_type}"
+  }
   
-  if [ -e "${conf_dir}/conf/nginx.conf" ]; then
+  if [ -e "${conf_dir}/conf/nginx.conf" ] && [ -e "${install_dir}/sbin/nginx" ]; then
     cleanup_src pcre2-${pcre_ver} openssl-${openssl_ver} ${src_name} ngx_brotli \
       lua-nginx-module-${lua_nginx_module_ver} \
       lua-resty-core-${lua_resty_core_ver} \
