@@ -172,6 +172,66 @@ assert_run "mysqladmin ping answers with the installed root password" \
 
 assert_exists /data/wwwroot
 
+# ------------------------------------------- 2b/4 svc_start liveness regression
+# systemd reports a Type=simple unit as started the moment the process is forked,
+# so `systemctl start` returning 0 does not prove the service stayed up. That
+# blind spot is what let a php-fpm which could not load libsodium.so.26 pass as
+# installed. svc_start now settles and re-checks Type=simple units, so prove both
+# directions with two throwaway units and then clean them up. This is the only
+# place the real systemd behaviour can be exercised.
+stage "2b/4 svc_start liveness on Type=simple units"
+
+# svc_start lives in include/common.sh, which only defines functions at load time
+# (it has no side effects and shares no helper names with this script).
+# shellcheck source=/dev/null
+. ./include/color.sh
+# shellcheck source=/dev/null
+. ./include/common.sh
+
+probe_unit() {  # probe_unit <name> <exec-start>
+  cat > "/etc/systemd/system/$1.service" <<EOF
+[Unit]
+Description=LNMP smoke probe ($1)
+
+[Service]
+Type=simple
+ExecStart=$2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+drop_probe() {  # drop_probe <name>
+  systemctl stop "$1" >/dev/null 2>&1
+  systemctl reset-failed "$1" >/dev/null 2>&1
+  rm -f "/etc/systemd/system/$1.service"
+}
+
+# A unit that keeps running: must be accepted, otherwise every install would abort.
+probe_unit lnmp-smoke-alive "/bin/sh -c 'while true; do sleep 1; done'"
+# A unit that dies shortly AFTER the fork, i.e. once systemctl start has already
+# returned 0 -- deliberately not /bin/false, which can lose the race and fail the
+# start job itself, which would test the pre-existing branch instead of the new one.
+probe_unit lnmp-smoke-dies "/bin/sh -c 'sleep 0.5; exit 1'"
+systemctl daemon-reload
+
+if svc_start lnmp-smoke-alive >/dev/null 2>&1; then
+  ok "live Type=simple unit is accepted"
+else
+  bad "live Type=simple unit was rejected"
+fi
+
+if svc_start lnmp-smoke-dies >/dev/null 2>&1; then
+  bad "Type=simple unit that dies right after start was accepted"
+else
+  ok "Type=simple unit that dies right after start is rejected"
+fi
+
+drop_probe lnmp-smoke-alive
+drop_probe lnmp-smoke-dies
+systemctl daemon-reload
+
 # ------------------------------------------------------- 3/4 idempotent re-run
 stage "3/4 idempotency: re-run the exact same command"
 "${INSTALL_CMD[@]}" 2>&1 | tee smoke-rerun.log
