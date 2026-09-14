@@ -82,5 +82,32 @@ if echo "${ubuntu_pkgs}" | grep -qw -- 'sysv-rc'; then
 fi
 [ "$absent_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
+echo "== 6. entry-point scripts must not end on a bare '&&' compound [HARD] =="
+# `test && action` as the script's LAST statement hands the script the status of
+# `test`: when the test is false the script exits 1 even though every step before
+# it succeeded.  install.sh used to end with
+#     [[ "${reboot_flag}" == y ]] && reboot
+# so every non-interactive install (CI, Ansible, docker build, `echo n | ...`)
+# reported failure while printing the success banner.  Use `if ...; then ...; fi`
+# instead.  A trailing '||' is fine: `a || b` returns 0 when a succeeds, and
+# `a && { ...; exit 0; } || { ...; exit 1; }` ends on '||' with an explicit exit
+# in both branches (tools/test_offline.sh relies on exactly that shape).  Only a
+# last statement whose final operator is '&&' leaves the script exposed.
+# include/*.sh are sourced libraries, so their last statement is not an exit code.
+tail_ok=1
+for f in $(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*'); do
+  last=$(grep -vE '^[[:space:]]*(#|$)' "$f" 2>/dev/null | tail -1)
+  case "$last" in
+    *'&&'*)
+      case "$last" in
+        *'||'*) : ;;   # ends on '||' - it has its own fallback, not this bug class
+        *) echo "  $f: last statement is a '&&' compound - the script exit status becomes that of its left-hand test"
+           echo "        $last"
+           tail_ok=0 ;;
+      esac ;;
+  esac
+done
+[ "$tail_ok" -eq 1 ] && echo "  OK" || FAIL=1
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then echo "STATIC CHECKS: PASS"; exit 0; else echo "STATIC CHECKS: FAIL"; exit 1; fi

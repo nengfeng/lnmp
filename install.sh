@@ -857,4 +857,10 @@ if [[ ${ARG_NUM} == 0 ]]; then
   echo "${CMSG}Please restart the server and see if the services start up fine.${CEND}"
   confirm "Do you want to restart OS?" reboot_flag n
 fi
-[[ "${reboot_flag}" == y ]] && reboot
+# NOTE: keep this an `if` statement, not `<test> && reboot`.  As the last
+# command in the script, `[[ ... ]] && reboot` makes the whole script exit 1
+# whenever no reboot is requested (non-interactive runs, or answering "no"),
+# which makes every automated install look like a failure.
+if [[ "${reboot_flag}" == y ]]; then
+  reboot
+fi
