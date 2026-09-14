@@ -17,13 +17,18 @@
 # the same way), and the repo ships only systemd units -- no SysV init scripts.
 # L1 gets away without systemd because it stops before any service is started.
 #
-# Usage (on a machine with a container runtime, repo mounted at /work):
+# Usage (on a machine with a container runtime, repo mounted at /work). The
+# image has to be built first -- systemd must be in place before the container
+# starts, because PID 1 cannot be replaced afterwards:
+#   docker build -t lnmp-smoke-systemd -f tools/container/systemd.Dockerfile tools/container
 #   docker run -d --name lnmp-smoke --privileged --cgroupns=host \
-#     -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/work" -w /work debian:12 \
-#     bash -c 'apt-get update -qq
-#              && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq systemd systemd-sysv dbus
-#              && exec /sbin/init'
+#     --tmpfs /run --tmpfs /run/lock \
+#     -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/work" -w /work \
+#     lnmp-smoke-systemd
 #   docker exec -w /work lnmp-smoke bash tools/container/smoke.sh
+#
+# .github/workflows/container-smoke.yml runs exactly this, plus a readiness
+# poll on `systemctl is-system-running`.
 #
 # Exit status: 0 only if install, idempotent re-run and uninstall all pass.
 
@@ -36,6 +41,18 @@ fi
 
 if [ ! -f install.sh ] || [ ! -f uninstall.sh ]; then
   echo "smoke must run from the repo root (cwd must hold install.sh/uninstall.sh)" >&2
+  exit 1
+fi
+
+# The container has to be running systemd, and this is the one thing that would
+# otherwise fail *silently*: has_systemd() would return false, the installer
+# would fall back to SysV `service`, every start would fail, and yet the run
+# would still report PASS because the assertions only look at the tree
+# afterwards. Refuse to run rather than produce that result. Same predicate as
+# include/common.sh:has_systemd.
+if [ ! -e /bin/systemctl ] || [ ! -d /run/systemd/system ]; then
+  echo "this container is not running systemd (has_systemd() would be false)" >&2
+  echo "build tools/container/systemd.Dockerfile and boot it as PID 1 -- see the header" >&2
   exit 1
 fi
 
