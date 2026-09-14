@@ -25,5 +25,11 @@ RUN apt-get update \
       dbus \
  && rm -rf /var/lib/apt/lists/*
 
+# A container image ships no machine ID and systemd wants one at boot. Generate
+# it here, best effort: || true so an unexpected failure cannot take the whole
+# build down, because a missing/empty machine-id still boots (systemd falls back
+# to a transient ID) whereas a failed build costs a full CI round.
+RUN systemd-machine-id-setup || true
+
 # systemd-sysv provides /sbin/init.
 CMD ["/sbin/init"]
