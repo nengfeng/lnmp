@@ -337,7 +337,11 @@ installDepsBySrc() {
   if command -v lsof >/dev/null 2>&1; then
     echo 'already initialize' > ~/.lnmp
   else
-    die_hard "${PM} config error parsing file failed"
+    # This used to report "${PM} config error parsing file failed", which sent
+    # anyone who hit it looking for a broken config file. The real cause is the
+    # dependency stage: lsof is in the package list, so it is missing only when
+    # that stage failed.
+    die_hard "dependency install failed: lsof is missing (${PM})"
   fi
 
   popd > /dev/null

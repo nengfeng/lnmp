@@ -348,9 +348,12 @@ install_mariadb_binary() {
   local safe_script="${install_dir}/bin/mariadbd-safe"
   [ ! -f "${safe_script}" ] && safe_script="${install_dir}/bin/mysqld_safe"
   if [ -f "${safe_script}" ]; then
-    # Preload the allocator .so only when one is selected; allocator_option=1
-    # ("none") leaves allocator_so empty, so skip the injection for that case.
-    if [ -n "${allocator_so}" ]; then
+    # Preload the allocator .so into the *_safe wrapper only where that wrapper is
+    # actually executed: with systemd the unit calls the daemon directly and the
+    # binary already links the allocator (see allocator_ldflag), so there is
+    # nothing to preload. Skipped as well when allocator_option=1 ("none") left
+    # allocator_so empty.
+    if [ -n "${allocator_so}" ] && ! has_systemd; then
       sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so}"'@' ${safe_script}
     fi
     sed -i "s@/usr/local/mysql@${install_dir}@g" ${safe_script}
@@ -1152,10 +1155,13 @@ install_db_common() {
     return 1
   fi
 
-  # Preload the allocator .so into mysqld_safe (skipped when allocator_option=1
-  # "none" left allocator_so empty).
-  if [ -n "${allocator_so}" ]; then
-    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so}"'@' ${install_dir}/bin/mysqld_safe 2>/dev/null || true
+  # Preload the allocator .so into mysqld_safe. Only the SysV fallback runs that
+  # wrapper -- with systemd the unit execs the daemon directly and the binary
+  # already links the allocator (see allocator_ldflag). Skipped when
+  # allocator_option=1 ("none") left allocator_so empty. The file check replaces
+  # the old "2>/dev/null || true", which hid a missing mysqld_safe entirely.
+  if [ -n "${allocator_so}" ] && ! has_systemd && [ -f "${install_dir}/bin/mysqld_safe" ]; then
+    sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so}"'@' ${install_dir}/bin/mysqld_safe
   fi
   # Update password in options.conf
   local pwd_escaped=$(escape_password "${dbrootpwd}")

@@ -477,7 +477,6 @@ post_install_php() {
   
   if [ -e "${install_dir}/bin/phpize" ]; then
     [ ! -e "${install_dir}/etc/php.d" ] && mkdir -p ${install_dir}/etc/php.d
-    echo "${CSUCCESS}PHP installed successfully! ${CEND}"
   else
     rm -rf ${install_dir}
     die_hard "PHP install failed, Please Contact the author!"
@@ -520,6 +519,11 @@ EOF
 
   # Setup logrotate
   setup_php_fpm_logrotate ${install_dir}
+
+  # Only claim success once php.ini, the INI snippets, the pool configuration,
+  # the service and logrotate are all in place. This used to be printed before
+  # any of them, so a failure further down still read as "installed successfully".
+  echo "${CSUCCESS}PHP installed successfully! ${CEND}"
 
   rm -rf ${current_dir}/src/php-${php_ver}
 }
