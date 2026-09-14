@@ -695,10 +695,22 @@ refresh_path() {
 # Usage: add_lib_path /path/to/lib
 add_lib_path() {
   local lib_path=$1
-  [ -z "$(grep "${lib_path}" /etc/ld.so.conf.d/*.conf 2>/dev/null)" ] && {
+  # Register the directory once.  -Fqx: the pattern is a literal path and each
+  # .conf holds one path per line, so an exact whole-line match is what
+  # "already registered" means (a plain -F pattern would let /usr/local/lib
+  # match /usr/local/lib64).  Test grep's exit status directly -- the previous
+  # `[ -z "$(grep ...)" ]` shape cannot be reused with -q, since -q prints
+  # nothing and the -z test would then be true every single time.
+  if ! grep -Fqx "${lib_path}" /etc/ld.so.conf.d/*.conf 2>/dev/null; then
     echo "${lib_path}" > /etc/ld.so.conf.d/${lib_path##*/}.conf
-    ldconfig
-  }
+  fi
+  # ldconfig runs UNCONDITIONALLY, and that is the whole point of this function.
+  # The directory is usually already listed (Debian's /etc/ld.so.conf.d/libc.conf
+  # ships /usr/local/lib) while a brand-new library has just been dropped into it.
+  # Gating ldconfig on "we just wrote a .conf" therefore skipped the cache refresh
+  # exactly when it was needed: libsodium.so.26 was built into /usr/local/lib but
+  # never entered ld.so.cache, and php-fpm died on start with status 127.
+  ldconfig
 }
 
 # ============================================
