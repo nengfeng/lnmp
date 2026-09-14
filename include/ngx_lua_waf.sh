@@ -6,7 +6,9 @@ Nginx_lua_waf() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${nginx_install_dir}/sbin/nginx" ] && echo "${CWARNING}Nginx is not installed on your system! ${CEND}" && exit 1
   if [ ! -e "/usr/local/lib/libluajit-5.1.so" ]; then
-    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* | xargs rm -rf
+    # Quote the -name pattern (an unquoted one is expanded by the shell against
+    # the CWD) and separate the arguments so an empty result is not fed to rm.
+    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name '*luajit*' -print0 | xargs -0 -r rm -rf
     src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
     tar xzf luajit2-${luajit2_ver}.tar.gz
     pushd luajit2-${luajit2_ver}
@@ -44,6 +46,12 @@ Nginx_lua_waf() {
   nginx_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
   rm -rf $$
   nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
+  # Believed unreachable: install_web_server always builds with
+  # --add-module=../lua-nginx-module-... (web-common.sh) and upgrade_web.sh
+  # explicitly re-adds it ("Always ensure lua modules"), so `nginx -V` always
+  # lists the module and this test is false. Kept as-is on purpose: the recompile
+  # below cannot be exercised by CI, and rewriting it blind would risk more than
+  # the dead code costs. Review it together with a dedicated waf refactor.
   if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
     src_url=https://nginx.org/download/nginx-${nginx_ver}.tar.gz && Download_src
     src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
@@ -83,7 +91,9 @@ Tengine_lua_waf() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${tengine_install_dir}/sbin/nginx" ] && echo "${CWARNING}Tengine is not installed on your system! ${CEND}" && exit 1
   if [ ! -e "/usr/local/lib/libluajit-5.1.so" ]; then
-    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name *luajit* | xargs rm -rf
+    # Quote the -name pattern (an unquoted one is expanded by the shell against
+    # the CWD) and separate the arguments so an empty result is not fed to rm.
+    [ -e "/usr/local/lib/libluajit-5.1.so.2.0.5" ] && find /usr/local -name '*luajit*' -print0 | xargs -0 -r rm -rf
     src_url="https://github.com/openresty/luajit2/archive/refs/tags/${luajit2_ver}.tar.gz" && Download_src
     tar xzf luajit2-${luajit2_ver}.tar.gz
     pushd luajit2-${luajit2_ver}
@@ -106,6 +116,9 @@ Tengine_lua_waf() {
   tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
   rm -rf $$
   tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
+  # Same dead branch as in Nginx_lua_waf above (install_web_server builds every
+  # server type with --add-module=../lua-nginx-module-...), and the test here is
+  # even looser (`grep lua`). Left in place for the same reason.
   if [ -z "$(echo ${tengine_configure_args} | grep lua)" ]; then
     src_url=https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz && Download_src
     src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src

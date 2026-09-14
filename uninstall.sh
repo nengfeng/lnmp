@@ -216,7 +216,12 @@ Uninstall_Web() {
   # Clean up LuaJIT and lua libraries (no longer needed after web server removal)
   if [ ! -d "${nginx_install_dir}" ] && [ ! -d "${tengine_install_dir}" ] && [ ! -d "${openresty_install_dir}" ]; then
     rm -f /usr/local/lib/libluajit-5.1.so*
-    rm -rf /usr/local/lib/lua /usr/local/share/lua /usr/local/include/luajit-2.1
+    rm -rf /usr/local/lib/lua /usr/local/include/luajit-2.1
+    # /usr/local/share/lua is a shared system location (luarocks and other Lua
+    # software live there too), so only drop the 5.1 symlink this project created,
+    # and the parent only if it is now empty.
+    [ -h "/usr/local/share/lua/5.1" ] && rm -f "/usr/local/share/lua/5.1"
+    rmdir /usr/local/share/lua 2>/dev/null
     rm -f /etc/ld.so.conf.d/luajit.conf
     ldconfig 2>/dev/null
   fi

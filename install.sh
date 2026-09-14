@@ -251,8 +251,7 @@ phpcache_option=${phpcache_option:-1}
 #
 # The step must run in the CURRENT shell, not in a subshell: a pipeline
 # ('cmd | tee') executes cmd in a subshell, so any global variable a step
-# assigns is lost. check_download.sh relies on this (it rewrites boost_ver
-# for MySQL 5.7) and so does mphp.sh (php_install_dir). We therefore
+# assigns is lost (mphp.sh assigns php_install_dir that way). We therefore
 # redirect the step's stdout/stderr into a FIFO drained by tee, which
 # keeps the step in the current shell while still duplicating the output.
 run_step() {
@@ -781,7 +780,12 @@ fi
 . include/check_dir.sh
 
 # Starting DB
-[ -d "/etc/mysql" ] && /bin/mv /etc/mysql{,_bk}
+# Back up a distro-supplied /etc/mysql before this install writes its own. The
+# timestamp keeps the move idempotent: with a fixed /etc/mysql_bk name a second
+# run moved the directory *into* the existing backup as /etc/mysql_bk/mysql.
+if [ -d "/etc/mysql" ]; then
+  /bin/mv "/etc/mysql" "/etc/mysql_$(date +%Y%m%d%H%M%S)"
+fi
 [ -d "${db_install_dir}/support-files" ] && ! svc_is_active mysqld && svc_start mysqld
 
 # reload php

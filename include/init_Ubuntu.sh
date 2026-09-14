@@ -28,7 +28,12 @@ sed -i 's@^"syntax on@syntax on@' /etc/vim/vimrc
 [ -z "$(grep history-timestamp ~/.bashrc)" ] && echo "PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });user=\$(whoami); echo \$(date \"+%Y-%m-%d %H:%M:%S\"):\$user:\$(pwd)/:\$msg ---- \$(who am i); } >> /tmp/\$(hostname).\$(whoami).history-timestamp'" >> ~/.bashrc
 
 # /etc/security/limits.conf
-[ -e /etc/security/limits.d/*nproc.conf ] && rename nproc.conf nproc.conf_bk /etc/security/limits.d/*nproc.conf
+# A glob handed to `test` fails with "too many arguments" as soon as two files
+# match, which silently skipped the rename; walk the matches one at a time.
+for _nproc_conf in /etc/security/limits.d/*nproc.conf; do
+  [ -e "${_nproc_conf}" ] || continue
+  rename nproc.conf nproc.conf_bk "${_nproc_conf}"
+done
 [ -z "$(grep 'session required pam_limits.so' /etc/pam.d/common-session)" ] && echo "session required pam_limits.so" >> /etc/pam.d/common-session
 sed -i '/^# End of file/,$d' /etc/security/limits.conf
 cat >> /etc/security/limits.conf <<EOF
