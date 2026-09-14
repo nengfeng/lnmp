@@ -18,15 +18,23 @@ jobs:
       matrix:
         include:
           - image: debian:12
-          - image: ubuntu:22.04
-          # Newer/re-rolled distros ship the t64-renamed runtime libraries
-          # (libaio1 -> libaio1t64, libglib2.0-0 -> libglib2.0-0t64), which
-          # resolve_pkg_name() now maps at runtime. Both were green on the run
-          # after that fix, so they block like the others. An apt-cache miss is
-          # advisory only -- apt gets the final say -- so a heuristic hiccup
-          # cannot fail a distro whose dependencies apt can install.
-          - image: debian:13
           - image: ubuntu:24.04
+          # Current support window: Debian 12/13, Ubuntu 24.04/26.04. Older
+          # releases are deliberately not covered -- the installer may still
+          # work on them, but nothing here claims it.
+          #
+          # These four all ship the t64-renamed runtime libraries
+          # (libaio1 -> libaio1t64, libglib2.0-0 -> libglib2.0-0t64), which
+          # resolve_pkg_name() maps at runtime. An apt-cache miss is advisory
+          # only -- apt gets the final say -- so a heuristic hiccup cannot fail
+          # a distro whose dependencies apt can install.
+          #
+          # ubuntu:26.04 (Resolute Raccoon, released 2026-04-23) is the one to
+          # watch: it replaces most GNU coreutils with Rust equivalents
+          # (cp/mv/rm excepted), so any script that leans on an exact GNU
+          # edge-case behaviour shows up here first.
+          - image: debian:13
+          - image: ubuntu:26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
