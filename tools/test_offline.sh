@@ -143,6 +143,74 @@ case "$out" in *"E: Unable to locate package ghostpkg"*) ok "apt's own error nam
 out="$(apt_install_packages libzip-dev ghostpkg 2>&1)"; rc=$?
 [ "$rc" -ne 0 ] && ok "a mixed list still fails on the apt failure" || ko "mixed list passed despite an apt failure"
 
+echo "== svc_start liveness for Type=simple units =="
+# The installer used to accept any unit whose `systemctl start` returned 0, but
+# systemd reports a Type=simple unit as started the moment the process is forked
+# -- so a service that died on the spot (missing .so, unusable config) was
+# recorded as installed and the installer printed its success banner. Both
+# php-fpm.service and the generated mysqld.service are Type=simple, and the
+# latter sets Restart=on-failure, which parks a crashed unit in
+# "activating/auto-restart" rather than "failed".
+# systemd is stubbed here so the whole state table is covered deterministically
+# in milliseconds; the container smoke job exercises the real thing.
+sleep(){ :; }                       # the settle delay is not the logic under test
+has_systemd(){ return 0; }
+SVC_RC=0; IS_ACTIVE_RC=0; UNIT_TYPE=simple; UNIT_STATE=active; UNIT_SUB=running
+
+_svc(){ return "${SVC_RC}"; }
+systemctl(){
+  case "$*" in
+    "show -p Type --value "*)                printf '%s\n' "${UNIT_TYPE}" ;;
+    "show -p ActiveState,SubState "*)        printf 'ActiveState=%s\nSubState=%s\n' "${UNIT_STATE}" "${UNIT_SUB}" ;;
+    *"is-active"*)                           return "${IS_ACTIVE_RC}" ;;
+    *)                                       return 0 ;;
+  esac
+}
+
+UNIT_TYPE=simple;  svc_unit_is_simple probe && ok "Type=simple is gated for re-check"   || ko "simple not gated"
+UNIT_TYPE=exec;    svc_unit_is_simple probe && ok "Type=exec is gated for re-check"     || ko "exec not gated"
+UNIT_TYPE=notify;  svc_unit_is_simple probe && ko "notify wrongly gated"                || ok "notify is not gated"
+UNIT_TYPE=forking; svc_unit_is_simple probe && ko "forking wrongly gated"               || ok "forking is not gated"
+UNIT_TYPE="";      svc_unit_is_simple probe && ko "empty Type wrongly gated"            || ok "unknown Type is not gated"
+
+# A Type=simple unit that stays up must still be accepted (a false failure here
+# would abort every install).
+UNIT_TYPE=simple; UNIT_STATE=active; UNIT_SUB=running; SVC_RC=0
+svc_start probe >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "live Type=simple unit is accepted" || ko "live Type=simple unit rejected (rc=$rc)"
+
+# ... one that died -> systemd leaves it failed -> must be rejected
+UNIT_STATE=failed; UNIT_SUB=failed
+svc_start probe >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "dead Type=simple unit is rejected" || ko "dead Type=simple unit accepted"
+
+# ... one that is crash-looping under Restart= is parked in activating/auto-restart
+UNIT_STATE=activating; UNIT_SUB=auto-restart
+svc_start probe >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && ok "unit queued for auto-restart is rejected" || ko "auto-restart unit accepted"
+
+# ... but merely still activating (e.g. ExecStartPre) is not a death
+UNIT_STATE=activating; UNIT_SUB=start
+svc_start probe >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "still-activating unit is not treated as dead" || ko "activating unit rejected (rc=$rc)"
+
+# Type=forking/notify: systemd validates those itself, so no re-check may run.
+# The stubbed unit is dead, yet the old contract (trust the start status) holds.
+UNIT_TYPE=forking; UNIT_STATE=inactive; UNIT_SUB=dead; SVC_RC=0
+svc_start probe >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "forking unit keeps its old behaviour (no re-check)" || ko "forking unit got the Type=simple re-check"
+
+# ... the pre-existing branch must survive: start timed out but process is alive
+UNIT_TYPE=forking; UNIT_STATE=active; UNIT_SUB=running; SVC_RC=1; IS_ACTIVE_RC=0
+svc_start probe >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "slow forking start that is really running still succeeds" || ko "running-but-timed-out service rejected (rc=$rc)"
+
+# Without systemd the SysV `service` status is already meaningful -> skip re-check
+has_systemd(){ return 1; }
+UNIT_TYPE=simple; UNIT_STATE=failed; UNIT_SUB=failed; SVC_RC=0
+svc_start probe >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "no systemd -> re-check is skipped" || ko "re-check ran without systemd"
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }

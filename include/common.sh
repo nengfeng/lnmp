@@ -521,6 +521,52 @@ service_action() {
   _svc "$1" "$2" "yes"
 }
 
+# Check whether a systemd unit's Type makes `systemctl start` trustworthy
+# Usage: svc_unit_is_simple <service_name>
+# Returns: 0 for Type=simple/exec, i.e. systemd declares the unit started the
+#          moment the process is forked and never checks that it stays alive;
+#          1 for every other type (systemd already waits for the process to
+#          prove itself), for unknown units, and when systemd is absent.
+# Both php-fpm.service and the generated mysqld.service are Type=simple, so
+# this is the gate svc_start uses to decide where a re-check is needed.
+svc_unit_is_simple() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  local unit_type
+  unit_type=$(systemctl show -p Type --value "$1" 2>/dev/null) || return 1
+  case "${unit_type}" in
+    simple|exec) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Re-check a Type=simple unit shortly after it was started
+# Usage: svc_settled_active <service_name>
+# Returns: 0 when the unit is active, or still activating for a reason other
+#          than a crash-restart (e.g. an ExecStartPre still running);
+#          1 when it is dead, failed, or queued for an automatic restart.
+# Type=simple units whose main process exits are moved to "activating /
+# auto-restart" rather than "failed" when the unit sets Restart= (the generated
+# mysqld.service does), so that substate has to count as a failure too.
+svc_settled_active() {
+  local out state sub
+  out=$(systemctl show -p ActiveState,SubState "$1" 2>/dev/null) || return 1
+  state=$(printf '%s\n' "${out}" | sed -n 's/^ActiveState=//p')
+  sub=$(printf '%s\n' "${out}" | sed -n 's/^SubState=//p')
+
+  case "${state}" in
+    active)
+      return 0
+      ;;
+    activating)
+      [ "${sub}" = "auto-restart" ] && return 1
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 # Start a service
 # Usage: svc_start <service_name> [quiet]
 svc_start() {
@@ -537,6 +583,22 @@ svc_start() {
     if svc_is_active "${service}"; then
       [[ "${quiet}" != "yes" ]] && echo "${CMSG}${service} is running despite startup timeout${CEND}"
       return 0
+    fi
+  fi
+  
+  # A Type=simple unit is reported as started as soon as the process is forked,
+  # so a process that dies immediately (missing shared library, unusable config,
+  # wrong permissions) still leaves result == 0 here. Without the re-check below
+  # the installer carried on and printed its success banner while the service was
+  # already dead -- exactly how a php-fpm that could not load libsodium.so.26 got
+  # past the install. Restricted to Type=simple/exec: for every other type
+  # systemd itself waits for the process to prove it is up, so those keep their
+  # current behaviour and pay no extra delay.
+  if [ ${result} -eq 0 ] && has_systemd && svc_unit_is_simple "${service}"; then
+    sleep 1
+    if ! svc_settled_active "${service}"; then
+      [[ "${quiet}" != "yes" ]] && echo "${CFAILURE}${service} stopped right after starting (see: systemctl status ${service})${CEND}"
+      return 1
     fi
   fi
   

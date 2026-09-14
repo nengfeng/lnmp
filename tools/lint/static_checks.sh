@@ -109,5 +109,28 @@ for f in $(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -no
 done
 [ "$tail_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
+echo "== 7. svc_start must re-verify Type=simple units [HARD] =="
+# systemd reports a Type=simple unit as started the moment the process is forked,
+# so `systemctl start` returning 0 says nothing about whether the process will
+# still be alive a moment later. Both php-fpm.service and the generated
+# mysqld.service are Type=simple; without the re-check in svc_start a service
+# that dies on the spot (missing shared library, unusable config) is recorded as
+# installed while the installer prints its success banner -- which is how a
+# php-fpm that could not load libsodium.so.26 got past a full install. The
+# container smoke job runs weekly and off push, so this pin is what stands
+# between a "simplification" of svc_start and the silent return of that bug.
+# Details: .workbuddy/ci-smoke-round2.md (the smoke run that found it).
+svc_start_body=$(sed -n '/^svc_start()/,/^}/p' include/common.sh)
+svc_ok=1
+if [ -z "${svc_start_body}" ]; then
+  echo "  include/common.sh: svc_start() not found (renamed, or no longer a top-level function)"
+  svc_ok=0
+elif ! echo "${svc_start_body}" | grep -q 'svc_unit_is_simple'; then
+  echo "  include/common.sh: svc_start() no longer re-checks Type=simple units"
+  echo "        a service that dies right after fork would be reported as installed again"
+  svc_ok=0
+fi
+[ "$svc_ok" -eq 1 ] && echo "  OK" || FAIL=1
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then echo "STATIC CHECKS: PASS"; exit 0; else echo "STATIC CHECKS: FAIL"; exit 1; fi
