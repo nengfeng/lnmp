@@ -115,6 +115,9 @@ options.conf.local
 .env.local
 .env.*.local
 
+# WorkBuddy 本地工作目录（内部笔记 + 本地设置，可能含 token；本仓公开，整体不提交）
+.workbuddy/
+
 # 密钥和凭据
 *.pem
 *.key
