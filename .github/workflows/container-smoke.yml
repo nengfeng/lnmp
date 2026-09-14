@@ -1,0 +1,81 @@
+name: Container smoke
+
+# Layer 2 of the container test net: a real install inside a systemd container
+# (Nginx + PHP + MariaDB), then the same command again to prove idempotency,
+# then a full uninstall to prove nothing is left behind.
+#
+# L1 (container.yml) is the fast dependency check that runs on every push.
+# This one compiles for 20-40 minutes, so it runs weekly and on demand instead
+# of on every push -- it is the last line of defence, not the first.
+#
+# systemd is required and the official debian image does not ship it: the
+# installer starts services with systemctl/service and treats a failed php-fpm
+# or mysqld start as fatal, while the repo provides only systemd units. So
+# install systemd and boot it as PID 1 inside a privileged container.
+on:
+  schedule:
+    # Every Sunday at 03:00 UTC.
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: smoke (debian:12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CONTAINER: lnmp-smoke
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Boot a systemd container
+        run: |
+          docker run -d --name "$CONTAINER" \
+            --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            -v "$PWD:/work" -w /work \
+            debian:12 \
+            bash -c 'apt-get update -qq
+                     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq systemd systemd-sysv dbus >/dev/null
+                     && exec /sbin/init'
+          for _ in $(seq 1 30); do
+            state=$(docker exec "$CONTAINER" systemctl is-system-running 2>/dev/null || true)
+            echo "systemd state: ${state:-<not up yet>}"
+            case "$state" in
+              running|degraded) exit 0 ;;
+            esac
+            sleep 2
+          done
+          echo "systemd did not reach a usable state; container log follows:" >&2
+          docker logs "$CONTAINER" >&2 || true
+          exit 1
+
+      - name: Smoke (install -> idempotent re-run -> uninstall)
+        run: docker exec -w /work "$CONTAINER" bash tools/container/smoke.sh
+
+      # Reproduce the failing tail in the job log: going through the artifact
+      # download to find out why a 30-minute run went red is a bad trade.
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          for f in smoke-install.log smoke-rerun.log smoke-uninstall.log install.log; do
+            if [ -f "$f" ]; then
+              echo "===== ${f} (tail) ====="
+              tail -n 60 "$f"
+            fi
+          done
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: |
+            smoke-*.log
+            install.log
+          if-no-files-found: ignore
+
+      - name: Remove the container
+        if: always()
+        run: docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
