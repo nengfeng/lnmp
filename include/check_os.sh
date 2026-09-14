@@ -20,29 +20,48 @@ if [[ "${Platform}" =~ ^debian$|^deepin$|^kali$ ]]; then
     [[ "${Debian_ver}" =~ ^20$ ]] && Debian_ver=10
     [[ "${Debian_ver}" =~ ^23$ ]] && Debian_ver=11
   elif [[ "${Platform}" =~ ^kali$ ]]; then
-    [[ "${Debian_ver}" =~ ^202 ]] && Debian_ver=10
+    # Kali is rolling and tracks Debian testing, so its year-based VERSION_ID
+    # (2022.1, 2026.2, ...) corresponds to no single Debian release. The old
+    # mapping pinned every 202x to Debian 10, which under the minimum below
+    # would refuse every Kali release; floor it at Debian 12 (bookworm) so a
+    # current Kali is not rejected. Granularity limit worth knowing: only the
+    # year survives VERSION_MAIN_ID, so a pre-2023.3 Kali (Debian 11 based)
+    # cannot be told apart from a current one and passes too.
+    [[ "${Debian_ver}" =~ ^202[0-9]$ ]] && Debian_ver=12
   fi
 elif [[ "${Platform}" =~ ^ubuntu$|^linuxmint$|^elementary$ ]]; then
   PM=apt-get
   Family=ubuntu
   Ubuntu_ver=${VERSION_MAIN_ID}
+  # The derivative tables below translate a derivative's own version into the
+  # Ubuntu LTS it is built on, because that is what decides support here. They
+  # are hand-maintained: a new derivative release has to be added, or the
+  # minimum check below will refuse it even when its base is supported.
   if [[ "${Platform}" =~ ^linuxmint$ ]]; then
     [[ "${VERSION_MAIN_ID}" =~ ^18$ ]] && Ubuntu_ver=16
     [[ "${VERSION_MAIN_ID}" =~ ^19$ ]] && Ubuntu_ver=18
     [[ "${VERSION_MAIN_ID}" =~ ^20$ ]] && Ubuntu_ver=20
     [[ "${VERSION_MAIN_ID}" =~ ^21$ ]] && Ubuntu_ver=22
+    [[ "${VERSION_MAIN_ID}" =~ ^22$ ]] && Ubuntu_ver=24   # Mint 22.x is Ubuntu 24.04
   elif [[ "${Platform}" =~ ^elementary$ ]]; then
     [[ "${VERSION_MAIN_ID}" =~ ^5$ ]] && Ubuntu_ver=18
     [[ "${VERSION_MAIN_ID}" =~ ^6$ ]] && Ubuntu_ver=20
     [[ "${VERSION_MAIN_ID}" =~ ^7$ ]] && Ubuntu_ver=22
+    [[ "${VERSION_MAIN_ID}" =~ ^8$ ]] && Ubuntu_ver=24   # elementary 8.x is Ubuntu 24.04
   fi
 else
-  die_hard "Does not support this OS. Only Debian 9+, Ubuntu 16+ are supported."
+  die_hard "Does not support this OS. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported."
 fi
 
-# Check OS Version
-if [ ${Debian_ver} -lt 9 >/dev/null 2>&1 ] || [ ${Ubuntu_ver} -lt 16 >/dev/null 2>&1 ]; then
-  die_hard "Does not support this OS, Please install Debian 9+,Ubuntu 16+"
+# Check OS Version -- the supported set is Debian 12/13 and Ubuntu 24.04/26.04,
+# i.e. exactly what CI exercises (.github/workflows/container.yml). Anything
+# older is refused, including derivative releases built on an older base;
+# anything newer is accepted, because every component is built from source and
+# the only thing a newer release has to provide is a resolvable package list.
+# The :-99 default means "this family does not apply", so only the branch that
+# was actually taken can fail the check.
+if [ "${Debian_ver:-99}" -lt 12 ] 2>/dev/null || [ "${Ubuntu_ver:-99}" -lt 24 ] 2>/dev/null; then
+  die_hard "Does not support this OS. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported."
 fi
 
 # Probe gcc defensively: on a minimal image it is absent AND the package index
