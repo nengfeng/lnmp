@@ -44,3 +44,9 @@ jobs:
       # 4. Offline logic tests (stubbed, no network / no build)
       - name: Offline logic tests
         run: bash tools/test_offline.sh
+
+      # 5. Supported-release gate: accept Debian 12/13 + Ubuntu 24.04/26.04 and
+      #    the derivatives built on them, refuse everything older. The same set
+      #    container.yml exercises, so widening one without the other goes red.
+      - name: OS gate checks
+        run: bash tools/lint/os_gate_checks.sh
