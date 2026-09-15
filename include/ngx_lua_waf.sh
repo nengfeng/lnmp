@@ -45,44 +45,19 @@ Nginx_lua_waf() {
   ${nginx_install_dir}/sbin/nginx -V &> $$
   nginx_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
   rm -rf $$
-  nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
-  # Believed unreachable: install_web_server always builds with
-  # --add-module=../lua-nginx-module-... (web-common.sh) and upgrade_web.sh
-  # explicitly re-adds it ("Always ensure lua modules"), so `nginx -V` always
-  # lists the module and this test is false. Kept as-is on purpose: the recompile
-  # below cannot be exercised by CI, and rewriting it blind would risk more than
-  # the dead code costs. Review it together with a dedicated waf refactor.
-  if [ -z "$(echo ${nginx_configure_args} | grep lua-nginx-module)" ]; then
-    src_url=https://nginx.org/download/nginx-${nginx_ver}.tar.gz && Download_src
-    src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
-    src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
-    src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
-    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-    tar xzf nginx-${nginx_ver}.tar.gz
-    tar xzf openssl-${openssl_ver}.tar.gz
-    tar xzf pcre2-${pcre_ver}.tar.gz
-    tar xzf ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz
-    tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
-    pushd nginx-${nginx_ver}
-    make clean
-    sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' auto/cc/gcc # close debug
-    export LUAJIT_LIB=/usr/local/lib
-    export LUAJIT_INC=/usr/local/include/luajit-2.1
-    ./configure ${nginx_configure_args} --with-ld-opt="-Wl,-rpath,/usr/local/lib" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}
-    compile_check
-    if [ -f "objs/nginx" ]; then
-      /bin/mv ${nginx_install_dir}/sbin/nginx{,$(date +%m%d)}
-      /bin/cp objs/nginx ${nginx_install_dir}/sbin/nginx
-      kill -USR2 $(cat /var/run/nginx.pid)
-      sleep 1
-      kill -QUIT $(cat /var/run/nginx.pid.oldbin)
-      popd > /dev/null
-      success_msg "lua-nginx-module"
-      sed -i "s@^nginx_modules_options='\(.*\)'@nginx_modules_options=\'\1 --with-ld-opt=\"-Wl,-rpath,/usr/local/lib\" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}\'@" ../options.conf
-      cleanup_src nginx-${nginx_ver}
-    else
-      fail_msg "lua-nginx-module"
-    fi
+  # Defensive guard: every server this project builds (install_web_server) and
+  # upgrades (upgrade_web.sh) ships with lua-nginx-module, so a missing module
+  # here means the nginx was installed by some other means. We used to silently
+  # recompile nginx in this branch, but that recompile was half-baked (it never
+  # unpacked ngx_brotli, so any brotli-enabled build would fail to configure)
+  # and duplicated the correct, complete lua-module addition that upgrade_web.sh
+  # already performs. Recompiling here would also risk deploying waf config onto
+  # an nginx that cannot interpret it. So abort with a clear pointer instead.
+  if [ -z "$(echo ${nginx_configure_args_tmp} | grep lua-nginx-module)" ]; then
+    echo "${CFAILURE}Current Nginx was not compiled with lua-nginx-module.${CEND}"
+    echo "${CWARNING}Please upgrade Nginx first (upgrade_web.sh adds the Lua module automatically), then retry.${CEND}"
+    popd > /dev/null
+    return 1
   fi
   popd > /dev/null
 }
@@ -115,43 +90,16 @@ Tengine_lua_waf() {
   ${tengine_install_dir}/sbin/nginx -V &> $$
   tengine_configure_args_tmp=$(cat $$ | grep 'configure arguments:' | awk -F: '{print $2}')
   rm -rf $$
-  tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-\w.\w.\w\+ @--with-openssl=../openssl-${openssl_ver} @" | sed "s@--with-pcre=../pcre2-\w.\w\+ @--with-pcre=../pcre2-${pcre_ver} @")
-  # Same dead branch as in Nginx_lua_waf above (install_web_server builds every
-  # server type with --add-module=../lua-nginx-module-...), and the test here is
-  # even looser (`grep lua`). Left in place for the same reason.
-  if [ -z "$(echo ${tengine_configure_args} | grep lua)" ]; then
-    src_url=https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz && Download_src
-    src_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" && Download_src
-    src_url="https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" && Download_src
-    src_url="https://github.com/vision5/ngx_devel_kit/archive/refs/tags/v${ngx_devel_kit_ver}.tar.gz" && Download_src "ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz"
-    src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-    tar xzf tengine-${tengine_ver}.tar.gz
-    tar xzf openssl-${openssl_ver}.tar.gz
-    tar xzf pcre2-${pcre_ver}.tar.gz
-    tar xzf ngx_devel_kit-${ngx_devel_kit_ver}.tar.gz
-    tar xzf lua-nginx-module-${lua_nginx_module_ver}.tar.gz
-    pushd tengine-${tengine_ver}
-    make clean
-    export LUAJIT_LIB=/usr/local/lib
-    export LUAJIT_INC=/usr/local/include/luajit-2.1
-    ./configure ${tengine_configure_args} --with-ld-opt="-Wl,-rpath,/usr/local/lib" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}
-    compile_check
-    if [ -f "objs/nginx" ]; then
-      /bin/mv ${tengine_install_dir}/sbin/nginx{,$(date +%m%d)}
-      /bin/mv ${tengine_install_dir}/modules{,$(date +%m%d)}
-      /bin/cp objs/nginx ${tengine_install_dir}/sbin/nginx
-      chmod +x ${tengine_install_dir}/sbin/*
-      make install
-      kill -USR2 $(cat /var/run/nginx.pid)
-      sleep 1
-      kill -QUIT $(cat /var/run/nginx.pid.oldbin)
-      popd > /dev/null
-      sed -i "s@^nginx_modules_options='\(.*\)'@nginx_modules_options=\'\1 --with-ld-opt=\"-Wl,-rpath,/usr/local/lib\" --add-module=../lua-nginx-module-${lua_nginx_module_ver} --add-module=../ngx_devel_kit-${ngx_devel_kit_ver}\'@" ../options.conf
-      success_msg "lua_module"
-      cleanup_src tengine-${tengine_ver}
-    else
-      fail_msg "lua_module"
-    fi
+  # Same defensive guard as in Nginx_lua_waf above: Tengine built by this project
+  # always ships lua support, so a missing module means it was installed by some
+  # other means. The old code recompiled Tengine here, but that recompile never
+  # unpacked ngx_brotli and duplicated what upgrade_web.sh already does correctly.
+  # Abort with a pointer instead of deploying waf config onto a lua-less server.
+  if [ -z "$(echo ${tengine_configure_args_tmp} | grep lua-nginx-module)" ]; then
+    echo "${CFAILURE}Current Tengine was not compiled with lua-nginx-module.${CEND}"
+    echo "${CWARNING}Please upgrade Tengine first (upgrade_web.sh adds the Lua module automatically), then retry.${CEND}"
+    popd > /dev/null
+    return 1
   fi
   popd > /dev/null
 }
