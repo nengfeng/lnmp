@@ -13,6 +13,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Validate the workflow files themselves (this one included). actionlint
+      # catches what YAML parsing cannot: unknown action inputs, invalid
+      # contexts, matrix field typos. Runs BEFORE shellcheck is installed on
+      # purpose: with a shellcheck binary present actionlint would also lint
+      # every run: block, which this job already covers at the file level via
+      # steps 1-2. Pinned like shellcheck so the gate cannot drift.
+      - name: Install actionlint v1.7.12
+        run: |
+          set -euo pipefail
+          VER=1.7.12
+          curl -sSfL -o al.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${VER}/actionlint_${VER}_linux_amd64.tar.gz"
+          tar xzf al.tar.gz actionlint
+          sudo install -m 0755 actionlint /usr/local/bin/actionlint
+          actionlint --version | head -n1
+
+      - name: Lint workflow files
+        run: actionlint -color
+
       # Pin a shellcheck version so the calibrated .shellcheckrc stays reproducible.
       - name: Install shellcheck 0.10.0
         run: |
@@ -36,6 +54,13 @@ jobs:
       #    No -x/-s: the scripts are #!/bin/bash, so shellcheck auto-detects bash.
       - name: Shellcheck
         run: shellcheck -S error $(find . -name '*.sh' -not -path './src/*')
+
+      # 2b. Ratchet: warnings are reported but do not fail. When this step has
+      #     been clean for a while, tighten .shellcheckrc / move -S warning
+      #     into the gate above and downgrade this step to -S info.
+      - name: Shellcheck (warning severity, advisory)
+        continue-on-error: true
+        run: shellcheck -S warning $(find . -name '*.sh' -not -path './src/*') || true
 
       # 3. Anti-regression static checks (swallowed exits, unguarded extractions, CWD balance)
       - name: Static checks
