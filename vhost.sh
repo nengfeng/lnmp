@@ -245,7 +245,12 @@ If you enter '.', the field will be left blank.
       "${HOME}/.acme.sh/acme.sh" --force --issue -k ${CERT_KEYLENGTH} -w ${vhostdir} -d ${domain} ${moredomainame_D}
     fi
       [ -e "${PATH_SSL}/${domain}.crt" ] && rm -f ${PATH_SSL}/${domain}.{crt,key}
-      Nginx_cmd="svc_restart nginx"
+      # reloadcmd is stored in ~/.acme.sh/<domain>/<domain>.conf and eval'd
+      # inside acme.sh's own process at every cron renewal -- shell functions
+      # defined in this repo (svc_restart) do not exist there, so the command
+      # must be self-contained. web_install_dir resolves the sbin path for
+      # nginx/tengine/openresty alike (see include/check_dir.sh).
+      Nginx_cmd="${web_install_dir}/sbin/nginx -s reload"
       Command="${Nginx_cmd}"
     if [ -s "${HOME}/.acme.sh/${domain}/fullchain.cer" ] && [[ "${CERT_KEYLENGTH}" =~ ^2048$|^3072$|^4096$|^8192$ ]]; then
       "${HOME}/.acme.sh/acme.sh" --force --install-cert -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null

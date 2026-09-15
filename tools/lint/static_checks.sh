@@ -132,5 +132,54 @@ elif ! echo "${svc_start_body}" | grep -q 'svc_unit_is_simple'; then
 fi
 [ "$svc_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
+echo "== 8. --reloadcmd values must be self-contained commands [HARD] =="
+# acme.sh stores the --reloadcmd string in ~/.acme.sh/<domain>/<domain>.conf
+# and eval's it inside ITS OWN process: at issuance a child of this shell, at
+# every cron renewal a child of crond. Shell functions defined in this tree
+# are not visible in either process (they are not exported), so a reloadcmd
+# naming one fails with 'command not found' on every renewal while issuance
+# looks fine -- install-cert copies the certs before running reloadcmd, the
+# error was silenced by '> /dev/null', and this script's own
+# 'nginx -t && nginx -s reload' picked the cert up a moment later. That was
+# vhost.sh:248 for its whole life: 30 days of daily reload failures, then
+# the served certificate expired.
+# The historical spelling hid the function two hops deep
+#     Nginx_cmd="svc_restart nginx"; Command="${Nginx_cmd}";
+#     --reloadcmd "${Command}"
+# so checking the reloadcmd line literally is not enough: follow ${VAR}
+# references through same-file assignments (max 5 hops) before scanning.
+# Details: the auto-renewal bug report (renewal fails, issuance ok).
+resolve_value() { # resolve_value <value> <file>
+  local v=$1 f=$2 i var rhs needle
+  for i in 1 2 3 4 5; do
+    var=$(printf '%s\n' "$v" | sed -nE 's/.*\$\{([A-Za-z_][A-Za-z0-9_]*)\}.*/\1/p' | head -n1)
+    [ -z "$var" ] && break
+    rhs=$(grep -hE "^[[:space:]]*(local[[:space:]]+)?${var}=" "$f" 2>/dev/null \
+            | head -n1 | sed -E "s/^[[:space:]]*(local[[:space:]]+)?${var}=\"([^\"]*)\".*/\2/")
+    needle='${'"$var"'}'
+    v=${v//"$needle"/$rhs}
+  done
+  printf '%s\n' "$v"
+}
+func_names=$(grep -hE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*\(\)' $FILES 2>/dev/null | sed -E 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)\(\).*/\1/' | sort -u)
+reload_ok=1
+while IFS=: read -r f lnum line; do
+  [ -z "$line" ] && continue
+  case "$line" in
+    *--reloadcmd*) ;;
+    *) continue ;;
+  esac
+  value=$(printf '%s\n' "$line" | sed -E 's/.*--reloadcmd[[:space:]]+"([^"]*)".*/\1/')
+  value=$(resolve_value "$value" "$f")
+  for fn in $func_names; do
+    if printf '%s\n' "$value" | grep -qw -- "$fn"; then
+      echo "  $f:$lnum: --reloadcmd resolves to a command naming shell function '$fn' - it does not exist inside acme.sh's process"
+      echo "        resolved: $value"
+      reload_ok=0
+    fi
+  done
+done < <(grep -n -- '--reloadcmd' $FILES 2>/dev/null)
+[ "$reload_ok" -eq 1 ] && echo "  OK" || FAIL=1
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then echo "STATIC CHECKS: PASS"; exit 0; else echo "STATIC CHECKS: FAIL"; exit 1; fi
