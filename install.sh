@@ -814,8 +814,8 @@ fi
 [[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "PostgreSQL user:")${CMSG}postgres${CEND}"
 [[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "postgres password:")${CMSG}${dbpostgrespwd}${CEND}"
 [[ "${php_option}" =~ ^[1-3]$ ]] && printf "%b" "\n$(printf "%-32s" "PHP install dir:")${CMSG}${php_install_dir}${CEND}\n"
-[[ "${phpcache_option}" == 1 ]] && echo "$(printf "%-32s" "Opcache Control Panel URL:")${CMSG}http://${IPADDR}/ocp.php${CEND}"
-[[ "${phpcache_option}" == 2 ]] && echo "$(printf "%-32s" "APC Control Panel URL:")${CMSG}http://${IPADDR}/apc.php${CEND}"
+[[ "${phpcache_option}" == 1 ]] && echo "$(printf "%-32s" "Opcache Control Panel URL:")${CMSG}http://127.0.0.1/ocp.php${CEND} (localhost only)"
+[[ "${phpcache_option}" == 2 ]] && echo "$(printf "%-32s" "APC Control Panel URL:")${CMSG}http://127.0.0.1/apc.php${CEND} (localhost only)"
 [[ "${pureftpd_flag}" == y ]] && printf "%b" "\n$(printf "%-32s" "Pure-FTPd install dir:")${CMSG}${pureftpd_install_dir}${CEND}\n"
 [[ "${pureftpd_flag}" == y ]] && echo "$(printf "%-32s" "Create FTP virtual script:")${CMSG}./pureftpd_vhost.sh${CEND}"
 [[ "${phpmyadmin_flag}" == y ]] && printf "%b" "\n$(printf "%-32s" "phpMyAdmin dir:")${CMSG}${wwwroot_dir}/default/phpMyAdmin${CEND}\n"
@@ -826,25 +826,38 @@ if [[ ${nginx_option} =~ ^[1-3]$ ]]; then
   printf "%b" "\n$(printf "%-32s" "Index URL:")${CMSG}http://${IPADDR}/${CEND}\n"
 fi
 
-# Security notice: the debug/diagnostic/management tools below are publicly
-# reachable on the default site by default. In production, delete the debug
-# files and relocate phpMyAdmin so they are not reachable from the Internet.
-_debug_panels=()
+# Security notice about what the installer leaves on the default site. The
+# probe pages (phpinfo/ocp/xprober/apc.php) are restricted to localhost by
+# the stock config (config/nginx.conf); webgrind and phpMyAdmin ARE publicly
+# reachable and need an explicit decision from the operator in production.
+_probe_pages=()
 for _p in phpinfo.php ocp.php xprober.php apc.php; do
-  if [ -e "${wwwroot_dir}/default/${_p}" ]; then _debug_panels+=("${_p}"); fi
+  if [ -e "${wwwroot_dir}/default/${_p}" ]; then _probe_pages+=("${_p}"); fi
 done
-if [ -d "${wwwroot_dir}/default/webgrind" ]; then _debug_panels+=("webgrind"); fi
-if [ "${#_debug_panels[@]}" -gt 0 ] || [ "${phpmyadmin_flag}" == y ]; then
+if [ "${#_probe_pages[@]}" -gt 0 ]; then
+  echo
+  echo "${CMSG}Probe pages installed (localhost-only via the default-site ACL):${CEND}"
+  for _p in "${_probe_pages[@]}"; do echo "    - http://127.0.0.1/${_p}"; done
+  echo "  Reach them remotely with an SSH tunnel, e.g.:"
+  echo "    ssh -L 8080:127.0.0.1:80 user@$(hostname -I | awk '{print $1}')"
+  echo "  Delete what you do not need:"
+  _rmargs=""
+  for _p in "${_probe_pages[@]}"; do _rmargs="${_rmargs} ${wwwroot_dir}/default/${_p}"; done
+  echo "    rm -f${_rmargs}"
+fi
+_public_panels=()
+[ -d "${wwwroot_dir}/default/webgrind" ] && _public_panels+=("webgrind")
+if [ "${#_public_panels[@]}" -gt 0 ] || [ "${phpmyadmin_flag}" == y ]; then
   echo
   echo "${CWARNING}==============================================================${CEND}"
-  echo "${CWARNING}  SECURITY NOTICE - clean up publicly reachable debug tools${CEND}"
+  echo "${CWARNING}  SECURITY NOTICE - publicly reachable debug tools${CEND}"
   echo "${CWARNING}==============================================================${CEND}"
-  if [ "${#_debug_panels[@]}" -gt 0 ]; then
-    echo "  These debug/diagnostic files were created and are publicly reachable:"
-    for _p in "${_debug_panels[@]}"; do echo "    - ${wwwroot_dir}/default/${_p}"; done
+  if [ "${#_public_panels[@]}" -gt 0 ]; then
+    echo "  These are PUBLICLY reachable (no localhost ACL applies):"
+    for _p in "${_public_panels[@]}"; do echo "    - ${wwwroot_dir}/default/${_p}"; done
     echo "  In production, delete them (keep only what your application needs):"
     _rmargs=""
-    for _p in "${_debug_panels[@]}"; do _rmargs="${_rmargs} ${wwwroot_dir}/default/${_p}"; done
+    for _p in "${_public_panels[@]}"; do _rmargs="${_rmargs} ${wwwroot_dir}/default/${_p}"; done
     echo "    rm -rf${_rmargs}"
   fi
   if [ "${phpmyadmin_flag}" == y ]; then
