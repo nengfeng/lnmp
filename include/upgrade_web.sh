@@ -230,14 +230,13 @@ Upgrade_Nginx() {
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
-      local brotli_arch=""
-      [[ "${armplatform}" != 'y' ]] && brotli_arch="-m64 "
       pushd ngx_brotli/deps/brotli > /dev/null
       mkdir -p out
       pushd out > /dev/null
+      # Plain Release build (-O3, portable codegen); the former -march=native
+      # baked the build host's CPU features in and risked SIGILL after a VPS
+      # live migration onto older hardware. Same rationale as web-common.sh.
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
-        -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
       cmake --build . --config Release --target brotlienc
       popd > /dev/null
@@ -420,14 +419,13 @@ Upgrade_Tengine() {
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
-      local brotli_arch=""
-      [[ "${armplatform}" != 'y' ]] && brotli_arch="-m64 "
       pushd ngx_brotli/deps/brotli > /dev/null
       mkdir -p out
       pushd out > /dev/null
+      # Plain Release build (-O3, portable codegen); the former -march=native
+      # baked the build host's CPU features in and risked SIGILL after a VPS
+      # live migration onto older hardware. Same rationale as web-common.sh.
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
-        -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
       cmake --build . --config Release --target brotlienc
       popd > /dev/null
@@ -521,14 +519,13 @@ Upgrade_OpenResty() {
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
-      local brotli_arch=""
-      [[ "${armplatform}" != 'y' ]] && brotli_arch="-m64 "
       pushd ngx_brotli/deps/brotli > /dev/null
       mkdir -p out
       pushd out > /dev/null
+      # Plain Release build (-O3, portable codegen); the former -march=native
+      # baked the build host's CPU features in and risked SIGILL after a VPS
+      # live migration onto older hardware. Same rationale as web-common.sh.
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_C_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
-        -DCMAKE_CXX_FLAGS="${brotli_arch}-Ofast -march=native -mtune=native -flto -funroll-loops -ffunction-sections -fdata-sections -Wl,--gc-sections" \
         -DCMAKE_INSTALL_PREFIX=./installed ..
       cmake --build . --config Release --target brotlienc
       popd > /dev/null
