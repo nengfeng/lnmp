@@ -1,0 +1,82 @@
+name: Version drift
+
+# Layer 0 of the test net: keep versions.txt from rotting between releases.
+#
+# update_versions.sh polls every tracked component's upstream feed and, with
+# --apply, writes minor/patch bumps into versions.txt (major/LTS jumps are
+# reported but never auto-applied -- that decision stays human). The script is
+# non-interactive by design (dry-run default, --apply flag, no prompts), so a
+# scheduled job can drive it directly.
+#
+# The schedule is deliberately one day ahead of container-smoke.yml (Sunday
+# 03:00 UTC): a bump PR opened Friday gets merged before the weekend smoke,
+# so newly bumped versions are proven by a real install instead of only by
+# URL reachability.
+#
+# Failed upstream fetches are reported inside the script's output and simply
+# leave versions.txt untouched, so a flaky feed cannot manufacture a bogus PR;
+# the job goes red only on a real script crash.
+
+on:
+  schedule:
+    # Every Friday at 21:00 UTC, ~30h before the Sunday smoke run.
+    - cron: '0 21 * * 5'
+  workflow_dispatch:
+
+permissions:
+  contents: write        # push the bump branch
+  pull-requests: write   # open the PR
+
+jobs:
+  bump:
+    name: check upstream versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply available version bumps
+        run: bash update_versions.sh --apply
+
+      - name: Detect changes to versions.txt
+        id: diff
+        run: |
+          if git diff --quiet -- versions.txt; then
+            echo "changed=no" >> "$GITHUB_OUTPUT"
+            echo "No upstream version updates to apply."
+          else
+            echo "changed=yes" >> "$GITHUB_OUTPUT"
+            git diff --stat -- versions.txt
+          fi
+
+      - name: Open a bump PR
+        if: steps.diff.outputs.changed == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          branch="version-bump/$(date +%Y%m%d)-${{ github.run_number }}"
+          git checkout -b "$branch"
+          git commit -am "chore(versions): upstream version bump (auto)"
+          git push origin "$branch"
+
+          {
+            echo "Weekly \`update_versions.sh --apply\` produced these changes:"
+            echo
+            echo '```'
+            git diff --stat "main...HEAD" -- versions.txt
+            git diff "main...HEAD" -- versions.txt | grep -E '^[+-][a-zA-Z]' || true
+            echo '```'
+            echo
+            echo "Minor/patch bumps only -- the script never auto-applies major"
+            echo "or LTS jumps (those are listed in the job log above). Merging"
+            echo "this PR puts the new versions under Sunday's container smoke"
+            echo "run before they reach a release."
+          } > body.md
+          gh pr create \
+            --base main --head "$branch" \
+            --title "chore(versions): upstream version bump $(date +%Y-%m-%d)" \
+            --body-file body.md
