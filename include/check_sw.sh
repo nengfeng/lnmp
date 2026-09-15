@@ -327,14 +327,15 @@ installDepsUbuntu() {
 }
 
 installDepsBySrc() {
-  pushd ${current_dir}/src > /dev/null
-  if ! command -v icu-config > /dev/null 2>&1 || icu-config --version | grep '^3.' || [[ "${Ubuntu_ver}" == "20" ]]; then
-    tar xzf icu4c-${icu4c_ver}-sources.tgz || { popd > /dev/null; return 1; }
-    pushd icu/source > /dev/null
-    ./configure --prefix=/usr/local || { popd > /dev/null; return 1; }
-    compile_and_install || { popd > /dev/null; return 1; }
-    popd > /dev/null
-    cleanup_src icu
+  # PHP intl links the distro ICU via pkg-config (icu-uc/icu-i18n). libicu-dev
+  # is in the package lists above; across the support window it ships ICU 72+
+  # (Debian 12) to 76+ (Debian 13), which PHP 8.3-8.5 are happy with. The old
+  # source build of icu4c existed for releases outside that window and is gone
+  # -- icu-config no longer ships there either, so the old probe could only
+  # ever answer "build from source". Refuse here, naming the package, rather
+  # than letting PHP's configure fail later with an indirect error.
+  if ! pkg-config --exists icu-uc 2>/dev/null; then
+    die_hard "libicu-dev is missing (PHP intl needs it; it is in the installDeps package list)"
   fi
 
   if command -v lsof >/dev/null 2>&1; then
@@ -347,6 +348,5 @@ installDepsBySrc() {
     die_hard "dependency install failed: lsof is missing (${PM})"
   fi
 
-  popd > /dev/null
   return 0
 }

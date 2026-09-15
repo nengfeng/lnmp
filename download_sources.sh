@@ -193,7 +193,6 @@ get_version() {
 
     mhash)          ver=${VERSIONS[mhash_ver]} ;;
     argon2)         ver=${VERSIONS[argon2_ver]} ;;
-    icu)            ver=${VERSIONS[icu4c_ver]} ;;
     imagemagick)    ver=${VERSIONS[imagemagick_ver]} ;;
     redis)          ver=${VERSIONS[redis_ver]} ;;
     memcached)      ver=${VERSIONS[memcached_ver]} ;;

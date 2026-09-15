@@ -270,12 +270,9 @@ checkDownload() {
 
   VERIFY_CHECKSUM="${VERIFY_CHECKSUM:-yes}"
 
-  # icu (GitHub only)
-  if ! command -v icu-config >/dev/null 2>&1 || icu-config --version | grep '^3.' || [[ "${Ubuntu_ver}" == "20" ]]; then
-    echo "Download icu..."
-    src_url="https://github.com/unicode-org/icu/releases/download/release-${icu4c_ver}/icu4c-${icu4c_ver}-sources.tgz"
-    Download_src
-  fi
+  # Note: ICU is deliberately NOT downloaded. PHP intl links the distro
+  # libicu (>=72 across the support window) via pkg-config -- see the guard
+  # in installDepsBySrc() in include/check_sw.sh.
 
   # OpenSSL for legacy or nginx
   if [[ "${with_old_openssl_flag}" == y ]]; then

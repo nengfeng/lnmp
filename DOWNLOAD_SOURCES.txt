@@ -107,7 +107,6 @@ libsodium           | https://download.libsodium.org/releases/       | 清华   
 libzip              | https://libzip.org/download/                   | 清华      | 无
 binutils            | https://ftp.gnu.org/gnu/binutils/              | 清华      | PGP
 argon2              | https://github.com/P-H-C/phc-winner-argon2     | 清华      | 无
-ICU                 | https://github.com/unicode-org/icu/releases    | 清华      | 无
 
 ================================================================================
 七、PECL 扩展
