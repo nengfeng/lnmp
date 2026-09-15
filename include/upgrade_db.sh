@@ -4,6 +4,51 @@
 
 . include/db-common.sh
 
+# Roll back a failed in-place DB upgrade: move the old install/data dirs back
+# into place (they were renamed to *_old_<ts> before the new tree was unpacked)
+# and try to bring the old server back up. Called from the failure paths after
+# the new server has been unpacked but failed to start or restore.
+# Usage: rollback_db_upgrade install_dir data_dir ts
+rollback_db_upgrade() {
+  local install_dir=$1
+  local data_dir=$2
+  local ts=$3
+
+  echo "${CSUCCESS}Rolling back to the previous ${DB} (${OLD_db_ver})...${CEND}"
+
+  # Stop the (broken) new server first so its dirs can be moved out of the way.
+  svc_stop mysqld 2>/dev/null
+  local timeout=60
+  while pidof mysqld mariadbd >/dev/null 2>&1; do
+    [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for the new ${DB} to stop during rollback${CEND}"; return 1; }
+    sleep 1
+  done
+
+  # Drop the half-installed new tree and move the preserved old one back.
+  rm -rf "${install_dir}" "${data_dir}"
+  if [ -d "${install_dir}_old_${ts}" ]; then
+    mv "${install_dir}_old_${ts}" "${install_dir}"
+  else
+    echo "${CFAILURE}Rollback failed: ${install_dir}_old_${ts} not found!${CEND}"
+    return 1
+  fi
+  if [ -d "${data_dir}_old_${ts}" ]; then
+    mv "${data_dir}_old_${ts}" "${data_dir}"
+  else
+    echo "${CFAILURE}Rollback failed: ${data_dir}_old_${ts} not found!${CEND}"
+    return 1
+  fi
+
+  # Bring the previous server back up and confirm it is usable.
+  svc_start mysqld
+  if wait_for_db_ready "${install_dir}"; then
+    echo "${CSUCCESS}Rollback complete: restored ${OLD_db_ver}.${CEND}"
+    return 0
+  fi
+  echo "${CFAILURE}Rollback failed: previous ${DB} could not be restarted. Data is preserved at ${install_dir}_old_${ts} / ${data_dir}_old_${ts}.${CEND}"
+  return 1
+}
+
 Upgrade_DB() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${db_install_dir}/bin/mysql" ] && echo "${CWARNING}MySQL/MariaDB is not installed on your system! ${CEND}" && exit 1
@@ -135,8 +180,9 @@ Upgrade_DB() {
         [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; return 1; }
         sleep 1
       done
-      mv ${mariadb_install_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
-      mv ${mariadb_data_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
+      local db_ts=$(date +"%Y%m%d_%H%M%S")
+      mv ${mariadb_install_dir}{,_old_${db_ts}}
+      mv ${mariadb_data_dir}{,_old_${db_ts}}
       [ ! -d "${mariadb_install_dir}" ] && mkdir -p ${mariadb_install_dir}
       mkdir -p ${mariadb_data_dir};chown mysql:mysql -R ${mariadb_data_dir}
       mv ${DB_filename}/* ${mariadb_install_dir}/
@@ -147,10 +193,15 @@ Upgrade_DB() {
       ${mariadb_install_dir}/scripts/mysql_install_db --user=mysql --basedir=${mariadb_install_dir} --datadir=${mariadb_data_dir}
       chown mysql:mysql -R ${mariadb_data_dir}
       svc_start mysqld
-      wait_for_db_ready ${mariadb_install_dir} || { echo "${CFAILURE}Database failed to start${CEND}"; return 1; }
+      if ! wait_for_db_ready ${mariadb_install_dir}; then
+        echo "${CFAILURE}Database failed to start${CEND}"
+        rollback_db_upgrade ${mariadb_install_dir} ${mariadb_data_dir} ${db_ts}
+        return 1
+      fi
       echo "Restoring data from ${DB_backup_file}......"
       if ! ${mariadb_install_dir}/bin/mysql < "${DB_backup_file}"; then
-        echo "${CFAILURE}Data restore failed! Old data preserved at ${mariadb_data_dir}_old_*, please restore manually.${CEND}"
+        echo "${CFAILURE}Data restore failed!${CEND}"
+        rollback_db_upgrade ${mariadb_install_dir} ${mariadb_data_dir} ${db_ts}
         return 1
       fi
       svc_restart mysqld
@@ -179,8 +230,9 @@ Upgrade_DB() {
         [ $((timeout--)) -le 0 ] && { echo "${CFAILURE}Timeout waiting for MySQL to stop${CEND}"; return 1; }
         sleep 1
       done
-      mv ${mysql_install_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
-      mv ${mysql_data_dir}{,_old_$(date +"%Y%m%d_%H%M%S")}
+      local db_ts=$(date +"%Y%m%d_%H%M%S")
+      mv ${mysql_install_dir}{,_old_${db_ts}}
+      mv ${mysql_data_dir}{,_old_${db_ts}}
       [ ! -d "${mysql_install_dir}" ] && mkdir -p ${mysql_install_dir}
       mkdir -p ${mysql_data_dir};chown mysql:mysql -R ${mysql_data_dir}
       mv ${DB_filename}/* ${mysql_install_dir}/
@@ -192,10 +244,15 @@ Upgrade_DB() {
       [ -e "${mysql_install_dir}/my.cnf" ] && rm -rf ${mysql_install_dir}/my.cnf
       sed -i '/myisam_repair_threads/d' /etc/my.cnf
       svc_start mysqld
-      wait_for_db_ready ${mysql_install_dir} || { echo "${CFAILURE}Database failed to start${CEND}"; return 1; }
+      if ! wait_for_db_ready ${mysql_install_dir}; then
+        echo "${CFAILURE}Database failed to start${CEND}"
+        rollback_db_upgrade ${mysql_install_dir} ${mysql_data_dir} ${db_ts}
+        return 1
+      fi
       echo "Restoring data from ${DB_backup_file}......"
       if ! ${mysql_install_dir}/bin/mysql < "${DB_backup_file}"; then
-        echo "${CFAILURE}Data restore failed! Old data preserved at ${mysql_data_dir}_old_*, please restore manually.${CEND}"
+        echo "${CFAILURE}Data restore failed!${CEND}"
+        rollback_db_upgrade ${mysql_install_dir} ${mysql_data_dir} ${db_ts}
         return 1
       fi
       svc_restart mysqld
