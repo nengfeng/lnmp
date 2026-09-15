@@ -200,15 +200,16 @@ installDepsDebian() {
 
   install_security_updates || return 1
 
-  # Packages common to Debian 9-13
+  # Packages common to the supported Debian releases (12/13), i.e. the last
+  # two releases (see the support policy in README and the gate in check_os.sh)
   local pkgCommon="debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl libcurl4-openssl-dev e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev bison re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev locales patch vim zip unzip tmux htop bc dc expect libexpat1-dev libonig-dev libtirpc-dev rsync git lsof lrzsz rsyslog cron logrotate chrony libsqlite3-dev psmisc wget sysv-rc apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
 
-  # Per-release renames/removals:
-  #   libc-client2007e-dev: gone in Debian 12+ (no uw-imap in the archive)
-  #   libncurses5 -> libncurses6, libidn11 -> libidn12 (Debian 12+)
-  #   libcurl3-gnutls: gone in Debian 12+ (libcurl4 covers it)
+  # Per-release additions for the supported Debian releases (12/13), which is
+  # all this needs a branch for: check_os.sh refuses anything else before this
+  # runs. The names below were verified against the archives.
+  #   libncurses6 replaces libncurses5, libidn12 replaces libidn11
   #   libidn12-dev does not exist anywhere: the libidn dev package is the
-  #     unversioned libidn-dev in Debian 12+ (libidn12 is the runtime name)
+  #     unversioned libidn-dev (libidn12 is the runtime name)
   #   software-properties-common: NOT requested -- nothing in this repo calls
   #     add-apt-repository, and Debian 13 (trixie) dropped the package, so
   #     asking for it aborted the whole list there
@@ -216,14 +217,12 @@ installDepsDebian() {
   #     (it runs before this stage) and parses /proc/meminfo instead
   local pkgExtra=""
   case "${Debian_ver}" in
-    9|10|11)
-      pkgExtra="libncurses5 libncurses5-dev libidn11 libidn11-dev libcurl3-gnutls libc-client2007e-dev"
-      ;;
     12|13)
       pkgExtra="libncurses6 libncurses-dev libidn12 libidn-dev"
       ;;
     *)
-      die_hard "Your system Debian ${Debian_ver} are not supported!"
+      # No verified package list for this release, so do not guess one.
+      die_hard "Your system Debian ${Debian_ver} is not supported. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported."
       ;;
   esac
 
@@ -264,17 +263,18 @@ installDepsUbuntu() {
 
   install_security_updates || return 1
 
-  # Packages common to Ubuntu 16-24
+  # Packages common to the supported Ubuntu releases (24.04/26.04), i.e. the
+  # last two LTS releases (see the support policy in README and the gate in
+  # check_os.sh)
   local pkgCommon="libperl-dev debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev libsqlite3-dev bison patch vim zip unzip tmux htop bc dc expect libexpat1-dev rsyslog libonig-dev libtirpc-dev libnss3 rsync git lsof lrzsz chrony psmisc wget apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
 
-  # Per-release renames/removals:
-  #   libpng12*/libpng3/libjpeg8: gone since Ubuntu 18 (libpng-dev/libjpeg-dev)
-  #   libcloog-ppl1: never existed on Ubuntu 22+
-  #   libncurses5 -> libncurses6, libidn11 -> libidn12 (Ubuntu 22+)
+  # Per-release additions for the supported Ubuntu releases (24.04/26.04),
+  # which is all this needs a branch for: check_os.sh refuses anything else
+  # before this runs. The names below were verified against the archives:
+  #   libncurses6 replaces libncurses5, libidn12 replaces libidn11 (the
+  #     rename predates the supported set: it landed in 22.04)
   #   libidn12-dev does not exist anywhere: the libidn dev package is the
-  #     unversioned libidn-dev in 22.04+ (libidn12 is the runtime name)
-  #   libcurl3-gnutls/libcurl4-gnutls-dev: folded into libcurl4 (22+)
-  #   libc-client2007e-dev: not in Ubuntu 20.04+ archives
+  #     unversioned libidn-dev (libidn12 is the runtime name)
   #   sysv-rc: does not exist in ANY Ubuntu release (verified against the
   #     archive); update-rc.d ships in init-system-helpers, which is
   #     priority: required and therefore always present. Do not re-add it.
@@ -284,17 +284,12 @@ installDepsUbuntu() {
   #   procps: health_check.sh reads 'free'
   local pkgExtra=""
   case "${Ubuntu_ver}" in
-    16|18)
-      pkgExtra="libjpeg8 libjpeg8-dev libpng12-0 libpng12-dev libpng3 libncurses5 libncurses5-dev libidn11 libidn11-dev libcurl3-gnutls libcurl4-gnutls-dev libcurl4-openssl-dev"
-      ;;
-    20)
-      pkgExtra="libncurses5 libncurses5-dev libidn11 libidn11-dev libcurl3-gnutls libcurl4-gnutls-dev libcurl4-openssl-dev"
-      ;;
-    22|24)
+    24|26)
       pkgExtra="libncurses6 libncurses-dev libidn12 libidn-dev libcurl4-openssl-dev"
       ;;
     *)
-      die_hard "Your system Ubuntu ${Ubuntu_ver} are not supported!"
+      # No verified package list for this release, so do not guess one.
+      die_hard "Your system Ubuntu ${Ubuntu_ver} is not supported. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported."
       ;;
   esac
 

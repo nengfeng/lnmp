@@ -284,10 +284,24 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 
 ## 系统要求
 
-- **操作系统**: Debian 12/13, Ubuntu 24.04/26.04（安装脚本会拒绝更早的版本；更新的版本可正常使用）
+- **操作系统**: Debian 12/13、Ubuntu 24.04/26.04
 - **内存**: 最低 512MB，推荐 1GB+
 - **磁盘**: 最低 5GB，推荐 10GB+
 - **架构**: x86_64, aarch64
+
+### 支持策略
+
+**只支持各发行版最近的 2–3 个正式版本**，其中 Ubuntu 只支持 LTS（长期支持）版本：
+
+| 发行版 | 支持版本 |
+|--------|----------|
+| Debian | 12 (bookworm)、13 (trixie) |
+| Ubuntu | 24.04 LTS、26.04 LTS |
+
+- 新版本发布后，经实测验证才加入支持列表；同时最早的一个版本移出，始终维持 2–3 个。
+- **不在列表中的版本会被安装脚本直接拒绝，比列表更新的版本同样拒绝**，并提示当前支持的版本号。理由是新版本没有经过验证的依赖包清单，放行只会在后续某个步骤报出与真实原因无关的错误，不如一开始就说明。
+- 衍生发行版按其上游基底判断（例如 Linux Mint 22.x、elementary OS 8.x 对应 Ubuntu 24.04；Kali 为滚动版，按 Debian 12 起算）。
+- 该支持集合同时固化在安装脚本的两道版本检查（`include/check_os.sh`、`include/check_sw.sh`）与 CI 用例表（`tools/lint/os_gate_checks.sh`）中。新增版本需同时修改这两个脚本与 `.github/workflows/container.yml`，用例表会拦住漏改。
 
 ## 数据库与 CPU 兼容性
 

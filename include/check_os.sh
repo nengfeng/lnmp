@@ -22,7 +22,7 @@ if [[ "${Platform}" =~ ^debian$|^deepin$|^kali$ ]]; then
   elif [[ "${Platform}" =~ ^kali$ ]]; then
     # Kali is rolling and tracks Debian testing, so its year-based VERSION_ID
     # (2022.1, 2026.2, ...) corresponds to no single Debian release. The old
-    # mapping pinned every 202x to Debian 10, which under the minimum below
+    # mapping pinned every 202x to Debian 10, which under the gate below
     # would refuse every Kali release; floor it at Debian 12 (bookworm) so a
     # current Kali is not rejected. Granularity limit worth knowing: only the
     # year survives VERSION_MAIN_ID, so a pre-2023.3 Kali (Debian 11 based)
@@ -35,8 +35,8 @@ elif [[ "${Platform}" =~ ^ubuntu$|^linuxmint$|^elementary$ ]]; then
   Ubuntu_ver=${VERSION_MAIN_ID}
   # The derivative tables below translate a derivative's own version into the
   # Ubuntu LTS it is built on, because that is what decides support here. They
-  # are hand-maintained: a new derivative release has to be added, or the
-  # minimum check below will refuse it even when its base is supported.
+  # are hand-maintained: a new derivative release has to be added, or the gate
+  # below will refuse it even when its base is supported.
   if [[ "${Platform}" =~ ^linuxmint$ ]]; then
     [[ "${VERSION_MAIN_ID}" =~ ^18$ ]] && Ubuntu_ver=16
     [[ "${VERSION_MAIN_ID}" =~ ^19$ ]] && Ubuntu_ver=18
@@ -53,16 +53,35 @@ else
   die_hard "Does not support this OS. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported."
 fi
 
-# Check OS Version -- the supported set is Debian 12/13 and Ubuntu 24.04/26.04,
-# i.e. exactly what CI exercises (.github/workflows/container.yml). Anything
-# older is refused, including derivative releases built on an older base;
-# anything newer is accepted, because every component is built from source and
-# the only thing a newer release has to provide is a resolvable package list.
-# The :-99 default means "this family does not apply", so only the branch that
-# was actually taken can fail the check.
-if [ "${Debian_ver:-99}" -lt 12 ] 2>/dev/null || [ "${Ubuntu_ver:-99}" -lt 24 ] 2>/dev/null; then
-  die_hard "Does not support this OS. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported."
-fi
+# Check OS Version -- only releases with a verified dependency list are
+# accepted: Debian 12/13 and Ubuntu 24.04/26.04, the set CI exercises in
+# .github/workflows/container.yml. That is the "last two or three official
+# releases of each distribution (Ubuntu: LTS only)" policy documented in
+# README, and it is maintained by hand on purpose -- it is not a lower bound.
+# This is deliberately the SAME set as the case statements in
+# include/check_sw.sh, which also pick the per-release package list: whichever
+# layer is reached, an unsupported release is refused.
+# A newer release is NOT accepted on faith -- there is no package list for it,
+# so it would fail later with a message naming a package instead of the
+# release. Add the release to both files (and to the CI matrix) when it has
+# been verified.
+# Derivative releases are judged by the base they are built on (see above).
+# tools/lint/os_gate_checks.sh pins all of the above with an accept/refuse
+# table, against both files at once.
+case "${Family}" in
+  debian)
+    case "${Debian_ver}" in
+      12|13) ;;
+      *) die_hard "Does not support this OS. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported (detected: Debian ${Debian_ver})." ;;
+    esac
+    ;;
+  ubuntu)
+    case "${Ubuntu_ver}" in
+      24|26) ;;
+      *) die_hard "Does not support this OS. Only Debian 12/13 and Ubuntu 24.04/26.04 are supported (detected: Ubuntu ${Ubuntu_ver})." ;;
+    esac
+    ;;
+esac
 
 # Probe gcc defensively: on a minimal image it is absent AND the package index
 # is still empty at this point (the dependency stage runs 'apt-get update'
@@ -108,12 +127,5 @@ else
 fi
 
 THREAD=$(grep 'processor' /proc/cpuinfo | sort -u | wc -l)
-
-# MySQL binary SSL library version
-if [ ${Debian_ver} -ge 9 >/dev/null 2>&1 ] || [ ${Ubuntu_ver} -ge 16 >/dev/null 2>&1 ]; then
-  sslLibVer=ssl102
-else
-  sslLibVer=unknown
-fi
 
 [ -e ~/.oneinstack ] && /bin/mv ~/.oneinstack ~/.lnmp
