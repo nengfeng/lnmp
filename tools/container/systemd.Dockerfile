@@ -13,7 +13,11 @@
 # systemd needs (--privileged, --cgroupns=host, a writable /sys/fs/cgroup) are
 # in the workflow, not here.
 
-FROM debian:12
+# BASE_IMAGE is the distro under test. The smoke workflow rotates it weekly
+# over the supported set (debian:12, debian:13, ubuntu:24.04, ubuntu:26.04);
+# all four install systemd the same way.
+ARG BASE_IMAGE=debian:12
+FROM ${BASE_IMAGE}
 
 # Recommends are kept: they pull in the pieces systemd expects in a container
 # (dbus and friends), and a base image that boots cleanly matters far more here
