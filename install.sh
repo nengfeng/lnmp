@@ -312,7 +312,10 @@ if [ -e "/etc/ssh/sshd_config" ]; then
     input_string "Please input SSH port" ssh_port "${now_ssh_port}"
   fi
   ssh_port=${ssh_port:-${now_ssh_port}}
-  if [[ "${ssh_port}" == "22" || ("${ssh_port}" -gt 1024 && "${ssh_port}" -lt 65535) ]] 2>/dev/null; then
+  # Numeric check FIRST: [[ arithmetic comparison would accept bash
+  # base-notation like 2#1024 and write "Port 2#1024" into sshd_config,
+  # which sshd rejects and the SSH service does not come back up.
+  if [[ "${ssh_port}" == "22" ]] || [[ "${ssh_port}" =~ ^[0-9]+$ && "${ssh_port}" -gt 1024 && "${ssh_port}" -lt 65535 ]]; then
     :
   else
     echo "${CWARNING}input error! Input range: 22,1025~65534${CEND}"

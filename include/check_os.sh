@@ -108,7 +108,10 @@ if uname -m | grep -Eqi "arm|aarch64"; then
   fi
 fi
 
-if [[ "$(uname -r | awk -F- '{print $3}' 2>/dev/null)" == "Microsoft" ]]; then
+# WSL1 kernel: 4.4.0-19041-Microsoft; WSL2: 5.15.90.1-microsoft-standard-WSL2.
+# The old field-split missed WSL2 entirely (field 3 is "standard" there);
+# a case-insensitive substring match covers both.
+if uname -r 2>/dev/null | grep -qi microsoft; then
   Wsl=true
 fi
 
