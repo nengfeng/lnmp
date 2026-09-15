@@ -294,8 +294,14 @@ install_web_server() {
   # A failed build has to abort right here: the check below only looks for
   # nginx.conf afterwards, and on a rebuild that file is already there from the
   # previous install, so a broken compile used to be reported as a success.
+  #
+  # NOTE: do NOT `rm -rf ${install_dir}` on failure. install_dir may already
+  # hold a previously-installed (and possibly still running) web server when
+  # this is a reinstall/replace; deleting it would take the old copy down too,
+  # so a broken rebuild must leave the old installation untouched and let
+  # fail_msg (die_hard) abort with the half-built tree still available for
+  # inspection. `make install` failures are rare and self-limiting anyway.
   compile_and_install || {
-    rm -rf ${install_dir}
     fail_msg "${server_type}"
   }
   
@@ -307,7 +313,6 @@ install_web_server() {
       lua-cjson-${lua_cjson_ver}
     success_msg "${server_type}"
   else
-    rm -rf ${install_dir}
     fail_msg "${server_type}"
   fi
 
