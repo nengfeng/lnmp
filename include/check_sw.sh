@@ -202,7 +202,12 @@ installDepsDebian() {
 
   # Packages common to the supported Debian releases (12/13), i.e. the last
   # two releases (see the support policy in README and the gate in check_os.sh)
-  local pkgCommon="debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl libcurl4-openssl-dev e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev bison re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev locales patch vim zip unzip tmux htop bc dc expect libexpat1-dev libonig-dev libtirpc-dev rsync git lsof lrzsz rsyslog cron logrotate chrony libsqlite3-dev psmisc wget sysv-rc apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
+  # Note: the runtime package is libxml2-dev only -- libxml2 is omitted. On
+  # newer releases it has been renamed to a soname package (libxml2-16 in
+  # Ubuntu 26.04, and Debian is moving the same way), while libxml2-dev keeps
+  # its name everywhere and Depends on the matching runtime package, so it
+  # alone pulls in the right library on every supported release.
+  local pkgCommon="debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl libcurl4-openssl-dev e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev bison re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev locales patch vim zip unzip tmux htop bc dc expect libexpat1-dev libonig-dev libtirpc-dev rsync git lsof lrzsz rsyslog cron logrotate chrony libsqlite3-dev psmisc wget sysv-rc apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
 
   # Per-release additions for the supported Debian releases (12/13), which is
   # all this needs a branch for: check_os.sh refuses anything else before this
@@ -266,7 +271,10 @@ installDepsUbuntu() {
   # Packages common to the supported Ubuntu releases (24.04/26.04), i.e. the
   # last two LTS releases (see the support policy in README and the gate in
   # check_os.sh)
-  local pkgCommon="libperl-dev debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2 libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev libsqlite3-dev bison patch vim zip unzip tmux htop bc dc expect libexpat1-dev rsyslog libonig-dev libtirpc-dev libnss3 rsync git lsof lrzsz chrony psmisc wget apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
+  # Note: libxml2 is omitted for the same reason as the Debian list -- it has
+  # been renamed to libxml2-16 in 26.04, while libxml2-dev keeps its name and
+  # Depends on the matching runtime package on every supported release.
+  local pkgCommon="libperl-dev debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev libsqlite3-dev bison patch vim zip unzip tmux htop bc dc expect libexpat1-dev rsyslog libonig-dev libtirpc-dev libnss3 rsync git lsof lrzsz chrony psmisc wget apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
 
   # Per-release additions for the supported Ubuntu releases (24.04/26.04),
   # which is all this needs a branch for: check_os.sh refuses anything else
