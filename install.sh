@@ -299,6 +299,19 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
     else
       echo "${CSUCCESS}MD5 verification passed (${script_md5}).${CEND}"
     fi
+    # MD5 alone is not tamper-evidence. The release workflow also records
+    # sha256sum.txt; verify it in addition whenever an entry exists, so the
+    # check tightens automatically for artifacts published after v1.7.2
+    # without breaking older packages that only have an md5 entry.
+    latest_script_sha=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/sha256sum.txt" 2>/dev/null | awk -v f="${script_md5}" '$2==f {print $1}')
+    if [ -n "${latest_script_sha}" ]; then
+      now_script_sha=$(sha256sum "${tool_file}" | awk '{print $1}')
+      if [ "${now_script_sha}" != "${latest_script_sha}" ]; then
+        echo "${CFAILURE}Error: The sha256 value of the installation package does not match the official website, please download again, url: https://github.com/nengfeng/lnmp${CEND}"
+        exit 1
+      fi
+      echo "${CSUCCESS}SHA256 verification passed (${script_md5}).${CEND}"
+    fi
   else
     echo "${CFAILURE}Error: ${tool_file} does not exist${CEND}"
     exit 1

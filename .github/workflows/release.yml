@@ -1,0 +1,115 @@
+name: Release
+
+# One-click release. Replaces the manual v1.7.2 sequence (bump version ->
+# tag -> archive -> checksum -> manifest commit -> upload), each step of
+# which is a chance to publish a manifest that does not match the artifact.
+#
+# Ordering note, on purpose: the annotated tag is cut BEFORE the checksum
+# manifest is committed. The archive embeds md5sum.txt, so a manifest that
+# lives inside the tagged tree could never contain the artifact's own hash.
+# Consumers (upgrade.sh --script, install.sh --md5sum) read the manifest
+# from raw main, never from inside the tarball, so manifest-on-main one
+# commit after the tag is the correct shape.
+#
+# inputs:
+#   version - required, X.Y.Z without the v prefix (validated below)
+#   notes   - optional release body; defaults to the annotated tag message
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, X.Y.Z (without the v prefix)'
+        required: true
+        type: string
+      notes:
+        description: 'Release notes (defaults to the annotated tag message)'
+        required: false
+        type: string
+
+permissions:
+  contents: write   # push the two commits + the tag, create the release
+
+jobs:
+  release:
+    name: release v${{ inputs.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Everything downstream interpolates VERSION into sed programs and a
+      # git ref, so the strict format check has to pass before any of that.
+      - name: Validate the version and that it is new
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version must be X.Y.Z, got '${VERSION}'"
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/v${VERSION}" | grep -q .; then
+            echo "::error::tag v${VERSION} already exists"
+            exit 1
+          fi
+
+      - name: Bump version() in install.sh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s@^  echo \"version: .*\"@  echo \"version: ${VERSION}\"@" install.sh
+          sed -i "s@^  echo \"updated date: .*\"@  echo \"updated date: $(date +%Y-%m-%d)\"@" install.sh
+          if git diff --quiet -- install.sh; then
+            echo "::error::version() not found in install.sh - the sed matched nothing"
+            exit 1
+          fi
+          git diff -- install.sh
+
+      - name: Commit, tag, package, record checksums
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add install.sh
+          git commit -m "chore(release): version ${VERSION}"
+          git tag -a "v${VERSION}" -m "v${VERSION}"
+
+          git archive --format=tar.gz --prefix=lnmp/ "v${VERSION}" -o "${RUNNER_TEMP}/lnmp.tar.gz"
+          md5=$(md5sum "${RUNNER_TEMP}/lnmp.tar.gz" | awk '{print $1}')
+          sha=$(sha256sum "${RUNNER_TEMP}/lnmp.tar.gz" | awk '{print $1}')
+          echo "artifact md5:    ${md5}"
+          echo "artifact sha256: ${sha}"
+
+          # Idempotent manifest update: drop any previous entry first.
+          grep -vE '  lnmp\.tar\.gz$' md5sum.txt > md5sum.txt.tmp || true
+          mv md5sum.txt.tmp md5sum.txt
+          printf '%s  lnmp.tar.gz\n' "${md5}" >> md5sum.txt
+          grep -vE '  lnmp\.tar\.gz$' sha256sum.txt 2>/dev/null > sha256sum.txt.tmp || true
+          mv sha256sum.txt.tmp sha256sum.txt
+          printf '%s  lnmp.tar.gz\n' "${sha}" >> sha256sum.txt
+
+          git add md5sum.txt sha256sum.txt
+          git commit -m "chore(release): record lnmp.tar.gz checksum for v${VERSION}"
+          git push origin main "v${VERSION}"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          args=("--title" "LNMP v${VERSION}" "${RUNNER_TEMP}/lnmp.tar.gz")
+          if [ -n "${NOTES}" ]; then
+            printf '%s\n' "${NOTES}" > "${RUNNER_TEMP}/notes.md"
+            args+=("--notes-file" "${RUNNER_TEMP}/notes.md")
+          else
+            args+=("--notes-from-tag")
+          fi
+          gh release create "v${VERSION}" "${args[@]}"
