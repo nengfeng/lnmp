@@ -436,7 +436,7 @@ systemctl {start|stop|restart} redis-server
 | 安全性 | A- | 已修复 eval 注入、curl\|bash、投毒域名等漏洞 |
 | 代码风格 | A | 9 类风格问题全部清零（见下表） |
 | POSIX 兼容 | A | 所有脚本使用 `#!/bin/bash`，bash 特性正确使用 |
-| 测试覆盖 | D | 仅有语法检查，无自动化测试 |
+| 测试覆盖 | B+ | 三层 CI（lint / 发行版矩阵 preflight / systemd 容器冒烟），见下「CI 测试」 |
 | 文档 | B+ | README/下载源/健康检查均有文档 |
 
 **代码风格修复统计（72 次提交）：**
@@ -473,13 +473,21 @@ systemctl {start|stop|restart} redis-server
 - `health_check.sh` 安装后健康检查
 - `--version` 显示当前组件版本
 
+**CI 测试：**
+
+本项目通过 GitHub Actions 建立了三层容器化 CI 测试网，全部跑在 `.github/workflows/` 下：
+
+| 层级 | 工作流 | 内容 |
+|------|--------|------|
+| L0 静态/离线 | `lint.yml` | `bash -n` 全量语法检查、ShellCheck 静态分析、7 项自定义静态护栏（`tools/lint/static_checks.sh`）、离线逻辑测试 37 用例（`tools/test_offline.sh`）与发行版门禁决策表 21 用例（`tools/lint/os_gate_checks.sh`） |
+| L1 发行版矩阵 | `container.yml` | 在 Debian 12/13、Ubuntu 24.04/26.04 四个容器内跑 `install.sh --preflight`，真装依赖、验证包名是否漂移 |
+| L2 全量冒烟 | `container.yml` | systemd 容器内跑 `tools/container/smoke.sh`：完整安装 → 幂等复跑 → `uninstall` 卸载，33 条断言闭环 |
+
 **未来改进方向：**
 
-1. **测试框架** — 添加自动化测试，覆盖安装/升级/卸载关键路径
-2. **CI/CD** — GitHub Actions 自动语法检查 + ShellCheck 静态分析
-3. **配置验证** — 安装前自动校验 `options.conf` 参数合法性
-4. **回滚机制** — 升级失败时自动恢复到之前的版本
-5. **多语言支持** — 支持中英文双语提示信息
+1. **配置验证** — 安装前自动校验 `options.conf` 参数合法性
+2. **回滚机制** — 升级失败时自动恢复到之前的版本
+3. **多语言支持** — 支持中英文双语提示信息
 
 ## 致谢
 
