@@ -85,7 +85,6 @@ Download_src() {
         --timeout=60 \
         --tries=3 \
         --waitretry=${retry_delay} \
-        --limit-rate=100M \
         --progress=bar:force \
         -c \
         -O "${file_name}" \

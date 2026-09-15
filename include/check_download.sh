@@ -610,10 +610,16 @@ checkDownload() {
     Download_src
     if [[ "${VERIFY_CHECKSUM}" == "yes" ]]; then
       echo "Verifying Node.js checksum..."
+      # Same policy as the PGP checks: "cannot check" (feed unreachable)
+      # warns and continues, a real mismatch is fatal.
       wget -q "https://nodejs.org/dist/v${nodejs_ver}/SHASUMS256.txt" -O "SHASUMS256.txt" 2>/dev/null && {
         expected_sha256=$(grep "${file_name}" SHASUMS256.txt | awk '{print $1}')
         actual_sha256=$(sha256sum "$file_name" | awk '{print $1}')
-        [[ "$expected_sha256" == "$actual_sha256" ]] && echo "${CGREEN}Node.js checksum verified${CEND}" || echo "${CFAILURE}Node.js checksum mismatch!${CEND}"
+        if [[ "$expected_sha256" == "$actual_sha256" ]]; then
+          echo "${CGREEN}Node.js checksum verified${CEND}"
+        else
+          die_hard "Node.js checksum mismatch for ${file_name} (expected ${expected_sha256:-<none>}, got ${actual_sha256:-<none>})"
+        fi
       } || echo "${CYELLOW}Could not verify Node.js checksum${CEND}"
     fi
   fi
