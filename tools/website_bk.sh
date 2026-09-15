@@ -23,7 +23,10 @@ if [ "$(du -sm "${wwwroot_dir}/${WebSite}" | awk '{print $1}')" -lt "${web_archi
     echo "[${NewFile}] The Backup File is exists, Can't Backup" >> ${LogFile}
   else
     pushd ${wwwroot_dir} > /dev/null
-    if tar czf "${NewFile}" "./${WebSite}" >> ${LogFile} 2>&1 && [ -s "${NewFile}" ]; then
+    # tar -t proves the archive is a structurally complete gzip, not just a
+    # non-empty file - same rationale as db_bk.sh.
+    if tar czf "${NewFile}" "./${WebSite}" >> ${LogFile} 2>&1 && [ -s "${NewFile}" ] \
+       && tar -tzf "${NewFile}" > /dev/null 2>&1; then
       chmod 600 "${NewFile}"
       echo "[${NewFile}] Backup success ">> ${LogFile}
       popd > /dev/null

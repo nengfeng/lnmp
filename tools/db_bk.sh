@@ -40,9 +40,21 @@ else
     rm -f "${DumpFile}"
     exit 1
   fi
+  # A truncated dump is a silent time bomb: the archive lists clean and the
+  # restore dies half-way through. mysqldump always ends with a
+  # "-- Dump completed" comment, so a missing footer means the write never
+  # finished (disk full, killed mid-run).
+  if ! tail -n 5 "${DumpFile}" | grep -q -- "-- Dump completed"; then
+    echo "[${DumpFile}] Backup FAILED (dump truncated: no 'Dump completed' footer)" >> "${LogFile}"
+    rm -f "${DumpFile}"
+    exit 1
+  fi
   chmod 600 "${DumpFile}"
   pushd "${backup_dir}" > /dev/null
-  if tar czf "${NewFile}" "${DumpFile##*/}" >> ${LogFile} 2>&1 && [ -s "${NewFile}" ]; then
+  # tar -t proves the archive is a structurally complete gzip, not just a
+  # non-empty file - the last bytes of a tar are what a truncated write loses.
+  if tar czf "${NewFile}" "${DumpFile##*/}" >> ${LogFile} 2>&1 && [ -s "${NewFile}" ] \
+     && tar -tzf "${NewFile}" > /dev/null 2>&1; then
     chmod 600 "${NewFile}"
     echo "[${NewFile}] Backup success ">> ${LogFile}
     rm -f "${DumpFile}"
