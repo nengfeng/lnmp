@@ -72,16 +72,23 @@ major_minor() {
 classify_update() {
   local current="$1" latest="$2"
   [[ "$current" == "$latest" ]] && echo "same" && return
-  
+
+  # Direction first: if current is not older than latest, it is a downgrade
+  # (or already covered by "same" above), never an upgrade. Without this the
+  # "major" branch below fired on cur_major > lat_major too, misreporting a
+  # rollback (e.g. 9.7.2 vs 8.4.11) as "major update available".
+  if ! version_lt "$current" "$latest"; then
+    echo "older"
+    return
+  fi
+
   local cur_major=$(echo "$current" | cut -d. -f1)
   local lat_major=$(echo "$latest" | cut -d. -f1)
-  
+
   if [ "$cur_major" != "$lat_major" ]; then
     echo "major"  # Different major version (e.g., PHP 8.4 → 8.5)
-  elif version_lt "$current" "$latest"; then
-    echo "minor"  # Same major, newer (e.g., PHP 8.5.3 → 8.5.4)
   else
-    echo "older"  # Same major, older (shouldn't happen normally)
+    echo "minor"  # Same major, newer (e.g., PHP 8.5.3 → 8.5.4)
   fi
 }
 
