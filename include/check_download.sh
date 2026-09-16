@@ -465,7 +465,7 @@ checkDownload() {
   # ============================================
   # PHP downloads
   # ============================================
-  if [[ "${php_option}" =~ ^[1-3]$ ]] || [[ "${mphp_ver}" =~ ^8[3-5]$ ]]; then
+  if [[ "${php_option}" =~ ^[1-${PHP_OPTION_MAX}]$ ]] || [[ "${mphp_ver}" =~ ^8[${PHP_MINOR_MIN}-${PHP_MINOR_MAX}]$ ]]; then
     echo "PHP dependencies..."
     # libiconv: no longer downloaded — PHP uses glibc iconv (no GNU libiconv needed)
     # curl (official only)

@@ -479,15 +479,14 @@ systemctl {start|stop|restart} redis-server
 
 | 层级 | 工作流 | 内容 |
 |------|--------|------|
-| L0 静态/离线 | `lint.yml` | `bash -n` 全量语法检查、ShellCheck 静态分析、7 项自定义静态护栏（`tools/lint/static_checks.sh`）、离线逻辑测试 37 用例（`tools/test_offline.sh`）与发行版门禁决策表 21 用例（`tools/lint/os_gate_checks.sh`） |
+| L0 静态/离线 | `lint.yml` | `bash -n` 全量语法检查、ShellCheck 静态分析、9 项自定义静态护栏（`tools/lint/static_checks.sh`）、离线逻辑测试 37 用例（`tools/test_offline.sh`）与发行版门禁决策表 21 用例（`tools/lint/os_gate_checks.sh`） |
 | L1 发行版矩阵 | `container.yml` | 在 Debian 12/13、Ubuntu 24.04/26.04 四个容器内跑 `install.sh --preflight`，真装依赖、验证包名是否漂移 |
 | L2 全量冒烟 | `container.yml` | systemd 容器内跑 `tools/container/smoke.sh`：完整安装 → 幂等复跑 → `uninstall` 卸载，33 条断言闭环 |
 
 **未来改进方向：**
 
 1. **配置验证** — 安装前自动校验 `options.conf` 参数合法性
-2. **回滚机制** — 升级失败时自动恢复到之前的版本
-3. **多语言支持** — 支持中英文双语提示信息
+2. **多语言支持** — 支持中英文双语提示信息
 
 ## 致谢
 

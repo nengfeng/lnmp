@@ -56,7 +56,7 @@ while [ $# -gt 0 ]; do
       ;;
     --mphp_ver)
       mphp_ver=$2; mphp_flag=y; shift 2
-      [[ ! "${mphp_ver}" =~ ^8[3-5]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 83~85${CEND}"; unset mphp_ver mphp_flag; }
+      [[ ! "${mphp_ver}" =~ ^8[${PHP_MINOR_MIN}-${PHP_MINOR_MAX}]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 8${PHP_MINOR_MIN}~${PHP_MINOR_MAX}${CEND}"; unset mphp_ver mphp_flag; }
       ;;
     --proxy)
       proxy_flag=y; shift 1

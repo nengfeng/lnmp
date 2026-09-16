@@ -181,5 +181,42 @@ while IFS=: read -r f lnum line; do
 done < <(grep -n -- '--reloadcmd' $FILES 2>/dev/null)
 [ "$reload_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
+echo "== 9. cp to sbin/bin in an upgrade must be preceded by stop/mv [HARD] =="
+# An upgrade that cp's a freshly built binary straight over the running
+# daemon's path hits ETXTBSY ("Text file busy"): the kernel forbids truncating
+# an in-use executable, so `cp objs/nginx /usr/local/nginx/sbin/nginx` fails
+# while the old master is still alive. This bit every web/cache upgrade in
+# v1.7.3. The correct fix is to either stop the service first (svc_stop /
+# service_action stop, with its return value checked) or move the old binary
+# aside with mv (a rename never touches the in-use inode). This check pins that
+# rule: inside an upgrade script, any cp whose target is an sbin/ or bin/ path
+# must have a stop or mv guard EARLIER in the same function.
+#
+# make install is deliberately NOT scanned: its target is an implicit --prefix
+# and is statically indistinguishable from a third-party library build
+# (luajit2, lua-resty-core, ...) that installs into lib/ and is harmless. The
+# binary-overwriting make installs (nginx/tengine/openresty/php/memcached) are
+# guarded by the same stop/mv presence, so this rule still trips if that guard
+# is removed -- which is exactly the regression it exists to catch.
+ovr_hits=$(
+  for f in include/upgrade_*.sh; do
+    awk '
+      /^[A-Za-z_][A-Za-z0-9_]*\(\)[[:space:]]*\{/ { in_fn=1; guarded=0 }
+      in_fn && /svc_stop|service_action[[:space:]]+stop/ { guarded=1 }
+      in_fn && /(\/bin\/)?mv([[:space:]]+-f)?[[:space:]]/ { guarded=1 }
+      in_fn && /(\/bin\/)?cp[[:space:]]/ && /(sbin\/|bin\/)/ && !/\.bak/ && !guarded {
+        print "  " FILENAME ":" FNR ": cp to sbin/bin without a prior stop/mv guard"
+      }
+      /^[[:space:]]*\}[[:space:]]*$/ { in_fn=0; guarded=0 }
+    ' "$f"
+  done
+)
+if [ -n "$ovr_hits" ]; then
+  echo "$ovr_hits"
+  FAIL=1
+else
+  echo "  OK"
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then echo "STATIC CHECKS: PASS"; exit 0; else echo "STATIC CHECKS: FAIL"; exit 1; fi

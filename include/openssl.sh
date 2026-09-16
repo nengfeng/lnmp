@@ -14,11 +14,11 @@ if openssl version | grep -Eqi 'OpenSSL 1.0.2*'; then
 elif openssl version | grep -Eqi 'OpenSSL 1.1.*'; then
   php_with_ssl="--with-ssl"
 
-  [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
+  [[ ${php_option} =~ ^[1-${PHP_OPTION_MAX}]$ ]] && with_old_openssl_flag=y
 elif openssl version | grep -Eqi 'OpenSSL 3.*'; then
   php_with_ssl="--with-ssl"
 
-  [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
+  [[ ${php_option} =~ ^[1-${PHP_OPTION_MAX}]$ ]] && with_old_openssl_flag=y
 else
   php_with_ssl="--with-ssl=${openssl_install_dir}"
 

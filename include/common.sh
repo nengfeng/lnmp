@@ -4,6 +4,17 @@
 # Description: Common functions for LNMP installation scripts
 
 # ============================================
+# PHP 版本支持窗口（新增 PHP 版本时只需改这里）
+# ============================================
+# php_option 的合法值域是 1..PHP_OPTION_MAX；mphp_ver 的合法 minor 是
+# 8.PHP_MINOR_MIN .. 8.PHP_MINOR_MAX。各脚本的校验/判断正则都引用这些常量，
+# 加一个版本（如 8.6）只需把两个 MAX 加 1，不必逐个改散落各处的
+# `^[1-N]$` / `^8[M-N]$` 正则。切勿改成空值：正则 `[1-]` 会静默失效。
+PHP_OPTION_MAX=3
+PHP_MINOR_MIN=3
+PHP_MINOR_MAX=5
+
+# ============================================
 # Mirror Detection (全局镜像源检测)
 # ============================================
 # Call init_mirror once to set USE_CHINA_MIRROR and mirror_link
@@ -495,6 +506,15 @@ has_systemd() {
 # Core service management function (internal)
 # Usage: _svc <action> <service_name> [quiet]
 # Returns: 0 on success, non-zero on failure
+#
+# quiet=yes means "silent on SUCCESS, still show the error on failure". The old
+# behaviour discarded stderr unconditionally, so a failed stop/start looked
+# exactly like a success and callers that DID check the return code (e.g.
+# upgrade paths guarding `if ! svc_stop php-fpm`) still could not tell the user
+# WHY it failed. Now a failure reruns the command without suppression so the
+# real systemctl/service error is visible; the exit status is still that of the
+# command. Callers that want full silence (uninstall best-effort stops) keep
+# their own `> /dev/null 2>&1` and are unaffected.
 _svc() {
   local action=$1
   local service=$2
@@ -502,13 +522,13 @@ _svc() {
 
   if has_systemd; then
     if [[ "${quiet}" == "yes" ]]; then
-      systemctl ${action} ${service} 2>/dev/null
+      systemctl ${action} ${service} 2>/dev/null || systemctl ${action} ${service}
     else
       systemctl ${action} ${service}
     fi
   else
     if [[ "${quiet}" == "yes" ]]; then
-      service ${service} ${action} 2>/dev/null
+      service ${service} ${action} 2>/dev/null || service ${service} ${action}
     else
       service ${service} ${action}
     fi

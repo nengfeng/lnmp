@@ -54,8 +54,8 @@ Show_Help() {
   echo "Usage: $0  command ...[parameters]....
   --version, -v               Show version info
   --nginx_option [1-3]        Install Nginx server version
-  --php_option [1-3]         Install PHP version
-  --mphp_ver [83~85]          Install another PHP version (PATH: ${php_install_dir}\${mphp_ver})
+  --php_option [1-${PHP_OPTION_MAX}]         Install PHP version
+  --mphp_ver [8${PHP_MINOR_MIN}~${PHP_MINOR_MAX}]          Install another PHP version (PATH: ${php_install_dir}\${mphp_ver})
   --mphp_addons               Only install another PHP addons
   --phpcache_option [1-2]     Install PHP opcode cache, default: 1 opcache
   --php_extensions [ext name] Install PHP extensions, include ioncube,
@@ -142,12 +142,12 @@ parse_args() {
         ;;
       --php_option)
         php_option=$2; shift 2
-        [[ ! ${php_option} =~ ^[1-3]$ ]] && { echo "${CWARNING}php_option input error! Please only input number 1~3${CEND}"; exit 1; }
+        [[ ! ${php_option} =~ ^[1-${PHP_OPTION_MAX}]$ ]] && { echo "${CWARNING}php_option input error! Please only input number 1~${PHP_OPTION_MAX}${CEND}"; exit 1; }
         [ -e "${php_install_dir}/bin/phpize" ] && { echo "${CWARNING}PHP already installed! ${CEND}"; unset php_option; }
         ;;
       --mphp_ver)
         mphp_ver=$2; mphp_flag=y; shift 2
-        [[ ! "${mphp_ver}" =~ ^8[3-5]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 83~85${CEND}"; exit 1; }
+        [[ ! "${mphp_ver}" =~ ^8[${PHP_MINOR_MIN}-${PHP_MINOR_MAX}]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 8${PHP_MINOR_MIN}~${PHP_MINOR_MAX}${CEND}"; exit 1; }
         ;;
       --mphp_addons)
         mphp_addons_flag=y; shift 1
@@ -287,30 +287,30 @@ if [[ ${ARG_NUM} == 0 ]] && [ ! -e "${HOME}/.lnmp" ] && [ -n "${tool_file}" ]; t
   confirm "Do you want to check md5sum?" md5sum_flag n
 fi
 if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
-  script_md5=${tool_file##*/}
+  tool_file_name=${tool_file##*/}
   if [ -e "${tool_file}" ]; then
     now_script_md5=$(md5sum "${tool_file}" | awk '{print $1}')
-    latest_script_md5=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" 2>/dev/null | awk -v f="${script_md5}" '$2==f {print $1}')
+    latest_script_md5=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" 2>/dev/null | awk -v f="${tool_file_name}" '$2==f {print $1}')
     if [ -z "${latest_script_md5}" ]; then
-      echo "${CWARNING}Warning: unable to verify md5 online (no entry for ${script_md5} or network failure), skipping.${CEND}"
+      echo "${CWARNING}Warning: unable to verify md5 online (no entry for ${tool_file_name} or network failure), skipping.${CEND}"
     elif [ "${now_script_md5}" != "${latest_script_md5}" ]; then
       echo "${CFAILURE}Error: The md5 value of the installation package does not match the official website, please download again, url: https://github.com/nengfeng/lnmp${CEND}"
       exit 1
     else
-      echo "${CSUCCESS}MD5 verification passed (${script_md5}).${CEND}"
+      echo "${CSUCCESS}MD5 verification passed (${now_script_md5}).${CEND}"
     fi
     # MD5 alone is not tamper-evidence. The release workflow also records
     # sha256sum.txt; verify it in addition whenever an entry exists, so the
     # check tightens automatically for artifacts published after v1.7.2
     # without breaking older packages that only have an md5 entry.
-    latest_script_sha=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/sha256sum.txt" 2>/dev/null | awk -v f="${script_md5}" '$2==f {print $1}')
+    latest_script_sha=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/sha256sum.txt" 2>/dev/null | awk -v f="${tool_file_name}" '$2==f {print $1}')
     if [ -n "${latest_script_sha}" ]; then
       now_script_sha=$(sha256sum "${tool_file}" | awk '{print $1}')
       if [ "${now_script_sha}" != "${latest_script_sha}" ]; then
         echo "${CFAILURE}Error: The sha256 value of the installation package does not match the official website, please download again, url: https://github.com/nengfeng/lnmp${CEND}"
         exit 1
       fi
-      echo "${CSUCCESS}SHA256 verification passed (${script_md5}).${CEND}"
+      echo "${CSUCCESS}SHA256 verification passed (${now_script_sha}).${CEND}"
     fi
   else
     echo "${CFAILURE}Error: ${tool_file} does not exist${CEND}"
@@ -442,7 +442,7 @@ if [[ ${ARG_NUM} == 0 ]]; then
       printf "%b" "	${CMSG}1${CEND}. Install php-8.3\n"
       printf "%b" "	${CMSG}2${CEND}. Install php-8.4\n"
       printf "%b" "	${CMSG}3${CEND}. Install php-8.5\n"
-      select_number "Please input a number" php_option 1 3 2
+      select_number "Please input a number" php_option 1 ${PHP_OPTION_MAX} 2
     fi
 
     # PHP opcode cache
@@ -502,7 +502,7 @@ if [[ ${ARG_NUM} == 0 ]]; then
   confirm "Do you want to install Pure-FTPd?" pureftpd_flag n
   [[ "${pureftpd_flag}" == y ]] && check_installed file "${pureftpd_install_dir}/sbin/pure-ftpwho" "Pure-FTPd" || unset pureftpd_flag
 
-  if [[ ${php_option} =~ ^[1-3]$ ]] || [ -e "${php_install_dir}/bin/phpize" ]; then
+  if [[ ${php_option} =~ ^[1-${PHP_OPTION_MAX}]$ ]] || [ -e "${php_install_dir}/bin/phpize" ]; then
     confirm "Do you want to install phpMyAdmin?" phpmyadmin_flag n
     [[ "${phpmyadmin_flag}" == y ]] && check_installed dir "${wwwroot_dir}/default/phpMyAdmin" "phpMyAdmin" || unset phpmyadmin_flag
   fi
@@ -829,7 +829,7 @@ fi
 [[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "PostgreSQL data dir:")${CMSG}${pgsql_data_dir}${CEND}"
 [[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "PostgreSQL user:")${CMSG}postgres${CEND}"
 [[ "${db_option}" == 8 ]] && echo "$(printf "%-32s" "postgres password:")${CMSG}${dbpostgrespwd}${CEND}"
-[[ "${php_option}" =~ ^[1-3]$ ]] && printf "%b" "\n$(printf "%-32s" "PHP install dir:")${CMSG}${php_install_dir}${CEND}\n"
+[[ "${php_option}" =~ ^[1-${PHP_OPTION_MAX}]$ ]] && printf "%b" "\n$(printf "%-32s" "PHP install dir:")${CMSG}${php_install_dir}${CEND}\n"
 [[ "${phpcache_option}" == 1 ]] && echo "$(printf "%-32s" "Opcache Control Panel URL:")${CMSG}http://127.0.0.1/ocp.php${CEND} (localhost only)"
 [[ "${phpcache_option}" == 2 ]] && echo "$(printf "%-32s" "APC Control Panel URL:")${CMSG}http://127.0.0.1/apc.php${CEND} (localhost only)"
 [[ "${pureftpd_flag}" == y ]] && printf "%b" "\n$(printf "%-32s" "Pure-FTPd install dir:")${CMSG}${pureftpd_install_dir}${CEND}\n"
