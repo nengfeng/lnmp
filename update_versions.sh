@@ -93,7 +93,15 @@ ver_lt_rc() {
   [[ "$a" == "$b" ]] && return 1
   local a_base="${a%%rc*}" b_base="${b%%rc*}"
   if [ "$a_base" == "$b_base" ]; then
-    [[ "$a" == *rc* ]] && [[ "$b" != *rc* ]]
+    # Same base version: rc < stable, and rcN < rcM by their N/M numbers.
+    # (The previous form only caught "rc vs non-rc", so rc4 < rc5 silently
+    # returned false and an rc bump was misreported as "up to date".)
+    local a_rc="${a#*rc}" b_rc="${b#*rc}"
+    if [[ "$a" == *rc* ]] && [[ "$b" == *rc* ]]; then
+      [ "$a_rc" -lt "$b_rc" ] 2>/dev/null
+    else
+      [[ "$a" == *rc* ]] && [[ "$b" != *rc* ]]
+    fi
   else
     version_lt "$a_base" "$b_base"
   fi
@@ -470,6 +478,7 @@ LUA_NGINX_RESTY_CORE_MAP=(
     ["0.10.32rc2"]="0.1.35rc1"
     ["0.10.32rc3"]="0.1.35rc1"
     ["0.10.32rc4"]="0.1.35rc1"
+    ["0.10.32rc5"]="0.1.35rc1"
 )
 
 _check_nginx_lua_group() {
