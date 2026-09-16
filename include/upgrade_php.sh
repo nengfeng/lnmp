@@ -5,6 +5,35 @@
 # Default checksum verification setting
 VERIFY_CHECKSUM="${VERIFY_CHECKSUM:-yes}"
 
+# Roll back a failed PHP upgrade by restoring the pre-upgrade backup.
+# Replaces the old `rm -rf php_install_dir && cp -a backup php_install_dir`
+# sequence: the old form was irreversible -- if the restore cp failed (disk
+# full, permissions), php_install_dir had already been deleted with no way
+# back. Here the broken install is moved aside first (mv is reversible), so a
+# failed restore can still be undone by moving the original directory back.
+# Usage: _php_rollback  (relies on $php_install_dir and $backup_php_dir)
+_php_rollback() {
+  local broken="${php_install_dir}.broken_$(date +%m%d%H%M%S)"
+  # Move the broken install aside instead of deleting it.
+  if [ -e "${php_install_dir}" ]; then
+    /bin/mv -f "${php_install_dir}" "${broken}" || {
+      echo "${CFAILURE}Rollback aborted: could not move ${php_install_dir} aside.${CEND}"
+      echo "${CYELLOW}Restore manually from ${BACKUP_DIR}.${CEND}"
+      return 1
+    }
+  fi
+  # Restore the backup into place.
+  if ! cp -a "${backup_php_dir}" "${php_install_dir}"; then
+    echo "${CFAILURE}Rollback restore failed! Reverting the move so nothing is lost.${CEND}"
+    [ -e "${broken}" ] && /bin/mv -f "${broken}" "${php_install_dir}" 2>/dev/null
+    echo "${CYELLOW}Restore manually from ${BACKUP_DIR}.${CEND}"
+    return 1
+  fi
+  svc_start php-fpm
+  echo "${CYELLOW}Rolled back. Broken install kept at ${broken} for inspection.${CEND}"
+  return 0
+}
+
 Upgrade_PHP() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${php_install_dir}" ] && echo "${CWARNING}PHP is not installed on your system! ${CEND}" && exit 1
@@ -139,16 +168,21 @@ ROLLBACK_EOF
     # ========================================
     
     echo "Stoping php-fpm..."
-    svc_stop php-fpm
+    if ! svc_stop php-fpm; then
+      echo "${CFAILURE}Failed to stop php-fpm! Aborting before replacing the running binary.${CEND}"
+      echo "${CYELLOW}php-fpm is still running; make install would hit 'Text file busy'.${CEND}"
+      echo "${CYELLOW}Stop it manually (systemctl stop php-fpm) then re-run the upgrade.${CEND}"
+      popd > /dev/null || true
+      rm -rf php-${NEW_php_ver}
+      exit 1
+    fi
     make install
     
     # ========== 【新增】安装后验证 ==========
     echo "Verifying installed PHP..."
     if ! "${php_install_dir}/bin/php" -v > /dev/null 2>&1; then
       echo "${CFAILURE}Installation verification failed! Rolling back...${CEND}"
-      rm -rf "${php_install_dir}"
-      cp -a "${backup_php_dir}" "${php_install_dir}"
-      svc_start php-fpm
+      _php_rollback
       exit 1
     fi
 
@@ -158,9 +192,7 @@ ROLLBACK_EOF
     sleep 2
     if ! svc_is_active php-fpm; then
       echo "${CWARNING}php-fpm failed to start! Rolling back...${CEND}"
-      rm -rf "${php_install_dir}"
-      cp -a "${backup_php_dir}" "${php_install_dir}"
-      svc_start php-fpm
+      _php_rollback
       exit 1
     fi
     # ========================================
