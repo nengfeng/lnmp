@@ -14,6 +14,12 @@ name: Release
 # inputs:
 #   version - required, X.Y.Z without the v prefix (validated below)
 #   notes   - optional release body; defaults to the annotated tag message
+#   rebuild - optional, set to true to re-publish an EXISTING version
+#             (e.g. after pushing a fix that should be folded into the same
+#             release). The old tag and Release are deleted and rebuilt from
+#             the current main HEAD; install.sh version() must already read
+#             <version> (no bump), so the tag moves to include the new
+#             commits. The default false path is unchanged.
 
 on:
   workflow_dispatch:
@@ -26,9 +32,14 @@ on:
         description: 'Release notes (defaults to the annotated tag message)'
         required: false
         type: string
+      rebuild:
+        description: 'Re-publish an existing version (delete old tag+release, rebuild from HEAD)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: write   # push the two commits + the tag, create the release
+  contents: write   # push the two commits + the tag, create/delete the release
 
 jobs:
   release:
@@ -44,18 +55,29 @@ jobs:
       - name: Validate the version and that it is new
         env:
           VERSION: ${{ inputs.version }}
+          REBUILD: ${{ inputs.rebuild }}
         run: |
           set -euo pipefail
           if ! printf '%s' "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::version must be X.Y.Z, got '${VERSION}'"
             exit 1
           fi
-          if git ls-remote --tags origin "refs/tags/v${VERSION}" | grep -q .; then
-            echo "::error::tag v${VERSION} already exists"
-            exit 1
+          if [ "${REBUILD}" != "true" ]; then
+            if git ls-remote --tags origin "refs/tags/v${VERSION}" | grep -q .; then
+              echo "::error::tag v${VERSION} already exists (use rebuild=true to re-publish it)"
+              exit 1
+            fi
+          else
+            # Rebuild: the tag is expected to exist; require install.sh to
+            # already read this version so the rebuilt tag matches the tree.
+            if ! grep -q "^  echo \"version: ${VERSION}\"" install.sh; then
+              echo "::error::rebuild=true but install.sh version() is not ${VERSION}; bump it first or drop rebuild"
+              exit 1
+            fi
           fi
 
       - name: Bump version() in install.sh
+        if: ${{ inputs.rebuild != true }}
         env:
           VERSION: ${{ inputs.version }}
         run: |
@@ -71,13 +93,28 @@ jobs:
       - name: Commit, tag, package, record checksums
         env:
           VERSION: ${{ inputs.version }}
+          REBUILD: ${{ inputs.rebuild }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add install.sh
-          git commit -m "chore(release): version ${VERSION}"
+          if [ "${REBUILD}" = "true" ]; then
+            # Re-publish: drop the old tag + Release so they can be recreated
+            # from the current HEAD (which now contains the folded-in fixes).
+            git push origin --delete "v${VERSION}" 2>/dev/null || true
+            gh release delete "v${VERSION}" --yes 2>/dev/null || true
+            # checkout fetches all tags, so the local tag must go too or the
+            # `git tag -a` below fails with "tag already exists".
+            git tag -d "v${VERSION}" 2>/dev/null || true
+          else
+            git add install.sh
+            git commit -m "chore(release): version ${VERSION}"
+          fi
+
+          # Cut the (annotated) tag at the current HEAD. On rebuild this moves
+          # the tag forward to include the commits landed since the first cut.
           git tag -a "v${VERSION}" -m "v${VERSION}"
 
           git archive --format=tar.gz --prefix=lnmp/ "v${VERSION}" -o "${RUNNER_TEMP}/lnmp.tar.gz"
