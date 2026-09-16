@@ -2,61 +2,34 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
-# Only support PHP 8.3, 8.4, 8.5
-# All supported PHP versions use the same OpenSSL configuration
+# All supported PHP versions use the same OpenSSL configure argument; the
+# per-version phpXX_with_ssl variables are only needed because each
+# include/php-X.Y.sh shell references its own name. When adding a new PHP
+# version, add its phpXX_with_ssl line to every branch below (the value is
+# identical across versions -- see .workbuddy/php-version-onboarding.md).
+# The _with_openssl/_with_curl variants were removed as dead: php.sh hardcodes
+# those two arguments and never consumed the per-version copies.
 
 if openssl version | grep -Eqi 'OpenSSL 1.0.2*'; then
-  php83_with_openssl="--with-openssl"
-  php84_with_openssl="--with-openssl"
-  php85_with_openssl="--with-openssl"
-
   php83_with_ssl="--with-ssl"
   php84_with_ssl="--with-ssl"
   php85_with_ssl="--with-ssl"
-
-  php83_with_curl="--with-curl"
-  php84_with_curl="--with-curl"
-  php85_with_curl="--with-curl"
 elif openssl version | grep -Eqi 'OpenSSL 1.1.*'; then
-  php83_with_openssl="--with-openssl"
-  php84_with_openssl="--with-openssl"
-  php85_with_openssl="--with-openssl"
-
   php83_with_ssl="--with-ssl"
   php84_with_ssl="--with-ssl"
   php85_with_ssl="--with-ssl"
-
-  php83_with_curl="--with-curl"
-  php84_with_curl="--with-curl"
-  php85_with_curl="--with-curl"
 
   [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
 elif openssl version | grep -Eqi 'OpenSSL 3.*'; then
-  php83_with_openssl="--with-openssl"
-  php84_with_openssl="--with-openssl"
-  php85_with_openssl="--with-openssl"
-
   php83_with_ssl="--with-ssl"
   php84_with_ssl="--with-ssl"
   php85_with_ssl="--with-ssl"
 
-  php83_with_curl="--with-curl"
-  php84_with_curl="--with-curl"
-  php85_with_curl="--with-curl"
-
   [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
 else
-  php83_with_openssl="--with-openssl=${openssl_install_dir} --with-openssl-dir=${openssl_install_dir}"
-  php84_with_openssl="--with-openssl=${openssl_install_dir} --with-openssl-dir=${openssl_install_dir}"
-  php85_with_openssl="--with-openssl=${openssl_install_dir} --with-openssl-dir=${openssl_install_dir}"
-
   php83_with_ssl="--with-ssl=${openssl_install_dir}"
   php84_with_ssl="--with-ssl=${openssl_install_dir}"
   php85_with_ssl="--with-ssl=${openssl_install_dir}"
-
-  php83_with_curl="--with-curl=${curl_install_dir}"
-  php84_with_curl="--with-curl=${curl_install_dir}"
-  php85_with_curl="--with-curl=${curl_install_dir}"
 
   with_old_openssl_flag=y
 fi
