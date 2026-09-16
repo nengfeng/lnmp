@@ -43,9 +43,19 @@ Upgrade_Memcached() {
     compile_check
 
     if [ -e "memcached" ]; then
-      echo "Restarting Memcached..."
-      service_action stop memcached
-      make install
+      echo "Stoping Memcached..."
+      if ! service_action stop memcached; then
+        echo "${CFAILURE}Failed to stop memcached! Aborting before replacing the running binary.${CEND}"
+        echo "${CYELLOW}Stop it manually then re-run the upgrade.${CEND}"
+        popd > /dev/null
+        exit 1
+      fi
+      if ! make install; then
+        echo "${CFAILURE}make install failed! Restarting old memcached...${CEND}"
+        service_action start memcached
+        popd > /dev/null
+        exit 1
+      fi
       service_action start memcached
       popd > /dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}${OLD_memcached_ver}${CEND} to ${CWARNING}${NEW_memcached_ver}${CEND}"

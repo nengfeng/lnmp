@@ -47,9 +47,19 @@ Upgrade_Redis() {
     fi
 
     if [ -f "src/redis-server" ]; then
-      echo "Restarting Redis..."
-      service_action stop redis-server
-      /bin/cp src/{redis-benchmark,redis-check-aof,redis-check-rdb,redis-cli,redis-sentinel,redis-server} $redis_install_dir/bin/
+      echo "Stoping Redis..."
+      if ! service_action stop redis-server; then
+        echo "${CFAILURE}Failed to stop redis-server! Aborting before replacing the running binary.${CEND}"
+        echo "${CYELLOW}Stop it manually then re-run the upgrade.${CEND}"
+        popd > /dev/null
+        exit 1
+      fi
+      if ! /bin/cp src/{redis-benchmark,redis-check-aof,redis-check-rdb,redis-cli,redis-sentinel,redis-server} $redis_install_dir/bin/; then
+        echo "${CFAILURE}Failed to copy new binaries! Restarting old redis-server...${CEND}"
+        service_action start redis-server
+        popd > /dev/null
+        exit 1
+      fi
       service_action start redis-server
       popd > /dev/null
       echo "You have ${CMSG}successfully${CEND} upgrade from ${CWARNING}$OLD_redis_ver${CEND} to ${CWARNING}$NEW_redis_ver${CEND}"
