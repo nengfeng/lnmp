@@ -256,7 +256,10 @@ Upgrade_Nginx() {
         fail_msg "Nginx upgrade (config test failed)"
       fi
       local ts=$(date +%m%d%H%M%S)
-      /bin/cp -a ${nginx_install_dir}/sbin/nginx ${nginx_install_dir}/sbin/nginx.bak${ts} || { fail_msg "Nginx upgrade (backup failed)"; }
+      # Move the running binary aside (rename does not touch the in-use inode,
+      # so no ETXTBSY) instead of overwriting it in place. cp onto a now-free
+      # path also avoids "Text file busy" while the old master still runs.
+      /bin/mv -f ${nginx_install_dir}/sbin/nginx ${nginx_install_dir}/sbin/nginx.bak${ts} || { fail_msg "Nginx upgrade (backup failed)"; }
       if ! /bin/cp objs/nginx ${nginx_install_dir}/sbin/nginx; then
         /bin/mv -f ${nginx_install_dir}/sbin/nginx.bak${ts} ${nginx_install_dir}/sbin/nginx 2>/dev/null
         fail_msg "Nginx upgrade (install new binary failed)"
@@ -440,7 +443,7 @@ Upgrade_Tengine() {
         fail_msg "Tengine upgrade (config test failed)"
       fi
       local ts=$(date +%m%d%H%M%S)
-      /bin/cp -a ${tengine_install_dir}/sbin/nginx ${tengine_install_dir}/sbin/nginx.bak${ts} || { fail_msg "Tengine upgrade (backup failed)"; }
+      /bin/mv -f ${tengine_install_dir}/sbin/nginx ${tengine_install_dir}/sbin/nginx.bak${ts} || { fail_msg "Tengine upgrade (backup failed)"; }
       if ! /bin/cp objs/nginx ${tengine_install_dir}/sbin/nginx; then
         /bin/mv -f ${tengine_install_dir}/sbin/nginx.bak${ts} ${tengine_install_dir}/sbin/nginx 2>/dev/null
         fail_msg "Tengine upgrade (install new binary failed)"
@@ -556,7 +559,7 @@ Upgrade_OpenResty() {
         fail_msg "OpenResty upgrade (config test failed)"
       fi
       local ts=$(date +%m%d%H%M%S)
-      /bin/cp -a ${openresty_install_dir}/nginx/sbin/nginx ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} || { fail_msg "OpenResty upgrade (backup failed)"; }
+      /bin/mv -f ${openresty_install_dir}/nginx/sbin/nginx ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} || { fail_msg "OpenResty upgrade (backup failed)"; }
       if ! make install > /dev/null 2>&1; then
         /bin/mv -f ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} ${openresty_install_dir}/nginx/sbin/nginx 2>/dev/null
         fail_msg "OpenResty upgrade (make install failed)"
