@@ -42,7 +42,15 @@ Upgrade_PHP() {
   pythonCtl=python
   command -v python3 > /dev/null 2>&1 && pythonCtl=python3
   Latest_php_ver=$(curl --connect-timeout 2 -m 3 -s https://www.php.net/releases/active.php | ${pythonCtl} -mjson.tool | awk '/version/{print $2}' | sed 's/"//g' | grep "${OLD_php_ver%.*}")
-  Latest_php_ver=${Latest_php_ver:-8.3.20}
+  # Fallback when the php.net API is unreachable: use the version recorded in
+  # versions.txt for the installed minor series (e.g. 8.4 -> ${php84_ver}),
+  # instead of a hardcoded 8.3.20 that silently drifts as support moves on.
+  # Indirect expansion maps the minor "8.4" to the php84_ver variable.
+  if [ -z "${Latest_php_ver}" ]; then
+    local _pma_minor="$(printf '%s' "${OLD_php_ver%.*}" | tr -d '.')"
+    local _pma_var="php${_pma_minor}_ver"
+    Latest_php_ver="${!_pma_var:-8.3.20}"
+  fi
   echo
   echo "Current PHP Version: ${CMSG}$OLD_php_ver${CEND}"
   

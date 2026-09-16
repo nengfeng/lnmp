@@ -6,5 +6,5 @@
 . include/php.sh
 
 Install_PHP84() {
-  Install_PHP "${php84_ver}" "${php84_with_ssl}"
+  Install_PHP "${php84_ver}" "${php_with_ssl}"
 }

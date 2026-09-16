@@ -7,8 +7,11 @@ Install_ZendOPcache() {
     pushd ${current_dir}/src > /dev/null
     PHP_detail_ver=$(${php_install_dir}/bin/php-config --version)
 
-    # PHP 8.5+ has opcache built-in, just need configuration (no .so file needed)
-    if [[ "${PHP_detail_ver}" =~ ^8\.[5-9]\. ]] || [[ "${PHP_detail_ver}" =~ ^9\. ]]; then
+    # PHP 8.5+ has opcache built-in, just need configuration (no .so file needed).
+    # Matched as "NOT 8.0-8.4" so future majors (9.x, 10.x) keep the built-in
+    # branch without maintaining an ever-growing version list -- opcache being
+    # built-in is the permanent direction since 8.5, not a per-version special.
+    if [[ ! "${PHP_detail_ver}" =~ ^8\.[0-4]\. ]]; then
       # Built-in opcache for PHP 8.5+
       cat > ${php_install_dir}/etc/php.d/02-opcache.ini << EOF
 [opcache]
@@ -57,7 +60,7 @@ EOF
 Uninstall_ZendOPcache() {
   local PHP_detail_ver=''
   [ -e "${php_install_dir}/bin/php-config" ] && PHP_detail_ver=$(${php_install_dir}/bin/php-config --version)
-  if [[ "${PHP_detail_ver}" =~ ^8\.[5-9]\. ]] || [[ "${PHP_detail_ver}" =~ ^9\. ]]; then
+  if [[ ! "${PHP_detail_ver}" =~ ^8\.[0-4]\. ]]; then
     # PHP 8.5+: opcache is built into the binary and always loaded; it cannot be
     # removed, so "uninstall" means disabling it via INI
     cat > ${php_install_dir}/etc/php.d/02-opcache.ini << EOF

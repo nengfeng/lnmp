@@ -2,34 +2,25 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
-# All supported PHP versions use the same OpenSSL configure argument; the
-# per-version phpXX_with_ssl variables are only needed because each
-# include/php-X.Y.sh shell references its own name. When adding a new PHP
-# version, add its phpXX_with_ssl line to every branch below (the value is
-# identical across versions -- see .workbuddy/php-version-onboarding.md).
+# All supported PHP versions use the same OpenSSL configure argument, so a
+# single php_with_ssl variable serves every version (each include/php-X.Y.sh
+# passes ${php_with_ssl} to the unified Install_PHP). Adding a new PHP version
+# no longer needs a new variable here -- the value is identical across versions.
 # The _with_openssl/_with_curl variants were removed as dead: php.sh hardcodes
 # those two arguments and never consumed the per-version copies.
 
 if openssl version | grep -Eqi 'OpenSSL 1.0.2*'; then
-  php83_with_ssl="--with-ssl"
-  php84_with_ssl="--with-ssl"
-  php85_with_ssl="--with-ssl"
+  php_with_ssl="--with-ssl"
 elif openssl version | grep -Eqi 'OpenSSL 1.1.*'; then
-  php83_with_ssl="--with-ssl"
-  php84_with_ssl="--with-ssl"
-  php85_with_ssl="--with-ssl"
+  php_with_ssl="--with-ssl"
 
   [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
 elif openssl version | grep -Eqi 'OpenSSL 3.*'; then
-  php83_with_ssl="--with-ssl"
-  php84_with_ssl="--with-ssl"
-  php85_with_ssl="--with-ssl"
+  php_with_ssl="--with-ssl"
 
   [[ ${php_option} =~ ^[1-3]$ ]] && with_old_openssl_flag=y
 else
-  php83_with_ssl="--with-ssl=${openssl_install_dir}"
-  php84_with_ssl="--with-ssl=${openssl_install_dir}"
-  php85_with_ssl="--with-ssl=${openssl_install_dir}"
+  php_with_ssl="--with-ssl=${openssl_install_dir}"
 
   with_old_openssl_flag=y
 fi
