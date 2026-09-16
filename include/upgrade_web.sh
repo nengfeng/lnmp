@@ -451,6 +451,8 @@ Upgrade_Tengine() {
       chmod +x ${tengine_install_dir}/sbin/*
       [ -d ${tengine_install_dir}/modules ] && mv ${tengine_install_dir}/modules{,.bak${ts}}
       if ! make install > /dev/null 2>&1; then
+        echo "${CFAILURE}make install failed; rerunning to show the error output:${CEND}"
+        make install
         /bin/mv -f ${tengine_install_dir}/sbin/nginx.bak${ts} ${tengine_install_dir}/sbin/nginx 2>/dev/null
         fail_msg "Tengine upgrade (make install failed)"
       fi
@@ -561,6 +563,8 @@ Upgrade_OpenResty() {
       local ts=$(date +%m%d%H%M%S)
       /bin/mv -f ${openresty_install_dir}/nginx/sbin/nginx ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} || { fail_msg "OpenResty upgrade (backup failed)"; }
       if ! make install > /dev/null 2>&1; then
+        echo "${CFAILURE}make install failed; rerunning to show the error output:${CEND}"
+        make install
         /bin/mv -f ${openresty_install_dir}/nginx/sbin/nginx.bak${ts} ${openresty_install_dir}/nginx/sbin/nginx 2>/dev/null
         fail_msg "OpenResty upgrade (make install failed)"
       fi

@@ -52,8 +52,18 @@ Upgrade_phpMyAdmin() {
       echo "${CFAILURE}Extracted archive missing expected directory, old installation is intact. ${CEND}"
       exit 1
     }
-    rm -rf ${wwwroot_dir}/default/phpMyAdmin
-    /bin/mv phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages ${wwwroot_dir}/default/phpMyAdmin
+    # Replace the old install by moving it aside first (rename is reversible),
+    # then moving the new tree into place. If the move fails (cross-device,
+    # disk full), move the old tree back so the site is never left without
+    # phpMyAdmin. Never rm -rf the old install before the new one is in place.
+    local pma_ts=$(date +%m%d%H%M%S)
+    /bin/mv ${wwwroot_dir}/default/phpMyAdmin ${wwwroot_dir}/default/phpMyAdmin.old${pma_ts} || \
+      { echo "${CFAILURE}Failed to move old phpMyAdmin aside, upgrade aborted. ${CEND}"; exit 1; }
+    if ! /bin/mv phpMyAdmin-${NEW_phpmyadmin_ver}-all-languages ${wwwroot_dir}/default/phpMyAdmin; then
+      /bin/mv ${wwwroot_dir}/default/phpMyAdmin.old${pma_ts} ${wwwroot_dir}/default/phpMyAdmin
+      echo "${CFAILURE}Failed to move new phpMyAdmin into place, old install restored. ${CEND}"
+      exit 1
+    fi
     /bin/cp ${wwwroot_dir}/default/phpMyAdmin/{config.sample.inc.php,config.inc.php}
     mkdir ${wwwroot_dir}/default/phpMyAdmin/{upload,save}
     sed -i "s@UploadDir.*@UploadDir'\] = 'upload';@" ${wwwroot_dir}/default/phpMyAdmin/config.inc.php
