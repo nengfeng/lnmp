@@ -28,6 +28,18 @@ openssl_ver_ge_32() {
   return 1
 }
 
+# Check if a PHP version string is 8.4 or later (8.4+ can use OpenSSL's
+# built-in Argon2 via --with-openssl-argon2, so no libargon2 is needed).
+# Takes a concrete version (e.g. "8.4.25") rather than the php_option number,
+# so adding a future PHP 8.6/8.7 needs no change here.
+php_ver_ge_84() {
+  local ver=$1
+  [ -z "$ver" ] && return 1
+  local major=$(echo "$ver" | cut -d. -f1)
+  local minor=$(echo "$ver" | cut -d. -f2)
+  [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]
+}
+
 # ============================================
 
 # 计算 SHA256
@@ -478,13 +490,17 @@ checkDownload() {
     fi
 
     # argon2 (GitHub) - only needed when can't use OpenSSL built-in Argon2
-    # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip
-    # php_option: 1=8.3, 2=8.4, 3=8.5 | mphp_ver: 83, 84, 85
+    # Requires PHP 8.4+ AND OpenSSL 3.2+ to skip.
+    # Decided from the concrete version strings (php_ver_to_use / mphp_php_ver,
+    # set in install.sh before checkDownload runs) rather than the php_option
+    # number, so a future PHP 8.6/8.7 needs no change here.
     local need_argon2=false
-    if [[ "${php_option}" == "1" ]] || [[ "${mphp_ver}" == "83" ]]; then
+    if { [ -n "$php_ver_to_use" ] && ! php_ver_ge_84 "$php_ver_to_use"; } \
+       || { [ -n "$mphp_php_ver" ] && ! php_ver_ge_84 "$mphp_php_ver"; }; then
+      # PHP < 8.4 always needs the external libargon2
       need_argon2=true
-    elif [[ "${php_option}" =~ ^[23]$ ]] || [[ "${mphp_ver}" =~ ^8[45]$ ]]; then
-      # PHP 8.4/8.5 - check OpenSSL version
+    elif [ -n "$php_ver_to_use" ] || [ -n "$mphp_php_ver" ]; then
+      # PHP 8.4+ - still need libargon2 when OpenSSL < 3.2
       if ! openssl_ver_ge_32; then
         need_argon2=true
       fi
