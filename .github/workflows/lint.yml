@@ -29,7 +29,14 @@ jobs:
           actionlint --version | head -n1
 
       - name: Lint workflow files
-        run: actionlint -color
+        # -shellcheck= / -pyflakes= disable actionlint's external-linter
+        # integrations. shellcheck is PREINSTALLED on the ubuntu-latest runner,
+        # so without this actionlint auto-enables it and re-lints every run:
+        # block here -- duplicating the dedicated Shellcheck step below AND
+        # failing the gate on warning-severity findings (SC2046/SC2044 in
+        # lint.yml's own `$(find ...)` calls). actionlint is scoped to workflow
+        # syntax only; shellcheck owns the script bodies.
+        run: actionlint -color -shellcheck= -pyflakes=
 
       # Pin a shellcheck version so the calibrated .shellcheckrc stays reproducible.
       - name: Install shellcheck 0.10.0
