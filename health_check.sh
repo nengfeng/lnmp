@@ -203,17 +203,24 @@ check_functional() {
   fi
 
   # MySQL connection
-  if [ -e "${mysql_install_dir}/bin/mysql" ] && [ -n "${dbrootpwd}" ]; then
-    if ${mysql_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "SELECT 1" > /dev/null 2>&1; then
+  if [ -e "${mysql_install_dir}/bin/mysql" ]; then
+    if [ -z "${dbrootpwd}" ]; then
+      check_warn "MySQL password unknown, skipped"
+    elif ${mysql_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "SELECT 1" > /dev/null 2>&1; then
       check_pass "MySQL connection: ok"
     else
-      check_fail "MySQL connection: failed"
+      # A stale password (user changed it manually, e.g. mysqladmin / ALTER
+      # USER, without syncing options.conf) fails here while the DB is
+      # healthy; the service's up/down is already reported by check_services.
+      check_warn "MySQL connection: failed (root password may be out of sync with options.conf)"
     fi
-  elif [ -e "${mariadb_install_dir}/bin/mysql" ] && [ -n "${dbrootpwd}" ]; then
-    if ${mariadb_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "SELECT 1" > /dev/null 2>&1; then
+  elif [ -e "${mariadb_install_dir}/bin/mysql" ]; then
+    if [ -z "${dbrootpwd}" ]; then
+      check_warn "MariaDB password unknown, skipped"
+    elif ${mariadb_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "SELECT 1" > /dev/null 2>&1; then
       check_pass "MariaDB connection: ok"
     else
-      check_fail "MariaDB connection: failed"
+      check_warn "MariaDB connection: failed (root password may be out of sync with options.conf)"
     fi
   fi
 
