@@ -714,28 +714,30 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
   mkdir -p "${current_dir}/src"
 
   _dl() {
-    local expected="$1" url="$2"
-    local fpath="${current_dir}/src/${expected}"
-    # -s checks non-empty (not just exists): prevents skipping truncated/empty cached files
-    [ -s "$fpath" ] && return 0
-    echo "${CWARNING}Missing: $expected, downloading...${CEND}"
-    local tmpfile="${current_dir}/src/tmp_${expected##*/}"
-    if wget -q -O "$tmpfile" "$url" 2>/dev/null && [ -s "$tmpfile" ]; then
-      mv "$tmpfile" "$fpath"
-      echo "${CSUCCESS}Downloaded: $expected${CEND}"
-    else
-      rm -f "$tmpfile"
-      echo "${CERROR}Failed to download: $expected${CEND}"
-      return 1
-    fi
+    local expected="$1" url="$2" china_url="${3:-}"
+    # Prefer the China mirror when one exists (get_mirror_url reads
+    # USE_CHINA_MIRROR, which checkDownload has already initialised).
+    [ -n "${china_url}" ] && url=$(get_mirror_url "${url}" "${china_url}" "${USE_CHINA_MIRROR}")
+    # Reuse Download_src for its retry, integrity probe (gzip -t on cached
+    # files) and unified die_hard failure path. It writes to the cwd, so run
+    # it from src/; clear the caller-set globals so a previous component's
+    # fallback/repack settings do not leak in.
+    pushd "${current_dir}/src" > /dev/null || return 1
+    src_url="${url}"
+    src_url_fallback=""
+    src_expected_dir=""
+    Download_src "${expected}"
+    local rc=$?
+    popd > /dev/null
+    return ${rc}
   }
 
   case "${nginx_option}" in
     1) _dl "nginx-${nginx_ver}.tar.gz" "https://nginx.org/download/nginx-${nginx_ver}.tar.gz" || exit 1 ;;
     2) _dl "tengine-${tengine_ver}.tar.gz" "https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz" || exit 1 ;;
-    3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" || exit 1 ;;
+    3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" "${MIRROR_BASE_URL}/openresty/openresty-${openresty_ver}.tar.gz" || exit 1 ;;
   esac
-  _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" || exit 1
+  _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" "${MIRROR_BASE_URL}/openssl/source/openssl-${openssl_ver}.tar.gz" || exit 1
   _dl "pcre2-${pcre_ver}.tar.gz" "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" || exit 1
   # Lua deps are now handled by check_download.sh; these _dl calls are a fallback only.
 fi
