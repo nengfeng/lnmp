@@ -10,6 +10,31 @@
 #   src_expected_dir   expected top-level dir of the archive; a fallback-sourced
 #                      archive whose top-level dir differs is re-packed to match
 #                      (e.g. GitHub auto-tag archives unpack to <repo>-<tag>)
+# Probe archive integrity for a downloaded file (gzip -t / xz -t / bzip2 -t).
+# A mirror that returns 200 OK with an HTML error page produces a non-empty
+# file that still fails the probe, so "downloaded + non-empty" is not enough.
+# Returns 0 when the file is a recognised archive type and passes its probe,
+# or is not an archive / the probe tool is absent (nothing to check);
+# non-zero when the archive is corrupt.
+_archive_integrity_ok() {
+  local file_name="$1"
+  case "${file_name}" in
+    *.tar.gz|*.tgz)
+      command -v gzip >/dev/null 2>&1 || return 0
+      gzip -t "${file_name}" 2>/dev/null
+      ;;
+    *.tar.xz)
+      command -v xz >/dev/null 2>&1 || return 0
+      xz -t "${file_name}" 2>/dev/null
+      ;;
+    *.tar.bz2)
+      command -v bzip2 >/dev/null 2>&1 || return 0
+      bzip2 -t "${file_name}" 2>/dev/null
+      ;;
+    *) return 0 ;;
+  esac
+}
+
 Download_src() {
   # Usage: Download_src [output_filename]
   # If output_filename is provided, download to that name; otherwise use URL basename
@@ -22,29 +47,12 @@ Download_src() {
   if [ -s "${file_name}" ]; then
     # Integrity probe for cached archives: a truncated file from a previous
     # interrupted download must not be trusted ("non-empty != complete")
-    case "${file_name}" in
-      *.tar.gz|*.tgz)
-        if command -v gzip >/dev/null 2>&1 && ! gzip -t "${file_name}" 2>/dev/null; then
-          echo "${CWARNING}[${file_name}] is corrupted (truncated?), re-downloading${CEND}"
-          rm -f "${file_name}"
-          Download_src "$@"
-          return $?
-        fi ;;
-      *.tar.xz)
-        if command -v xz >/dev/null 2>&1 && ! xz -t "${file_name}" 2>/dev/null; then
-          echo "${CWARNING}[${file_name}] is corrupted (truncated?), re-downloading${CEND}"
-          rm -f "${file_name}"
-          Download_src "$@"
-          return $?
-        fi ;;
-      *.tar.bz2)
-        if command -v bzip2 >/dev/null 2>&1 && ! bzip2 -t "${file_name}" 2>/dev/null; then
-          echo "${CWARNING}[${file_name}] is corrupted (truncated?), re-downloading${CEND}"
-          rm -f "${file_name}"
-          Download_src "$@"
-          return $?
-        fi ;;
-    esac
+    if ! _archive_integrity_ok "${file_name}"; then
+      echo "${CWARNING}[${file_name}] is corrupted (truncated?), re-downloading${CEND}"
+      rm -f "${file_name}"
+      Download_src "$@"
+      return $?
+    fi
     echo "[${CMSG}${file_name}${CEND}] found"
     return 0
   fi
@@ -91,28 +99,35 @@ Download_src() {
         "${url}" 2>&1 | tee -a "${current_dir}/download.log"
       local wget_exit_code=${PIPESTATUS[0]}
       if [ ${wget_exit_code} -eq 0 ] && [ -f "${file_name}" ] && [ -s "${file_name}" ]; then
-        # Align the archive's top-level dir with what the build step expects.
-        # GitHub auto-tag archives unpack to <repo>-<tag> (e.g.
-        # freetype-VER-2-14-3), not the release dir (freetype-2.14.3), so a
-        # fallback-sourced archive must be re-packed before it will build.
-        if [ -n "${src_expected_dir:-}" ] && tar -tzf "${file_name}" >/dev/null 2>&1; then
-          local probe_dir
-          probe_dir=$(tar -tzf "${file_name}" 2>/dev/null | head -1 | cut -d'/' -f1)
-          if [ -n "${probe_dir}" ] && [ "${probe_dir}" != "${src_expected_dir}" ]; then
-            echo "${CMSG}Repacking ${file_name} to expected top-level dir '${src_expected_dir}'...${CEND}"
-            local work=".repack_${file_name}_$$"
-            rm -rf "${work}"
-            mkdir -p "${work}"
-            if tar -xzf "${file_name}" -C "${work}" 2>/dev/null \
-               && mv "${work}/${probe_dir}" "${work}/${src_expected_dir}" 2>/dev/null \
-               && tar -czf "${work}/${file_name}" -C "${work}" "${src_expected_dir}" 2>/dev/null; then
-              mv -f "${work}/${file_name}" "${file_name}"
+        # A mirror returning 200 OK + an HTML error page yields a non-empty
+        # file that is not a valid archive; probe it before trusting the size.
+        if ! _archive_integrity_ok "${file_name}"; then
+          echo "${CWARNING}Downloaded ${file_name} failed integrity probe (mirror returned HTML?), discarding...${CEND}"
+          rm -f "${file_name}"
+        else
+          # Align the archive's top-level dir with what the build step expects.
+          # GitHub auto-tag archives unpack to <repo>-<tag> (e.g.
+          # freetype-VER-2-14-3), not the release dir (freetype-2.14.3), so a
+          # fallback-sourced archive must be re-packed before it will build.
+          if [ -n "${src_expected_dir:-}" ] && tar -tzf "${file_name}" >/dev/null 2>&1; then
+            local probe_dir
+            probe_dir=$(tar -tzf "${file_name}" 2>/dev/null | head -1 | cut -d'/' -f1)
+            if [ -n "${probe_dir}" ] && [ "${probe_dir}" != "${src_expected_dir}" ]; then
+              echo "${CMSG}Repacking ${file_name} to expected top-level dir '${src_expected_dir}'...${CEND}"
+              local work=".repack_${file_name}_$$"
+              rm -rf "${work}"
+              mkdir -p "${work}"
+              if tar -xzf "${file_name}" -C "${work}" 2>/dev/null \
+                 && mv "${work}/${probe_dir}" "${work}/${src_expected_dir}" 2>/dev/null \
+                 && tar -czf "${work}/${file_name}" -C "${work}" "${src_expected_dir}" 2>/dev/null; then
+                mv -f "${work}/${file_name}" "${file_name}"
+              fi
+              rm -rf "${work}"
             fi
-            rm -rf "${work}"
           fi
+          echo "${CSUCCESS}Successfully downloaded ${file_name} (source: ${url})${CEND}"
+          return 0
         fi
-        echo "${CSUCCESS}Successfully downloaded ${file_name} (source: ${url})${CEND}"
-        return 0
       fi
 
       echo "${CWARNING}Download attempt $attempt from ${url} failed${CEND}"
