@@ -207,7 +207,9 @@ Upgrade_DB() {
       svc_restart mysqld
       ${mariadb_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "drop database test;" >/dev/null 2>&1
       ${mariadb_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "reset master;" >/dev/null 2>&1
-      ${mariadb_install_dir}/bin/mysql_upgrade -uroot -p"${dbrootpwd}" >/dev/null 2>&1
+      # No mysql_upgrade: this is a dump+restore (logical) upgrade, so every
+      # table is rebuilt by the new server, and MariaDB 10.4+ upgrades its
+      # schema automatically on startup. mysql_upgrade is unneeded here.
       # Reset root user permissions (including root@'127.0.0.1')
       local root_cmd="mysql"
       [ -x "${mariadb_install_dir}/bin/mariadb" ] && root_cmd="mariadb"
@@ -258,7 +260,10 @@ Upgrade_DB() {
       svc_restart mysqld
       ${mysql_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "drop database test;" >/dev/null 2>&1
       ${mysql_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "reset master;" >/dev/null 2>&1
-      ${mysql_install_dir}/bin/mysql_upgrade -uroot -p"${dbrootpwd}" >/dev/null 2>&1
+      # No mysql_upgrade: this is a dump+restore (logical) upgrade, so every
+      # table is rebuilt by the new server, and MySQL 8.0.16+ upgrades its
+      # schema automatically on startup. The binary is a no-op since 8.0.16
+      # and was removed entirely in 8.4.
       # Reset root user permissions (including root@'127.0.0.1')
       setup_mysql_root ${mysql_install_dir} ${dbrootpwd} "" y
       [ $? -eq 0 ] &&  echo "You have ${CMSG}successfully${CEND} upgrade from ${CMSG}${OLD_db_ver}${CEND} to ${CMSG}${NEW_db_ver}${CEND}"
