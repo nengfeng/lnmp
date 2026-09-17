@@ -171,8 +171,8 @@ verify_md5_with_retry() {
   [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
   
   # 下载 MD5 文件
-  wget -q "$md5_url" -O "${file_name}.md5" 2>/dev/null || {
-    echo "${CFAILURE}Could not download MD5 file${CEND}"
+  wget "$md5_url" -O "${file_name}.md5" || {
+    echo "${CFAILURE}Could not download MD5 file (network error?)${CEND}"
     return 1
   }
   
@@ -195,7 +195,12 @@ verify_md5_with_retry() {
     # -c resumes on an existing file, so a complete-but-corrupted tarball would
     # be left untouched and the loop would spin for 6 iterations then die_hard.
     rm -f "${file_name}"
-    wget "$download_url" -O "${file_name}" 2>/dev/null
+    # Keep stderr visible and check the exit code: a network failure leaves an
+    # empty/absent file (NOT a genuine MD5 mismatch), and both were previously
+    # reported as the same "MD5 mismatch".
+    if ! wget "$download_url" -O "${file_name}"; then
+      echo "${CFAILURE}wget failed to download ${file_name} (network error?)${CEND}"
+    fi
     actual_md5=$(compute_md5 "${file_name}")
     [[ "$actual_md5" == "$expected_md5" ]] || [ "$try_count" -ge 6 ] && break
   done
