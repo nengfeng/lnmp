@@ -562,6 +562,11 @@ fi
 [[ "${armplatform}" == "y" ]] && dbinstallmethod=2
 # PostgreSQL non-interactive defaults (interactive menu sets these at runtime)
 [[ "${db_option}" == 8 && -z "${pgsql_ver}" ]] && pgsql_ver=${pgsql18_ver}
+# Check memory + disk BEFORE downloading: a box with <5GB free otherwise
+# downloads everything and dies mid-`make` with 'No space left on device',
+# unrelated to the real cause. Skipped in --preflight (that only validates
+# deps, and its CI containers may legitimately be small).
+[[ "${preflight_flag}" == y ]] || run_step check_system_resources check_system_resources
 # --preflight only validates that this distro can satisfy the dependencies;
 # skip every download so the run never touches the network beyond apt.
 [[ "${preflight_flag}" == y ]] || run_step checkDownload checkDownload
