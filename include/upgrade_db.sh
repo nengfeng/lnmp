@@ -85,7 +85,7 @@ Upgrade_DB() {
 
   OLD_db_ver_tmp=$(${db_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e 'select version()\G;' | grep version | awk '{print $2}')
   if [[ -n "$(${db_install_dir}/bin/mysql -V | grep -i MariaDB)" ]]; then
-    [[ "${OUTIP_STATE}"x == "China"x ]] && DOWN_ADDR=https://mirrors.tuna.tsinghua.edu.cn/mariadb || DOWN_ADDR=https://archive.mariadb.org
+    [[ "${OUTIP_STATE}"x == "CN"x ]] && DOWN_ADDR=https://mirrors.tuna.tsinghua.edu.cn/mariadb || DOWN_ADDR=https://archive.mariadb.org
     DB=MariaDB
     OLD_db_ver=$(echo ${OLD_db_ver_tmp} | awk -F'-' '{print $1}')
   else

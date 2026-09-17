@@ -41,7 +41,7 @@ Install_PostgreSQL_APT() {
   echo "${CMSG}Installing PostgreSQL from official APT repository...${CEND}"
 
   # Add PostgreSQL official repository
-  [[ "${OUTIP_STATE}"x == "China"x ]] && PG_REPO_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/postgresql || PG_REPO_MIRROR=https://download.postgresql.org/pub/repos/apt
+  [[ "${OUTIP_STATE}"x == "CN"x ]] && PG_REPO_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/postgresql || PG_REPO_MIRROR=https://download.postgresql.org/pub/repos/apt
 
   # Import GPG key into a keyring (apt-key was removed on Debian 12+/Ubuntu 22+)
   install -d /usr/share/keyrings
