@@ -130,5 +130,3 @@ else
 fi
 
 THREAD=$(grep 'processor' /proc/cpuinfo | sort -u | wc -l)
-
-[ -e ~/.oneinstack ] && /bin/mv ~/.oneinstack ~/.lnmp
