@@ -21,7 +21,7 @@ Install_MariaDB() {
     "${mariadb_install_dir}" \
     "${mariadb_data_dir}" \
     "${dbinstallmethod}" \
-    "${boost_oldver}" \
+    "" \
     "${THREAD}" \
     "${init_cmd}" \
     "${cleanup_func}" \

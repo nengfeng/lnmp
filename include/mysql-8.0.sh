@@ -6,6 +6,6 @@
 . include/mysql.sh
 
 Install_MySQL80() {
-  # source builds pin the older boost; binary installs ignore it
-  Install_MySQL "${mysql80_ver}" "generate_my_cnf_mysql80" "yes" "${boost_oldver}"
+  # MySQL 8.0 does not bundle boost; source builds need boost 1.77.0
+  Install_MySQL "${mysql80_ver}" "generate_my_cnf_mysql80" "yes" "${boost_ver}"
 }

@@ -180,25 +180,29 @@ install_mysql_binary() {
 
 # Install MySQL from source
 # Usage: install_mysql_source mysql_ver install_dir data_dir boost_ver thread_count
+#   boost_ver: empty = MySQL bundles boost in the source (8.3+); non-empty =
+#              extract/point at this external boost (MySQL 8.0).
 install_mysql_source() {
   local mysql_ver=$1
   local install_dir=$2
   local data_dir=$3
   local boost_ver=$4
   local threads=$5
-  
-  local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
-  # boost is optional here: cmake carries -DDOWNLOAD_BOOST=1 and can fetch it
-  # itself, so a missing tarball is a warning, not a hard failure.
-  tar xzf boost_${boostVersion2}.tar.gz || echo "${CWARNING}Failed to extract boost_${boostVersion2}.tar.gz, relying on cmake -DDOWNLOAD_BOOST=1${CEND}"
+
+  local boostVersion2=""
+  if [ -n "${boost_ver}" ]; then
+    boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
+    tar xzf boost_${boostVersion2}.tar.gz || echo "${CWARNING}Failed to extract boost_${boostVersion2}.tar.gz, relying on cmake -DDOWNLOAD_BOOST=1${CEND}"
+  fi
   tar xzf mysql-${mysql_ver}.tar.gz || { echo "${CERROR}Failed to extract mysql-${mysql_ver}.tar.gz${CEND}"; return 1; }
   pushd mysql-${mysql_ver} > /dev/null || return 1
   [ -e "/usr/bin/cmake3" ] && local CMAKE=cmake3 || local CMAKE=cmake
   local rc=0
+  local boost_flag=""
+  [ -n "${boost_ver}" ] && boost_flag="-DDOWNLOAD_BOOST=1 -DWITH_BOOST=../boost_${boostVersion2}"
   $CMAKE . -DCMAKE_INSTALL_PREFIX=${install_dir} \
     -DMYSQL_DATADIR=${data_dir} \
-    -DDOWNLOAD_BOOST=1 \
-    -DWITH_BOOST=../boost_${boostVersion2} \
+    ${boost_flag} \
     -DFORCE_INSOURCE_BUILD=1 \
     -DSYSCONFDIR=/etc \
     -DWITH_INNOBASE_STORAGE_ENGINE=1 \
@@ -225,15 +229,14 @@ install_mysql_source() {
 cleanup_mysql_files() {
   local mysql_ver=$1
   local method=$2
-  # boost version actually extracted by install_mysql_source; fall back to the
-  # versions.txt global when the caller (old path) does not pass one
-  local boost_ver=${3:-${boost_ver}}
+  # empty unless a boost version was actually extracted by install_mysql_source
+  local boost_ver=${3-}
 
   if [[ "${method}" == "1" ]]; then
     rm -rf mysql-${mysql_ver}-*-$SYS_ARCH_M
   elif [[ "${method}" == "2" ]]; then
-    local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
-    rm -rf mysql-${mysql_ver} boost_${boostVersion2}
+    rm -rf mysql-${mysql_ver}
+    [ -n "${boost_ver}" ] && rm -rf boost_$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
   fi
 }
 
@@ -362,24 +365,20 @@ install_mariadb_binary() {
 
 # Install MariaDB from source
 # Usage: install_mariadb_source mariadb_ver install_dir data_dir boost_ver thread_count
+#   boost_ver ($4) is intentionally ignored: MariaDB's boost dependency is
+#   optional (only the OQGraph engine uses it), so no tarball is extracted or
+#   pointed at here; cmake simply skips OQGraph when boost is absent.
 install_mariadb_source() {
   local mariadb_ver=$1
   local install_dir=$2
   local data_dir=$3
-  local boost_ver=$4
   local threads=$5
-  
-  local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
-  # boost is optional here: cmake carries -DDOWNLOAD_BOOST=1 and can fetch it
-  # itself, so a missing tarball is a warning, not a hard failure.
-  tar xzf boost_${boostVersion2}.tar.gz || echo "${CWARNING}Failed to extract boost_${boostVersion2}.tar.gz, relying on cmake -DDOWNLOAD_BOOST=1${CEND}"
+
   tar xzf mariadb-${mariadb_ver}.tar.gz || { echo "${CERROR}Failed to extract mariadb-${mariadb_ver}.tar.gz${CEND}"; return 1; }
   pushd mariadb-${mariadb_ver} > /dev/null || return 1
   local rc=0
   cmake . -DCMAKE_INSTALL_PREFIX=${install_dir} \
     -DMYSQL_DATADIR=${data_dir} \
-    -DDOWNLOAD_BOOST=1 \
-    -DWITH_BOOST=../boost_${boostVersion2} \
     -DSYSCONFDIR=/etc \
     -DWITH_INNOBASE_STORAGE_ENGINE=1 \
     -DWITH_PARTITION_STORAGE_ENGINE=1 \
@@ -409,14 +408,13 @@ install_mariadb_source() {
 cleanup_mariadb_files() {
   local mariadb_ver=$1
   local method=$2
-  # MariaDB source builds always pin boost_oldver (see Install_MariaDB)
-  local boost_ver=${3:-${boost_oldver}}
+  # boost ($3) is intentionally ignored: MariaDB never extracts boost, so
+  # there is no boost directory to clean up.
 
   if [[ "${method}" == "1" ]]; then
     rm -rf mariadb-${mariadb_ver}-linux-systemd-$SYS_ARCH_M
   elif [[ "${method}" == "2" ]]; then
-    local boostVersion2=$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
-    rm -rf mariadb-${mariadb_ver} boost_${boostVersion2}
+    rm -rf mariadb-${mariadb_ver}
   fi
 }
 
@@ -1134,9 +1132,9 @@ install_db_common() {
     fi
   elif [[ "${install_method}" == "2" ]]; then
     if [[ "${db_type}" == "mysql" ]]; then
-      install_mysql_source ${mysql_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count} || install_rc=$?
+      install_mysql_source ${mysql_ver} ${install_dir} ${data_dir} "${boost_ver}" ${thread_count} || install_rc=$?
     else
-      install_mariadb_source ${mariadb_ver} ${install_dir} ${data_dir} ${boost_ver} ${thread_count} || install_rc=$?
+      install_mariadb_source ${mariadb_ver} ${install_dir} ${data_dir} "${boost_ver}" ${thread_count} || install_rc=$?
     fi
   fi
 
@@ -1169,7 +1167,8 @@ install_db_common() {
   chmod 600 ../options.conf
   # Call cleanup callback (removes the extracted sources, needs cwd = src);
   # pass the boost version actually used so cleanup removes the right dir
-  ${cleanup_func} ${mysql_ver:-${mariadb_ver}} ${install_method} ${boost_ver}
+  # (quoted so an empty boost still occupies its argument slot)
+  ${cleanup_func} ${mysql_ver:-${mariadb_ver}} ${install_method} "${boost_ver}"
 
   # Everything below can still fail - the service unit, the data directory
   # initialisation, the first startup and the root password. Report success

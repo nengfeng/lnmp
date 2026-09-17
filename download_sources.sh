@@ -203,7 +203,6 @@ get_version() {
     tcmalloc)       ver=${VERSIONS[tcmalloc_ver]} ;;
     jemalloc)       ver=${VERSIONS[jemalloc_ver]} ;;
     boost)          ver=${VERSIONS[boost_ver]} ;;
-    boost-old)      ver=${VERSIONS[boost_oldver]} ;;
     lua-nginx-module) ver=${VERSIONS[lua_nginx_module_ver]} ;;
     ngx-devel-kit)  ver=${VERSIONS[ngx_devel_kit_ver]} ;;
     luajit2)        ver=${VERSIONS[luajit2_ver]} ;;
