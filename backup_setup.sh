@@ -7,7 +7,10 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Machine architecture token for prebuilt binaries (amd64 / arm64)
 M_ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
-clear
+# 'clear' needs TERM and prints a warning without one (CI, cron, containers)
+if [ -n "${TERM}" ]; then
+  clear
+fi
 printf "
 #######################################################################
 #                     Setup the backup parameters                     #

@@ -5,7 +5,10 @@
 #
 
 export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-clear
+# 'clear' needs TERM and prints a warning without one (CI, cron, containers)
+if [ -n "${TERM}" ]; then
+  clear
+fi
 printf "
 #######################################################################
 #                  Reset Database root password                       #
