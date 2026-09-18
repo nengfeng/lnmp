@@ -337,22 +337,19 @@ verify_checksum() {
   
   case $checksum_type in
     sha256)
-      # 先尝试匹配包含文件名的行，再尝试纯校验码
-      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)
+      # 按文件名精确匹配（GNU 双空格 / BSD 星号）。多文件 digest 必须命中
+      # 当前文件名；禁止 head -1 猜第一个条目——那会拿错对象的校验和去比。
       expected_checksum=$(grep -E "  ${filename}$|\*${filename}$" "$checksum_file" | awk '{print $1}')
-      [ -z "$expected_checksum" ] && expected_checksum=$(grep -E "^[a-fA-F0-9]{64}$" "$checksum_file" | head -1)
       actual_checksum=$(sha256sum "$file" | awk '{print $1}')
       ;;
     sha1)
-      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)
+      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)；同样禁止 head -1 兜底
       expected_checksum=$(grep -E "  ${filename}$|\*${filename}$" "$checksum_file" | awk '{print $1}')
-      [ -z "$expected_checksum" ] && expected_checksum=$(grep -E "^[a-fA-F0-9]{40}$" "$checksum_file" | head -1)
       actual_checksum=$(sha1sum "$file" | awk '{print $1}')
       ;;
     md5)
-      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)
+      # 支持 GNU 格式 (双空格) 和 BSD 格式 (星号)；同样禁止 head -1 兜底
       expected_checksum=$(grep -E "  ${filename}$|\*${filename}$" "$checksum_file" | awk '{print $1}')
-      [ -z "$expected_checksum" ] && expected_checksum=$(grep -E "^[a-fA-F0-9]{32}$" "$checksum_file" | head -1)
       actual_checksum=$(md5sum "$file" | awk '{print $1}')
       ;;
     asc)
@@ -372,19 +369,20 @@ verify_checksum() {
       fi
       ;;
     *)
-      log WARN "Unknown checksum type: $checksum_type"
-      return 0
+      log ERROR "Unknown checksum type: $checksum_type"
+      return 1
       ;;
   esac
   
   if [ -z "$expected_checksum" ]; then
-    # 有些校验码文件直接就是校验码值
+    # 有些校验码文件直接就是校验码值（单行纯 hex）。多文件/HTML 内容
+    # 会被拼成与 actual 长度不符的字符串，最终走 mismatch 失败。
     expected_checksum=$(cat "$checksum_file" | tr -d '[:space:]')
   fi
   
   if [ -z "$expected_checksum" ]; then
-    log WARN "Could not extract checksum from file"
-    return 0
+    log ERROR "Could not extract checksum from file (wrong format, or filename not present in a multi-file digest)"
+    return 1
   fi
   
   # 转换为小写比较
@@ -503,7 +501,10 @@ download_file() {
               return 1
             fi
           else
-            log WARN "Could not download checksum file, skipping verification"
+            log ERROR "Could not download checksum file, treating as verification failure"
+            rm -f "$filename"
+            popd > /dev/null
+            return 1
           fi
         fi
 
