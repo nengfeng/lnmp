@@ -117,7 +117,7 @@ ver_lt_rc() {
 # Helper: check latest version from URL pattern
 # Usage: check_latest <name> <current> <url> <regex> [sort_cmd] <versions_var>
 check_latest() {
-  local name="$1" current="$2" url="$3" regex="$4" sort_cmd="${5:-head -1}" varname="$6"
+  local name="$1" current="$2" url="$3" regex="$4" sort_cmd="${5:-sort -V | tail -1}" varname="$6"
   total=$((total + 1))
 
   local latest
@@ -197,21 +197,21 @@ else
 fi
 
 check_latest "OpenResty" "$openresty_ver" \
-  "https://openresty.org/en/download.html" '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "head -1" openresty_ver
+  "https://openresty.org/en/download.html" '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1" openresty_ver
 
 # --- Databases ---
 # MySQL
 check_latest "MySQL 9.7" "$mysql97_ver" \
   "https://dev.mysql.com/downloads/mysql/9.7.html" \
-  'mysql-\K9\.\d+\.\d+' "head -1" mysql97_ver
+  'mysql-\K9\.\d+\.\d+' "sort -V | tail -1" mysql97_ver
 
 check_latest "MySQL 8.4" "$mysql84_ver" \
   "https://dev.mysql.com/downloads/mysql/8.4.html" \
-  'mysql-\K8\.4\.\d+' "head -1" mysql84_ver
+  'mysql-\K8\.4\.\d+' "sort -V | tail -1" mysql84_ver
 
 check_latest "MySQL 8.0" "$mysql80_ver" \
   "https://dev.mysql.com/downloads/mysql/8.0.html" \
-  'mysql-\K8\.0\.\d+' "head -1" mysql80_ver
+  'mysql-\K8\.0\.\d+' "sort -V | tail -1" mysql80_ver
 
 # MariaDB - use REST API and filter status=="stable" (Preview/RC excluded,
 # otherwise a tracked series could jump to a non-GA release with no tarball)
@@ -694,7 +694,7 @@ fi
 node_major=$(echo "$nodejs_ver" | cut -d. -f1)
 check_latest "Node.js" "$nodejs_ver" \
   "https://nodejs.org/dist/latest-v${node_major}.x/SHASUMS256.txt" \
-  "node-v\\K[0-9]+\.[0-9]+\.[0-9]+" "head -1" nodejs_ver
+  "node-v\\K[0-9]+\.[0-9]+\.[0-9]+" "sort -V | tail -1" nodejs_ver
 
 # --- PECL extensions (web scraping releases atom feeds) ---
 pecl_repos=(
@@ -746,7 +746,7 @@ done
 # --- Others ---
 # phpMyAdmin: use context-aware regex to avoid matching unrelated numbers
 check_latest "phpMyAdmin" "$phpmyadmin_ver" \
-  "https://www.phpmyadmin.net/" 'Download\s+\K[0-9]+\.[0-9]+\.[0-9]+' "head -1" phpmyadmin_ver
+  "https://www.phpmyadmin.net/" 'Download\s+\K[0-9]+\.[0-9]+\.[0-9]+' "sort -V | tail -1" phpmyadmin_ver
 
 check_latest "Pure-FTPd" "$pureftpd_ver" \
   "https://download.pureftpd.org/pub/pure-ftpd/releases/" \
