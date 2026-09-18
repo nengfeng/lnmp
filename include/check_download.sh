@@ -221,10 +221,10 @@ verify_pgp_signature() {
   local component=$3
   
   [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
-  # gpg is installed by installDeps, which runs AFTER checkDownload, and this
-  # project never imports any upstream public key. Both cases therefore mean
-  # "could not check", not "bad file": they must warn and skip. Only a
-  # genuinely BAD signature (gpg exit status 1) may stop the install.
+  # gpg and the upstream public keys are now provisioned before checkDownload
+  # (install.sh installs gnupg and imports keys/*.asc). A missing gpg is thus
+  # an abnormal environment, not the normal path; still skip rather than fail
+  # the whole install on a tooling gap.
   if ! command -v gpg >/dev/null 2>&1; then
     echo "${CYELLOW}gpg not available, skipping ${component} PGP check${CEND}"
     return 0
@@ -247,9 +247,10 @@ verify_pgp_signature() {
     return 1
   else
     # gpg exits 2 (and above) when it could not check at all - e.g. the
-    # signer's public key is not in the keyring. That is a skipped check.
-    echo "${CYELLOW}${component} PGP signature could not be checked (key not imported?), skipping${CEND}"
-    return 0
+    # signer's public key is not in the keyring. The keys are imported before
+    # checkDownload now, so this is abnormal: fail loudly instead of skipping.
+    echo "${CFAILURE}${component} PGP signature could not be verified (exit ${gpg_rc})${CEND}"
+    return 1
   fi
 }
 

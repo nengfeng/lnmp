@@ -531,7 +531,7 @@ if [ ! -e "${HOME}/.lnmp" ]; then
   # unattended install on a real box.
   export DEBIAN_FRONTEND=noninteractive
   apt-get -y update > /dev/null
-  apt-get -y install wget gcc curl > /dev/null
+  apt-get -y install wget gcc curl gnupg > /dev/null
 fi
 
 # get the IP information
@@ -567,6 +567,13 @@ fi
 # unrelated to the real cause. Skipped in --preflight (that only validates
 # deps, and its CI containers may legitimately be small).
 [[ "${preflight_flag}" == y ]] || run_step check_system_resources check_system_resources
+# Import the bundled upstream PGP keys BEFORE the download stage runs its
+# signature checks (gpg was installed above). Best-effort: a missing gpg or
+# key file leaves verify_pgp_signature's "gpg not available" skip path in
+# charge, so this can never hard-fail an install by itself.
+if [ "${preflight_flag}" != y ] && command -v gpg >/dev/null 2>&1; then
+  gpg --import "${current_dir}/keys/"*.asc >/dev/null 2>&1 || true
+fi
 # --preflight only validates that this distro can satisfy the dependencies;
 # skip every download so the run never touches the network beyond apt.
 [[ "${preflight_flag}" == y ]] || run_step checkDownload checkDownload
