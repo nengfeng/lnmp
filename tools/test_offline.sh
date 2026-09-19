@@ -231,6 +231,71 @@ _tag_a=85; _tag_b=84
 [ "$(( 10#${_tag_a#8} ))" -ge "$PHP_OPCACHE_BUILTIN_MINOR" ] && [ "$(( 10#${_tag_b#8} ))" -lt "$PHP_OPCACHE_BUILTIN_MINOR" ] && ok "opcache-built-in boundary sits between 8.4 and 8.5" || ko "opcache built-in boundary wrong"
 [ "$(php_ver_ge_84 8.3.9 && echo y || echo n)" = "n" ] && [ "$(php_ver_ge_84 8.4.0 && echo y || echo n)" = "y" ] && ok "php_ver_ge_84 boundary" || ko "php_ver_ge_84 boundary wrong"
 
+# ---- PGP verification in download_sources.sh (asc branch) ----
+# Real gpg with an isolated GNUPGHOME and a throwaway key, exercising the
+# ACTUAL verify_checksum from download_sources.sh (sourced in a subshell; its
+# main() is guarded so sourcing runs no downloads). Four outcomes are pinned:
+# good signature passes, tampered file fails, missing key fails, gpg missing
+# fails - the pre-download path must verify exactly as strictly as the
+# install path does.
+pgp_dir="$work/pgp"
+mkdir -p "$pgp_dir/gnupg" "$pgp_dir/src" "$pgp_dir/keys"
+chmod 700 "$pgp_dir/gnupg"
+export GNUPGHOME="$pgp_dir/gnupg"
+gpg --batch --passphrase '' --quick-gen-key "lnmp-offline-test <offline@test.invalid>" rsa2048 sign never >/dev/null 2>&1   && ok "throwaway gpg key generated" || ko "could not generate a throwaway gpg key"
+printf 'payload-line
+' > "$pgp_dir/src/artifact.tar.gz"
+gpg --batch --yes --output "$pgp_dir/src/artifact.tar.gz.asc" --detach-sign "$pgp_dir/src/artifact.tar.gz" >/dev/null 2>&1   && ok "test artifact signed" || ko "could not sign the test artifact"
+gpg --armor --export "offline@test.invalid" > "$pgp_dir/keys/test.asc" 2>/dev/null   && [ -s "$pgp_dir/keys/test.asc" ] && ok "public key exported for the keys/ fixture" || ko "could not export the public key"
+
+pgp_run() {  # pgp_run <gnupghome> <keydir> -> rc of verify_checksum (asc)
+  (
+    set +e
+    export GNUPGHOME="$1"
+    cd "$ROOT" || exit 97
+    . ./download_sources.sh >/dev/null 2>&1
+    set +e
+    LOG_FILE=/dev/null
+    VERIFY_CHECKSUM=yes
+    PGP_KEYS_DIR="$2"
+    SRC_DIR="$pgp_dir/src"
+    if [ "$2" != "nokeys" ]; then
+      import_pgp_keys "$2" >/dev/null 2>&1 || exit 98
+    fi
+    verify_checksum "$SRC_DIR/artifact.tar.gz" "$SRC_DIR/artifact.tar.gz.asc" "asc" "artifact.tar.gz" >/dev/null 2>&1
+  )
+}
+
+pgp_run "$GNUPGHOME" "$pgp_dir/keys"; pgp_rc=$?; [ "$pgp_rc" -eq 0 ]   && ok "good signature verifies (rc 0)" || ko "good signature rejected (rc=$pgp_rc)"
+
+printf 'tampered
+' >> "$pgp_dir/src/artifact.tar.gz"
+pgp_run "$GNUPGHOME" "$pgp_dir/keys"; pgp_rc=$?; [ "$pgp_rc" -ne 0 ]   && ok "tampered file is rejected (BAD signature)" || ko "tampered file PASSED verification"
+# restore the pristine artifact for the remaining cases
+printf 'payload-line
+' > "$pgp_dir/src/artifact.tar.gz"
+
+pgp_dir_empty="$work/pgp-empty-keys"
+mkdir -p "$pgp_dir_empty"
+pgp_run "$GNUPGHOME" "$pgp_dir_empty"; pgp_rc=$?; [ "$pgp_rc" -ne 0 ]   && ok "missing keys/ directory fails verification" || ko "missing keys/ directory PASSED verification"
+
+pgp_run "$work/pgp/no-such-home" "$pgp_dir/keys"; pgp_rc=$?; [ "$pgp_rc" -ne 0 ]   && ok "signer key not in keyring fails verification (gpg exit 2)" || ko "unverifiable signature PASSED"
+
+(
+  set +e
+  export GNUPGHOME="$GNUPGHOME"
+    cd "$ROOT" || exit 97
+    . ./download_sources.sh >/dev/null 2>&1
+    set +e
+    LOG_FILE=/dev/null
+    command(){ if [ "$1" = "-v" ] && [ "$2" = "gpg" ]; then return 1; else builtin command "$@"; fi; }
+    SRC_DIR="$pgp_dir/src"
+    verify_checksum "$SRC_DIR/artifact.tar.gz" "$SRC_DIR/artifact.tar.gz.asc" "asc" "artifact.tar.gz" >/dev/null 2>&1
+)
+pgp_rc=$?
+[ "$pgp_rc" -ne 0 ] && ok "missing gpg fails verification instead of passing" || ko "missing gpg PASSED verification"
+unset GNUPGHOME
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }

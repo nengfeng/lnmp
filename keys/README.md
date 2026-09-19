@@ -1,8 +1,13 @@
 # PGP 公钥（用于验证下载的源码签名）
 
-本目录存放上游项目的 PGP 公钥，`install.sh` 在 `checkDownload` 之前执行
-`gpg --import keys/*.asc`，供 `verify_pgp_signature`（include/check_download.sh）
-验证 Nginx / OpenResty / Curl / libsodium 的源码签名。
+本目录存放上游项目的 PGP 公钥，供两条下载路径使用：
+
+- 安装路径：`install.sh` 在 `checkDownload` 之前执行 `gpg --import keys/*.asc`，
+  供 `verify_pgp_signature`（include/check_download.sh）使用；
+- 预下载路径：`download_sources.sh` 的 asc 校验分支同样导入本目录并强制校验
+  （坏签名 / 无法验证 / 钥匙缺失均判该组件失败）。
+
+覆盖 Nginx / OpenResty / Curl / libsodium 的源码签名。
 
 **这些 fingerprint 必须与上游官网公布的完全一致**——一旦固化错公钥，等于主动
 信任错误来源，比「不验证」更危险。上游 rotate 公钥时，按下面的「更新」流程做。

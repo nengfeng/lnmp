@@ -39,6 +39,11 @@ MIRROR_MODE="${MIRROR_MODE:-auto}"
 
 # 是否验证校验码
 VERIFY_CHECKSUM="${VERIFY_CHECKSUM:-yes}"
+# Where the bundled upstream PGP public keys live. Derived from the script
+# location; overridable so the offline tests (which source this file from
+# tools/test_offline.sh, where $0-based derivation points elsewhere) can
+# point at their own fixture keyring.
+PGP_KEYS_DIR="${PGP_KEYS_DIR:-${SCRIPT_DIR}/keys}"
 
 # Machine architecture token for binary tarball names (x86_64 / aarch64)
 SYS_ARCH_M=$(uname -m)
@@ -316,6 +321,27 @@ download_checksum() {
 # ============================================
 # 验证校验码
 # ============================================
+# ============================================
+# PGP key import (pre-download path)
+# ============================================
+# The upstream public keys ship inside this tree (keys/*.asc, fingerprints
+# pinned in keys/README.md - install.sh imports the same set for the install
+# path). Idempotent: re-importing a known key is a no-op for gpg. An import
+# failure means the tree is incomplete or tampered with, and verifying
+# against it would be meaningless.
+import_pgp_keys() {
+  local key_dir="$1"
+  if [ ! -d "${key_dir}" ] || ! ls "${key_dir}"/*.asc >/dev/null 2>&1; then
+    log ERROR "keys/ with the upstream PGP public keys is missing from this tree - cannot verify signatures"
+    return 1
+  fi
+  gpg --import "${key_dir}"/*.asc >/dev/null 2>&1 || {
+    log ERROR "gpg --import failed for ${key_dir}/*.asc"
+    return 1
+  }
+  return 0
+}
+
 verify_checksum() {
   local file=$1
   local checksum_file=$2
@@ -353,19 +379,39 @@ verify_checksum() {
       actual_checksum=$(md5sum "$file" | awk '{print $1}')
       ;;
     asc)
-      # PGP 签名验证
-      if command -v gpg >/dev/null 2>&1; then
-        log INFO "Verifying PGP signature..."
-        if gpg --verify "$checksum_file" "$file" 2>/dev/null; then
-          log INFO "PGP signature verified successfully"
-          return 0
-        else
-          log WARN "PGP signature verification failed (key may not be imported)"
-          return 0  # 不阻断安装，仅警告
+      # PGP signature verification - mirrors verify_pgp_signature in
+      # include/check_download.sh (the install path): a BAD signature or an
+      # unverifiable one fails the component, never passes. The pre-download
+      # path IS the offline supply chain, so it verifies exactly as strictly.
+      if ! command -v gpg >/dev/null 2>&1; then
+        # The install path gets gnupg from its dependency stage; this script
+        # can run on a bare box before any of that, so try to self-provision.
+        log WARN "gpg not found, attempting to install gnupg..."
+        apt-get install -y gnupg >/dev/null 2>&1 || true
+        if ! command -v gpg >/dev/null 2>&1; then
+          log ERROR "gpg is not available - cannot verify PGP signatures. Install gnupg, or skip on purpose with --no-verify."
+          return 1
         fi
-      else
-        log WARN "gpg not found, skipping PGP verification"
+      fi
+      import_pgp_keys "${PGP_KEYS_DIR}" || return 1
+      log INFO "Verifying PGP signature..."
+      local gpg_out gpg_rc
+      gpg_out=$(gpg --verify "$checksum_file" "$file" 2>&1)
+      gpg_rc=$?
+      if [ "$gpg_rc" -eq 0 ]; then
+        log INFO "PGP signature verified successfully"
         return 0
+      else
+        if [ "$gpg_rc" -eq 1 ]; then
+          log ERROR "PGP signature is BAD for ${file} (file may be tampered)"
+        else
+          # gpg exits 2+ when it could not check at all (e.g. signer key not
+          # in the keyring) - the bundled keys make this abnormal: fail loud.
+          log ERROR "PGP signature could not be verified for ${file} (gpg exit ${gpg_rc})"
+        fi
+        printf '%s
+' "$gpg_out" | tail -n 3 | while IFS= read -r gpg_line; do log ERROR "  gpg: ${gpg_line}"; done
+        return 1
       fi
       ;;
     *)
@@ -959,4 +1005,8 @@ main() {
   log INFO "Done. Log file: ${LOG_FILE}"
 }
 
-main "$@"
+# Run only when executed, not when sourced (tools/test_offline.sh sources
+# this file to exercise verify_checksum offline).
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi
