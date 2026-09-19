@@ -301,6 +301,9 @@ check_backups() {
   # (backup.sh: "! has_local_backup && rm -f ..."), so an empty backup_dir is
   # a legitimate state there, and local freshness is only verifiable when
   # local or remote is configured.
+  # A remote,cloud mix without 'local' still verifies fine: the cloud leg
+  # deletes only the archive IT created, while the remote leg's fresh archive
+  # always survives - the newest local artefact is from today either way.
   local_persist=n
   if [ -n "$(echo "${backup_destination}" | grep -ow 'local')" ] \
      || [ -n "$(echo "${backup_destination}" | grep -ow 'remote')" ]; then
@@ -340,7 +343,16 @@ check_backups() {
         [ -n "${W}" ] && find "${backup_dir}" -maxdepth 1 \( -name "Web_${W}_*.tgz" -type f -o -name "${W}" -type d \) -printf '%T@\n' 2>/dev/null
       done | sort -nr | head -1)
       if [ -z "${web_newest}" ]; then
-        check_fail "Web backup: no Web_*.tgz archive or site mirror in ${backup_dir} although web backup is configured"
+        if [ -z "$(echo "${backup_destination}" | grep -ow 'local')" ] \
+           && [ -n "$(echo "${backup_destination}" | grep -ow 'remote')" ]; then
+          # remote-only destination: web_remote_backup pushes sites above
+          # web_max_mb as a RAW directory - no Web_*.tgz and no mirror is
+          # left locally to judge, so missing evidence is inconclusive.
+          # (db has no such case: db_remote_backup always dumps locally.)
+          check_warn "Web backup: no local Web_*.tgz/mirror in ${backup_dir} (remote-only destination: sites above web_max_mb are pushed raw - verify on the remote side)"
+        else
+          check_fail "Web backup: no Web_*.tgz archive or site mirror in ${backup_dir} although web backup is configured"
+        fi
       else
         web_age=$(( ($(date +%s) - ${web_newest%.*}) / 86400 ))
         if [ ${web_age} -le ${window} ]; then
