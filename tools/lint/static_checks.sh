@@ -178,7 +178,10 @@ while IFS=: read -r f lnum line; do
       reload_ok=0
     fi
   done
-done < <(grep -n -- '--reloadcmd' $FILES 2>/dev/null)
+done < <(grep -n -- '--reloadcmd' $FILES 2>/dev/null | grep -v 'tools/lint/static_checks.sh')
+# (self-excluded: this rule's own message text contains the literal
+# "--reloadcmd" plus the word "command" - a test stub defines command() -
+# and a rule must not flag its own error message.)
 [ "$reload_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
 echo "== 9. cp to sbin/bin in an upgrade must be preceded by stop/mv [HARD] =="
