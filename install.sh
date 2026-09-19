@@ -45,8 +45,8 @@ pgsql_ver=""
 preflight_flag=n
 
 version() {
-  echo "version: 1.7.4"
-  echo "updated date: 2026-09-18"
+  echo "version: 1.7.5"
+  echo "updated date: 2026-09-19"
 }
 
 Show_Help() {
