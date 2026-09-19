@@ -2,4 +2,4 @@
 # Format: <md5>  <filename>
 # Consumers: install.sh (--md5sum), include/upgrade_script.sh
 # Maintained by .github/workflows/release.yml (md5 + sha256sum.txt); do not hand-edit
-ff395b96b2f493435fd39c83285ad00b  lnmp.tar.gz
+84470cada40f5d69a00476ac447c2179  lnmp.tar.gz
