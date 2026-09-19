@@ -196,7 +196,6 @@ get_version() {
     libsodium)      ver=${VERSIONS[libsodium_ver]} ;;
     libzip)         ver=${VERSIONS[libzip_ver]} ;;
 
-    mhash)          ver=${VERSIONS[mhash_ver]} ;;
     argon2)         ver=${VERSIONS[argon2_ver]} ;;
     imagemagick)    ver=${VERSIONS[imagemagick_ver]} ;;
     redis)          ver=${VERSIONS[redis_ver]} ;;
@@ -800,7 +799,6 @@ download_common() {
     "libsodium"
     "libzip"
     "argon2"
-    "mhash"
     "redis"
     "memcached"
     "libmemcached"

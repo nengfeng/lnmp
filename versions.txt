@@ -34,7 +34,6 @@ libiconv_ver=1.19
 curl_ver=8.22.0
 libmcrypt_ver=2.5.8
 mcrypt_ver=2.6.8
-mhash_ver=0.9.9.9
 freetype_ver=2.14.3
 # pinned commit of freetype's 'dlg' submodule (subprojects/dlg) required to
 # build freetype 2.14+ from a plain source tarball; re-derive when freetype_ver

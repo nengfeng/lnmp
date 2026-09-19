@@ -498,9 +498,9 @@ checkDownload() {
     Download_src
 
     # binutils - installed via apt, no longer downloaded
-    # mhash (SourceForge)
-    src_url="https://downloads.sourceforge.net/project/mhash/mhash/${mhash_ver}/mhash-${mhash_ver}.tar.gz"
-    Download_src
+    # mhash is gone with it: PHP >= 7.4 emulates mhash in the hash extension
+    # (no libmhash, no --with-mhash), and mhash-0.9.9.9 does not compile
+    # under GCC 15's C23 default (ubuntu:26.04) - it aborted the smoke run.
   fi
 
   # PHP source

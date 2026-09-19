@@ -139,15 +139,6 @@ EOF
     cleanup_src libzip-${libzip_ver}
   fi
 
-  # mhash
-  if [[ ! -e "/usr/local/include/mhash.h" && ! -e "/usr/include/mhash.h" ]]; then
-    enter_src_dir mhash "mhash-${mhash_ver}.tar.gz" "mhash-${mhash_ver}" || return 1
-    ./configure || { popd > /dev/null; return 1; }
-    compile_and_install || { popd > /dev/null; return 1; }
-    popd > /dev/null
-    cleanup_src mhash-${mhash_ver}
-  fi
-
   # binutils-dev (needed for some PHP extensions like xdebug profiling)
   # Not strictly required for basic PHP installation
   if [ ! -e "/usr/include/bfd.h" ] && [ ! -e "/usr/local/include/bfd.h" ]; then
@@ -419,7 +410,7 @@ install_php_source() {
     --enable-xml --disable-rpath --enable-bcmath --enable-shmop --enable-exif \
     --enable-sysvsem ${php_with_curl} --enable-mbregex \
     --enable-mbstring ${argon2_arg} --with-sodium=/usr/local --enable-gd ${php_with_openssl} \
-    --with-mhash --enable-pcntl --enable-sockets --enable-ftp --enable-intl --with-xsl \
+    --enable-pcntl --enable-sockets --enable-ftp --enable-intl --with-xsl \
     --with-gettext --with-zip=/usr/local --enable-soap --disable-debug ${php_modules_options} || rc=$?
   if [ ${rc} -eq 0 ]; then
     make -j ${threads} || rc=$?
