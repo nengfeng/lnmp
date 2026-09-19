@@ -299,6 +299,14 @@ fi
 mkdir -p /data/wwwroot/${BK_SITE}
 echo smoke-web-marker-42 > /data/wwwroot/${BK_SITE}/marker.txt
 
+# This script deliberately does not source options.conf (install.sh and
+# backup.sh each read it in their own process), so backup_dir is NOT defined
+# here -- under set -u the parent-shell expansions in the asserts below would
+# abort the whole run. Read the one variable this stage needs: where
+# backup.sh actually wrote the archives, not an assumed default.
+backup_dir=$(sed -n 's/^backup_dir=//p' options.conf | tail -n 1)
+[ -n "${backup_dir}" ] || backup_dir=/data/backup
+
 sed -i 's@^backup_destination=.*@backup_destination=local@' options.conf
 sed -i 's@^backup_content=.*@backup_content=db,web@' options.conf
 sed -i "s@^db_name=.*@db_name=${BK_SITE}@" options.conf
