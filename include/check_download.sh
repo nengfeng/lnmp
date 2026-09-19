@@ -7,38 +7,9 @@
 #   - Node.js, MariaDB, OpenResty, libiconv, binutils
 # All other components use official sources directly.
 
-# ============================================
-# OpenSSL version check (for Argon2 support)
-# OpenSSL 3.2+ has built-in Argon2 support
-openssl_ver_ge_32() {
-  local ver
-  ver=$(openssl version 2>/dev/null | awk '{print $2}')
-  if [ -z "$ver" ]; then
-    return 1
-  fi
-  local major=$(echo "$ver" | cut -d. -f1)
-  local minor=$(echo "$ver" | cut -d. -f2)
-  if [[ "$major" -ge 4 ]]; then
-    return 0
-  elif [[ "$major" -eq 3 ]]; then
-    if [[ "$minor" -ge 2 ]]; then
-      return 0
-    fi
-  fi
-  return 1
-}
-
-# Check if a PHP version string is 8.4 or later (8.4+ can use OpenSSL's
-# built-in Argon2 via --with-openssl-argon2, so no libargon2 is needed).
-# Takes a concrete version (e.g. "8.4.25") rather than the php_option number,
-# so adding a future PHP 8.6/8.7 needs no change here.
-php_ver_ge_84() {
-  local ver=$1
-  [ -z "$ver" ] && return 1
-  local major=$(echo "$ver" | cut -d. -f1)
-  local minor=$(echo "$ver" | cut -d. -f2)
-  [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]
-}
+# php_ver_ge_84 / openssl_ver_ge_32 / can_use_openssl_argon2 live in
+# include/common.sh (sourced before this file), so the argon2 decision in
+# checkDownload below can call them directly.
 
 # ============================================
 
