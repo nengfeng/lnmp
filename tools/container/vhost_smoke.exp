@@ -1,0 +1,92 @@
+#!/usr/bin/expect -f
+# SPDX-License-Identifier: Apache-2.0
+#
+# Drives vhost.sh's interactive vhost lifecycle for the container smoke run
+# (tools/container/smoke.sh stage 2c), on behalf of --add --selfsigned and
+# --delete --quiet.
+#
+# Why expect and not a piped printf answer sequence: a fixed answer list is
+# positional - if vhost.sh ever adds, removes or reorders a prompt, the
+# answers silently shift (and an exhausted stdin inside a y/n validation
+# loop hangs forever, because read on EOF returns empty and the loop never
+# matches). Matching each prompt by TEXT makes any such change fail loudly,
+# naming the prompt that was expected and never seen.
+#
+# expect itself is installed by the installer's dependency stage
+# (include/check_sw.sh pkgCommon), so the smoke container always has it.
+#
+# Usage: expect tools/container/vhost_smoke.exp add|delete <domain>
+# The full transcript goes to stdout (log_user default), so the caller's
+# log file shows exactly which prompt was on screen when something stuck.
+#
+# Prompt anchors are distinctive literal substrings of vhost.sh's read
+# prompts (glob syntax; no regex metachars used). If a prompt text changes,
+# the anchor must be updated here - the timeout message says which one.
+
+set mode   [lindex $argv 0]
+set domain [lindex $argv 1]
+
+if {$mode ne "add" && $mode ne "delete"} {
+    puts "usage: vhost_smoke.exp add|delete <domain>"
+    exit 64
+}
+
+# Wait for a prompt matching the glob pattern, then answer it. Any other
+# outcome - a prompt that never comes, or vhost.sh dying mid-flow - fails
+# loudly instead of leaving the caller guessing.
+proc answer {pattern reply} {
+    set timeout 90
+    expect {
+        "$pattern" {
+            send -- "$reply\r"
+        }
+        timeout {
+            puts "\nSMOKE-EXPECT: timed out after ${timeout}s waiting for prompt matching '$pattern'"
+            exit 42
+        }
+        eof {
+            puts "\nSMOKE-EXPECT: vhost.sh exited early while waiting for '$pattern'"
+            exit 43
+        }
+    }
+}
+
+if {$mode eq "add"} {
+    # --selfsigned presets Domain_Mode=2 (sslquiet), so the mode menu is
+    # skipped. Prompt order mirrors vhost.sh's Add_Vhost call sequence:
+    # Input_Add_domain (domain, dir, more-domain, HTTPS redirect, then the
+    # five self-signed cert DN fields via Create_SSL), then hotlinking,
+    # rewrite, access log. Empty replies take vhost.sh's own defaults.
+    spawn ./vhost.sh --add --selfsigned
+    answer "input domain"              $domain
+    answer "Default directory"         ""
+    answer "add more domain"           "n"
+    answer "redirect all HTTP"         "n"
+    answer "Country Name"              ""
+    answer "State or Province"         ""
+    answer "Locality Name"             ""
+    answer "Organization Name"         ""
+    answer "Organizational Unit"       ""
+    answer "hotlink protection"        "n"
+    answer "Allow Rewrite rule"        "n"
+    answer "OpenResty access_log"      "n"
+} else {
+    # --quiet skips the get_char gate (no TTY is needed either way under the
+    # pty, but quiet keeps the flow to exactly two prompts).
+    spawn ./vhost.sh --delete --quiet
+    answer "Please input a domain you want to delete" $domain
+    answer "delete Virtul Host directory"             "y"
+}
+
+# vhost.sh finishes with nginx -t / reload / a summary banner; anything it
+# prints before exiting ends up in the transcript.
+set timeout 120
+expect {
+    eof {}
+    timeout {
+        puts "\nSMOKE-EXPECT: timed out after prompting completed (nginx -t / reload stuck?)"
+        exit 44
+    }
+}
+set rc [lindex [wait] 3]
+exit $rc

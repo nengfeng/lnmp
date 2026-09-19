@@ -236,48 +236,49 @@ drop_probe lnmp-smoke-dies
 systemctl daemon-reload
 
 # ------------------------------------------------- 2c/4 vhost add + delete
-# vhost.sh is interactive; drive it with piped answers. --selfsigned needs no
-# external dependency (no acme.sh, no real DNS): Domain_Mode=2 is preset by
-# the flag, then the prompts are: domain, empty vhostdir (default), no
-# more-domain, no HTTPS redirect, five empty DN fields (self-signed cert
-# defaults), no hotlinking, no rewrite, no access log. This is the layer that
-# let the acme.sh reloadcmd bug live for years: vhost.sh had zero end-to-end
-# coverage, so the reload command stored for renewal was never re-run here.
+# vhost.sh is interactive; drive it with prompt-TEXT matching (expect), not a
+# positional answer sequence: a piped answer list breaks silently when
+# vhost.sh adds, removes or reorders a prompt, and an exhausted stdin inside
+# a y/n validation loop hangs forever (read on EOF returns empty, the loop
+# never matches). vhost_smoke.exp names the missing prompt instead.
+# --selfsigned needs no external dependency (no acme.sh, no real DNS).
+# This is the layer that let the acme.sh reloadcmd bug live for years:
+# vhost.sh had zero end-to-end coverage before this stage existed.
 stage "2c/4 vhost lifecycle (self-signed add -> serve -> delete)"
 VHOST_DOMAIN=smoke.test
-printf '%s\n' "${VHOST_DOMAIN}" '' n n '' '' '' '' '' n n n \
-  | ./vhost.sh --add --selfsigned > smoke-vhost-add.log 2>&1
-if [ $? -eq 0 ]; then
-  ok "vhost.sh --add exited 0"
+if ! command -v expect > /dev/null 2>&1; then
+  bad "expect is not installed - the installer's dependency stage should provide it"
 else
-  bad "vhost.sh --add exited non-zero"
-  tail -n 20 smoke-vhost-add.log
-fi
-assert_exists /usr/local/nginx/conf/vhost/${VHOST_DOMAIN}.conf
-assert_exists /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.crt
-assert_exists /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.key
+  if expect tools/container/vhost_smoke.exp add "${VHOST_DOMAIN}" > smoke-vhost-add.log 2>&1; then
+    ok "vhost.sh --add exited 0"
+  else
+    bad "vhost.sh --add failed (transcript in smoke-vhost-add.log)"
+    tail -n 25 smoke-vhost-add.log
+  fi
+  assert_exists /usr/local/nginx/conf/vhost/${VHOST_DOMAIN}.conf
+  assert_exists /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.crt
+  assert_exists /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.key
 
-# The vhost docroot starts empty (403); deploy a page like an operator would,
-# then prove both listeners actually serve this vhost, not just the default.
-echo '<h1>smoke vhost</h1>' > /data/wwwroot/${VHOST_DOMAIN}/index.html
-http_code=$(curl -s -o /dev/null -w '%{http_code}' --resolve ${VHOST_DOMAIN}:80:127.0.0.1 http://${VHOST_DOMAIN}/ 2>/dev/null || true)
-[ "${http_code}" = "200" ] && ok "vhost answers HTTP 200" || bad "vhost HTTP returned '${http_code:-none}'"
-https_code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve ${VHOST_DOMAIN}:443:127.0.0.1 https://${VHOST_DOMAIN}/ 2>/dev/null || true)
-[ "${https_code}" = "200" ] && ok "vhost answers HTTPS 200 (self-signed)" || bad "vhost HTTPS returned '${https_code:-none}'"
+  # The vhost docroot starts empty (403); deploy a page like an operator
+  # would, then prove both listeners actually serve this vhost, not just
+  # the default site.
+  echo '<h1>smoke vhost</h1>' > /data/wwwroot/${VHOST_DOMAIN}/index.html
+  http_code=$(curl -s -o /dev/null -w '%{http_code}' --resolve ${VHOST_DOMAIN}:80:127.0.0.1 http://${VHOST_DOMAIN}/ 2>/dev/null || true)
+  [ "${http_code}" = "200" ] && ok "vhost answers HTTP 200" || bad "vhost HTTP returned '${http_code:-none}'"
+  https_code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve ${VHOST_DOMAIN}:443:127.0.0.1 https://${VHOST_DOMAIN}/ 2>/dev/null || true)
+  [ "${https_code}" = "200" ] && ok "vhost answers HTTPS 200 (self-signed)" || bad "vhost HTTPS returned '${https_code:-none}'"
 
-# Delete: domain answer, then yes to removing the docroot. --quiet skips the
-# get_char gate (no TTY in the container).
-printf '%s\n' "${VHOST_DOMAIN}" y | ./vhost.sh --delete --quiet > smoke-vhost-del.log 2>&1
-if [ $? -eq 0 ]; then
-  ok "vhost.sh --delete exited 0"
-else
-  bad "vhost.sh --delete exited non-zero"
-  tail -n 20 smoke-vhost-del.log
+  if expect tools/container/vhost_smoke.exp delete "${VHOST_DOMAIN}" > smoke-vhost-del.log 2>&1; then
+    ok "vhost.sh --delete exited 0"
+  else
+    bad "vhost.sh --delete failed (transcript in smoke-vhost-del.log)"
+    tail -n 25 smoke-vhost-del.log
+  fi
+  assert_absent /usr/local/nginx/conf/vhost/${VHOST_DOMAIN}.conf
+  assert_absent /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.crt
+  assert_absent /data/wwwroot/${VHOST_DOMAIN}
+  assert_run "nginx config still valid after vhost delete" /usr/local/nginx/sbin/nginx -t
 fi
-assert_absent /usr/local/nginx/conf/vhost/${VHOST_DOMAIN}.conf
-assert_absent /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.crt
-assert_absent /data/wwwroot/${VHOST_DOMAIN}
-assert_run "nginx config still valid after vhost delete" /usr/local/nginx/sbin/nginx -t
 
 # ------------------------------------------------------ 2d/4 backup roundtrip
 # The difference between a backup that exists and one that restores: run a
