@@ -5,8 +5,11 @@
 # with the repo mounted at the working directory.
 #
 # L1 (preflight.sh) stops once the apt dependency stage succeeds. This goes all
-# the way: a real install of Nginx + PHP + MariaDB, then the exact same command
-# a second time to prove the install is idempotent, then
+# the way: a real install of Nginx + PHP + MariaDB, a vhost lifecycle
+# (self-signed add -> serve -> delete), a backup roundtrip (real DB and site
+# archived, then restored from the archives and compared), composer
+# install/uninstall through addons.sh, then the exact same install command a
+# second time to prove the install is idempotent, then
 # `uninstall.sh --quiet --yes --all` to prove it leaves nothing behind. That is
 # 20-40 minutes of downloading and compiling, which is why it runs weekly and
 # on demand rather than on every push.
@@ -231,6 +234,130 @@ fi
 drop_probe lnmp-smoke-alive
 drop_probe lnmp-smoke-dies
 systemctl daemon-reload
+
+# ------------------------------------------------- 2c/4 vhost add + delete
+# vhost.sh is interactive; drive it with piped answers. --selfsigned needs no
+# external dependency (no acme.sh, no real DNS): Domain_Mode=2 is preset by
+# the flag, then the prompts are: domain, empty vhostdir (default), no
+# more-domain, no HTTPS redirect, five empty DN fields (self-signed cert
+# defaults), no hotlinking, no rewrite, no access log. This is the layer that
+# let the acme.sh reloadcmd bug live for years: vhost.sh had zero end-to-end
+# coverage, so the reload command stored for renewal was never re-run here.
+stage "2c/4 vhost lifecycle (self-signed add -> serve -> delete)"
+VHOST_DOMAIN=smoke.test
+printf '%s\n' "${VHOST_DOMAIN}" '' n n '' '' '' '' '' n n n \
+  | ./vhost.sh --add --selfsigned > smoke-vhost-add.log 2>&1
+if [ $? -eq 0 ]; then
+  ok "vhost.sh --add exited 0"
+else
+  bad "vhost.sh --add exited non-zero"
+  tail -n 20 smoke-vhost-add.log
+fi
+assert_exists /usr/local/nginx/conf/vhost/${VHOST_DOMAIN}.conf
+assert_exists /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.crt
+assert_exists /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.key
+
+# The vhost docroot starts empty (403); deploy a page like an operator would,
+# then prove both listeners actually serve this vhost, not just the default.
+echo '<h1>smoke vhost</h1>' > /data/wwwroot/${VHOST_DOMAIN}/index.html
+http_code=$(curl -s -o /dev/null -w '%{http_code}' --resolve ${VHOST_DOMAIN}:80:127.0.0.1 http://${VHOST_DOMAIN}/ 2>/dev/null || true)
+[ "${http_code}" = "200" ] && ok "vhost answers HTTP 200" || bad "vhost HTTP returned '${http_code:-none}'"
+https_code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve ${VHOST_DOMAIN}:443:127.0.0.1 https://${VHOST_DOMAIN}/ 2>/dev/null || true)
+[ "${https_code}" = "200" ] && ok "vhost answers HTTPS 200 (self-signed)" || bad "vhost HTTPS returned '${https_code:-none}'"
+
+# Delete: domain answer, then yes to removing the docroot. --quiet skips the
+# get_char gate (no TTY in the container).
+printf '%s\n' "${VHOST_DOMAIN}" y | ./vhost.sh --delete --quiet > smoke-vhost-del.log 2>&1
+if [ $? -eq 0 ]; then
+  ok "vhost.sh --delete exited 0"
+else
+  bad "vhost.sh --delete exited non-zero"
+  tail -n 20 smoke-vhost-del.log
+fi
+assert_absent /usr/local/nginx/conf/vhost/${VHOST_DOMAIN}.conf
+assert_absent /usr/local/nginx/conf/ssl/${VHOST_DOMAIN}.crt
+assert_absent /data/wwwroot/${VHOST_DOMAIN}
+assert_run "nginx config still valid after vhost delete" /usr/local/nginx/sbin/nginx -t
+
+# ------------------------------------------------------ 2d/4 backup roundtrip
+# The difference between a backup that exists and one that restores: run a
+# real backup of a real database and site, then restore both from the
+# archives and compare marker content. backup.sh must exit 0 - since
+# v1.7.2 it propagates child failures (db_bk/website_bk), and the archives
+# are only called success after tar -t (db_bk.sh) / footer checks.
+stage "2d/4 backup roundtrip (db + web)"
+BK_SITE=smokebk
+MARIADB_CLI="$(command -v /usr/local/mariadb/bin/mariadb || echo /usr/local/mariadb/bin/mysql)"
+if env MYSQL_PWD="${DB_ROOT_PWD}" "${MARIADB_CLI}" -uroot -e \
+     "CREATE DATABASE ${BK_SITE}; \
+      CREATE TABLE ${BK_SITE}.t (id INT PRIMARY KEY, marker VARCHAR(64)); \
+      INSERT INTO ${BK_SITE}.t VALUES (1, 'smoke-db-marker-42');"; then
+  ok "test database ${BK_SITE} created"
+else
+  bad "could not create test database ${BK_SITE}"
+fi
+mkdir -p /data/wwwroot/${BK_SITE}
+echo smoke-web-marker-42 > /data/wwwroot/${BK_SITE}/marker.txt
+
+sed -i 's@^backup_destination=.*@backup_destination=local@' options.conf
+sed -i 's@^backup_content=.*@backup_content=db,web@' options.conf
+sed -i "s@^db_name=.*@db_name=${BK_SITE}@" options.conf
+sed -i "s@^website_name=.*@website_name=${BK_SITE}@" options.conf
+
+if ./backup.sh > smoke-backup.log 2>&1; then
+  ok "backup.sh exited 0"
+else
+  bad "backup.sh exited non-zero"
+  tail -n 20 smoke-backup.log
+fi
+db_tgz=$(command ls -t ${backup_dir}/DB_${BK_SITE}_*.tgz 2>/dev/null | head -1)
+web_tgz=$(command ls -t ${backup_dir}/Web_${BK_SITE}_*.tgz 2>/dev/null | head -1)
+[ -n "${db_tgz}" ] && ok "DB archive created: ${db_tgz##*/}" || bad "no DB_${BK_SITE}_*.tgz in ${backup_dir}"
+[ -n "${web_tgz}" ] && ok "Web archive created: ${web_tgz##*/}" || bad "no Web_${BK_SITE}_*.tgz in ${backup_dir}"
+
+bk_restore="${PWD}/.smoke_restore"
+rm -rf "${bk_restore}"; mkdir -p "${bk_restore}"
+if [ -n "${db_tgz}" ] && tar -xzf "${db_tgz}" -C "${bk_restore}" 2>/dev/null \
+   && grep -q 'smoke-db-marker-42' "${bk_restore}"/DB_${BK_SITE}_*.sql 2>/dev/null; then
+  ok "DB archive restores and contains the inserted marker row"
+else
+  bad "DB archive does not restore to the marker row"
+fi
+if [ -n "${web_tgz}" ] && tar -xzf "${web_tgz}" -C "${bk_restore}" 2>/dev/null \
+   && grep -q 'smoke-web-marker-42' "${bk_restore}/${BK_SITE}/marker.txt" 2>/dev/null; then
+  ok "Web archive restores and contains the marker file"
+else
+  bad "Web archive does not restore to the marker file"
+fi
+
+# Cleanup: the uninstall stage asserts /data/wwwroot is gone, the idempotent
+# re-run reads options.conf, and leftover fixtures would pollute later runs.
+env MYSQL_PWD="${DB_ROOT_PWD}" "${MARIADB_CLI}" -uroot -e "DROP DATABASE IF EXISTS ${BK_SITE};" >/dev/null 2>&1
+rm -rf /data/wwwroot/${BK_SITE} "${bk_restore}" /data/backup
+sed -i 's@^backup_destination=.*@backup_destination=@' options.conf
+sed -i 's@^backup_content=.*@backup_content=@' options.conf
+sed -i 's@^db_name=.*@db_name=@' options.conf
+sed -i 's@^website_name=.*@website_name=@' options.conf
+
+# ------------------------------------------------------- 2e/4 addons: composer
+# Exercises the addons.sh dispatch (flag parse -> install -> verify ->
+# uninstall) against the real PHP; composer.org reachability is the same
+# class of network dependency the rest of this script already has.
+stage "2e/4 addons: composer install -> version -> uninstall"
+if bash addons.sh -i --composer > smoke-composer.log 2>&1; then
+  ok "addons.sh --composer install exited 0"
+else
+  bad "addons.sh --composer install exited non-zero"
+  tail -n 20 smoke-composer.log
+fi
+assert_run "composer runs under the installed PHP" /usr/local/php/bin/php /usr/local/bin/composer --version
+if bash addons.sh -u --composer >> smoke-composer.log 2>&1; then
+  ok "addons.sh --composer uninstall exited 0"
+else
+  bad "addons.sh --composer uninstall exited non-zero"
+  tail -n 20 smoke-composer.log
+fi
+assert_absent /usr/local/bin/composer
 
 # ------------------------------------------------------- 3/4 idempotent re-run
 stage "3/4 idempotency: re-run the exact same command"

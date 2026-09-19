@@ -116,7 +116,7 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: |
-          for f in smoke-install.log install.log smoke-rerun.log smoke-uninstall.log; do
+          for f in smoke-install.log install.log smoke-vhost-add.log smoke-vhost-del.log smoke-backup.log smoke-composer.log smoke-rerun.log smoke-uninstall.log; do
             if [ -f "$f" ]; then
               echo "===== ${f} (tail) ====="
               tail -n 60 "$f"
