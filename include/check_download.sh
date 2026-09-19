@@ -4,7 +4,7 @@
 # Description: Download management with verified mirror support
 #
 # Mirror support is limited to components confirmed available:
-#   - Node.js, MariaDB, OpenResty, libiconv, binutils
+#   - Node.js, MariaDB, OpenResty, binutils
 # All other components use official sources directly.
 
 # php_ver_ge_84 / openssl_ver_ge_32 / can_use_openssl_argon2 live in

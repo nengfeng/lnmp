@@ -9,13 +9,9 @@
 # The _with_openssl/_with_curl variants were removed as dead: php.sh hardcodes
 # those two arguments and never consumed the per-version copies.
 
-if openssl version | grep -Eqi 'OpenSSL 1.0.2*'; then
-  php_with_ssl="--with-ssl"
-elif openssl version | grep -Eqi 'OpenSSL 1.1.*'; then
-  php_with_ssl="--with-ssl"
-
-  [[ ${php_option} =~ ^[1-${PHP_OPTION_MAX}]$ ]] && with_old_openssl_flag=y
-elif openssl version | grep -Eqi 'OpenSSL 3.*'; then
+# The support window (Debian 12+) only ships OpenSSL 3.x; the 1.0/1.1
+# branches existed for releases below that window and are gone with it.
+if openssl version | grep -Eqi 'OpenSSL 3.*'; then
   php_with_ssl="--with-ssl"
 
   [[ ${php_option} =~ ^[1-${PHP_OPTION_MAX}]$ ]] && with_old_openssl_flag=y

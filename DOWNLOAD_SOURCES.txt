@@ -100,7 +100,6 @@ PHP 8.5             | https://www.php.net/distributions/             | 清华   
 
 组件名称            | 官方下载地址                                    | 国内镜像  | 校验码
 --------------------|------------------------------------------------|-----------|--------
-libiconv            | https://ftp.gnu.org/gnu/libiconv/              | 清华      | PGP
 curl                | https://curl.se/download/                       | 清华      | PGP
 freetype            | https://download.savannah.gnu.org/releases/    | 清华      | 无
 libsodium           | https://download.libsodium.org/releases/       | 清华      | PGP
@@ -216,7 +215,6 @@ lua-nginx-module, acme.sh 等) 不在国内镜像覆盖范围内，直接从 Git
 - openresty/       OpenResty ✅ (302 重定向)
 - mariadb/         MariaDB 二进制/源码 ✅
 - nodejs-release/  Node.js ✅
-- gnu/libiconv/    libiconv ✅
 - gnu/binutils/    binutils ✅
 
 不可用的路径:
@@ -233,7 +231,7 @@ lua-nginx-module, acme.sh 等) 不在国内镜像覆盖范围内，直接从 Git
 
 支持的校验码类型:
 - SHA256: OpenSSL, PHP, Node.js, phpMyAdmin
-- PGP 签名: Nginx, OpenResty, libiconv, curl, libsodium, binutils
+- PGP 签名: Nginx, OpenResty, curl, libsodium
 - MD5: MySQL, MariaDB, PostgreSQL
 
 默认启用校验码验证。跳过方式:
