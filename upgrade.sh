@@ -339,3 +339,4 @@ else
   [[ "${NEW_acme_ver}" == "latest" ]] && [ -e "${HOME}/.acme.sh/acme.sh" ] && { "${HOME}/.acme.sh/acme.sh" --force --upgrade; "${HOME}/.acme.sh/acme.sh" --version; }
   [[ "${cacert_flag}" == "y" ]] && Upgrade_Cacert
 fi
+exit 0

@@ -668,3 +668,6 @@ else
     [[ "${all_flag}" == y ]] && Uninstall_openssl
   fi
 fi
+# Selective uninstalls (e.g. --redis alone) end on test compounds that
+# evaluate false; without an explicit exit they reported rc 1 on success.
+exit 0

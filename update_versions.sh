@@ -801,3 +801,4 @@ if [[ "$apply_changes" == "n" ]] && [ "$minor_updated" -gt 0 ]; then
   echo "${CYELLOW}提示: 使用 --apply 参数应用小版本更新${CEND}"
   echo "  ./update_versions.sh --apply"
 fi
+exit 0

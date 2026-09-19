@@ -240,5 +240,31 @@ if [ -n "$hits" ]; then echo "  literal per-version variable/function/include (u
 [ "$win_bad" -eq 1 ] && echo "  OK" || FAIL=1
 
 
+echo "== 11. entry-point scripts must end on an explicit exit [HARD] =="
+# Rule 6 checks the literal last line; its blind spot is a dispatch that
+# ends on 'fi' whose last EXECUTED statement is a false test-compound:
+# vhost.sh's arg dispatch ended with '[[ delete_flag ]] && Del_NGX_Vhost',
+# so a successful 'vhost.sh --add' exited 1 - the smoke run's expect
+# wrapper failed a fully-successful vhost creation, and every scripted
+# caller of vhost.sh --add/--list saw rc 1. uninstall.sh (--redis alone)
+# and pureftpd_vhost.sh had the same class. Requiring an explicit exit
+# forces the author to own the exit status.
+exit_ok=1
+for f in $(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*' -not -path './tools/lint/static_checks.sh'); do
+  last=$(grep -vE '^[[:space:]]*(#|$)' "$f" 2>/dev/null | tail -1)
+  case "$last" in
+    *exit*) : ;;
+    *)
+      # download_sources.sh deliberately ends on a guarded 'main' so the
+      # offline tests can source it; everything else must exit explicitly.
+      if [ "$f" != "./download_sources.sh" ]; then
+        echo "  $f: last statement is not an explicit exit - the exit status is whatever the last command returned"
+        echo "        $last"
+        exit_ok=0
+      fi ;;
+  esac
+done
+[ "$exit_ok" -eq 1 ] && echo "  OK" || FAIL=1
+
 echo ""
-if [ "$FAIL" -eq 0 ]; then echo "STATIC CHECKS: PASS"; exit 0; else echo "STATIC CHECKS: FAIL"; exit 1; fi
+[ "$FAIL" -eq 0 ] && { echo "STATIC CHECKS: PASS"; exit 0; } || { echo "STATIC CHECKS: FAIL"; exit 1; }

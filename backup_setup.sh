@@ -561,3 +561,4 @@ if [ -n "$(echo ${desc_bk} | grep -w 8)" ]; then
     fi
   done
 fi
+exit 0

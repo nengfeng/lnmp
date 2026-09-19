@@ -949,7 +949,18 @@ List_Vhost() {
 if [[ ${ARG_NUM} == 0 ]]; then
   Add_Vhost
 else
-  [[ "${add_flag}" == y || "${proxy_flag}" == y || "${sslquiet_flag}" == y ]] && Add_Vhost
-  [[ "${list_flag}" == y ]] && List_Vhost
-  [[ "${delete_flag}" == y ]] && Del_NGX_Vhost
+  # if/fi, not test-compounds: a trailing [[ ]] && action that evaluates
+  # false leaves the script exit status at 1 - vhost.sh --add (and --list)
+  # reported failure after fully succeeding, which is how the smoke run's
+  # expect wrapper failed a successful vhost creation.
+  if [[ "${add_flag}" == y || "${proxy_flag}" == y || "${sslquiet_flag}" == y ]]; then
+    Add_Vhost
+  fi
+  if [[ "${list_flag}" == y ]]; then
+    List_Vhost
+  fi
+  if [[ "${delete_flag}" == y ]]; then
+    Del_NGX_Vhost
+  fi
 fi
+exit 0

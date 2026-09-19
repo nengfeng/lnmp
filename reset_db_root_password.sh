@@ -198,3 +198,4 @@ else
   fi
 fi
 popd > /dev/null
+exit $?

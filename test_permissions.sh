@@ -50,3 +50,4 @@ rm -rf /tmp/test_wwwroot /tmp/test_wwwlogs
 
 echo ""
 echo "Test completed successfully!"
+exit 0

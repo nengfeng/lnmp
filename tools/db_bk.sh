@@ -67,3 +67,4 @@ else
     exit 1
   fi
 fi
+exit 0

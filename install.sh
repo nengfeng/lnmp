@@ -899,3 +899,4 @@ fi
 if [[ "${reboot_flag}" == y ]]; then
   reboot
 fi
+exit 0

@@ -271,3 +271,4 @@ else
   [ "${listalluser_flag}" = 'y' ] && ListAllUser
   [ "${showuser_flag}" = 'y' ] && ShowUser
 fi
+exit 0

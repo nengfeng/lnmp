@@ -49,3 +49,4 @@ if [ "${rc}" -ne 0 ]; then
 fi
 
 echo "=== preflight OK: dependencies resolved on ${PRETTY_NAME:-this distro} ==="
+exit 0
