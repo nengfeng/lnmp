@@ -109,14 +109,20 @@ jobs:
           exit 1
 
       - name: Smoke (install -> idempotent re-run -> uninstall)
-        run: docker exec -w /work "$CONTAINER" bash tools/container/smoke.sh
+        # tee the run's own stdout (stage verdicts, PASS/FAIL lines) into the
+        # workspace so the artifact carries them - the per-stage logs only
+        # cover what the stages themselves print, and a failing assertion was
+        # invisible in the artifact, diagnosable only from the job log.
+        run: |
+          set -o pipefail
+          docker exec -w /work "$CONTAINER" bash tools/container/smoke.sh 2>&1 | tee smoke-stdout.log
 
       # Reproduce the failing tail in the job log: going through the artifact
       # download to find out why a 30-minute run went red is a bad trade.
       - name: Show logs on failure
         if: failure()
         run: |
-          for f in smoke-install.log install.log smoke-vhost-add.log smoke-vhost-del.log smoke-backup.log smoke-composer.log smoke-rerun.log smoke-uninstall.log; do
+          for f in smoke-stdout.log smoke-install.log install.log smoke-vhost-add.log smoke-vhost-del.log smoke-backup.log smoke-composer.log smoke-rerun.log smoke-uninstall.log; do
             if [ -f "$f" ]; then
               echo "===== ${f} (tail) ====="
               tail -n 60 "$f"
