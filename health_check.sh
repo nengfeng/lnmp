@@ -295,9 +295,23 @@ check_backups() {
   window=${expired_days:-5}
   [[ "${window}" =~ ^[0-9]+$ ]] || window=5
 
+  # Where do archives persist? backup.sh keeps local copies for 'local' and
+  # 'remote' (SSH push) destinations; pure-cloud destinations (oss/cos/s3/...)
+  # delete the local archive right after a successful upload
+  # (backup.sh: "! has_local_backup && rm -f ..."), so an empty backup_dir is
+  # a legitimate state there, and local freshness is only verifiable when
+  # local or remote is configured.
+  local_persist=n
+  if [ -n "$(echo "${backup_destination}" | grep -ow 'local')" ] \
+     || [ -n "$(echo "${backup_destination}" | grep -ow 'remote')" ]; then
+    local_persist=y
+  fi
+
   if [ -n "$(echo "${backup_content}" | grep -ow 'db')" ]; then
     if [ -z "${db_name}" ]; then
       check_warn "DB backup: configured but db_name is empty in options.conf"
+    elif [ "${local_persist}" != y ]; then
+      check_warn "DB backup: cloud-only destination - local archive freshness cannot be verified here (check the bucket)"
     else
       db_newest=$(find "${backup_dir}" -maxdepth 1 -name 'DB_*.tgz' -type f -printf '%T@\n' 2>/dev/null | sort -nr | head -1)
       if [ -z "${db_newest}" ]; then
@@ -316,6 +330,8 @@ check_backups() {
   if [ -n "$(echo "${backup_content}" | grep -ow 'web')" ]; then
     if [ -z "${website_name}" ]; then
       check_warn "Web backup: configured but website_name is empty in options.conf"
+    elif [ "${local_persist}" != y ]; then
+      check_warn "Web backup: cloud-only destination - local archive freshness cannot be verified here (check the bucket)"
     else
       # Sites too large to archive become rsync mirrors named after the site
       # itself (tools/website_bk.sh), so the newest artefact is either a
