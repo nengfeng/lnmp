@@ -33,7 +33,7 @@ Show_Help() {
   --help, -h                  Show this help message
   --quiet, -q                 quiet operation
   --list, -l                  List Virtualhost
-  --mphp_ver [83~85]          Use another PHP version (PATH: /usr/local/php${mphp_ver})
+  --mphp_ver [8${PHP_MINOR_MIN}~8${PHP_MINOR_MAX}]          Use another PHP version (PATH: /usr/local/php${mphp_ver})
   --proxy                     Use proxy
   --add                       Add Virtualhost
   --delete, --del             Delete Virtualhost
@@ -373,24 +373,36 @@ What Are You Doing?
     if [ "${mphp_flag}" != 'y' ]; then
       PHP_detail_ver=$(${php_install_dir}/bin/php-config --version)
       PHP_main_ver=${PHP_detail_ver%.*}
+      # Entries derive from the PHP support window (common.sh); a tag only
+      # appears when its FPM socket actually exists.
       while :; do echo
         echo 'Please select a version of the PHP:'
-        printf "%b" "\t${CMSG} 0${CEND}. PHP ${PHP_main_ver} (default)\n"
-        [ -e "/dev/shm/php83-cgi.sock" ] && printf "%b" "\t${CMSG} 1${CEND}. PHP 8.3\n"
-        [ -e "/dev/shm/php84-cgi.sock" ] && printf "%b" "\t${CMSG} 2${CEND}. PHP 8.4\n"
-        [ -e "/dev/shm/php85-cgi.sock" ] && printf "%b" "\t${CMSG} 3${CEND}. PHP 8.5\n"
+        printf "%b" "	${CMSG} 0${CEND}. PHP ${PHP_main_ver} (default)
+"
+        _n=0
+        _mphptags=""
+        for _tag in $(php_supported_tags); do
+          [ -e "/dev/shm/php${_tag}-cgi.sock" ] || continue
+          _n=$((_n + 1))
+          printf "%b" "	${CMSG} ${_n}${CEND}. PHP $(php_dotted_for_tag "${_tag}")
+"
+          _mphptags="${_mphptags}${_tag} "
+        done
         read -e -p "Please input a number:(Default 0 press Enter) " php_option
         php_option=${php_option:-0}
-        if [[ ! ${php_option} =~ ^[0-3]$ ]]; then
-          echo "${CWARNING}input error! Please only input number 0~3${CEND}"
+        if [[ ! ${php_option} =~ ^[0-9]+$ ]] || [ "${php_option}" -gt "${_n}" ]; then
+          echo "${CWARNING}input error! Please only input number 0~${_n}${CEND}"
         else
           break
         fi
       done
     fi
-    [[ "${php_option}" == 1 ]] && mphp_ver=83
-    [[ "${php_option}" == 2 ]] && mphp_ver=84
-    [[ "${php_option}" == 3 ]] && mphp_ver=85
+    # Map the menu number back to its tag; skipped when the menu did not run
+    # (--mphp_ver came from the command line and _mphptags stayed empty).
+    if [ -n "${_mphptags}" ] && [[ "${php_option}" =~ ^[0-9]+$ ]] && [ "${php_option}" -ge 1 ]; then
+      _mphptags_a=(${_mphptags})
+      mphp_ver=${_mphptags_a[$((php_option - 1))]}
+    fi
     [ ! -e "/dev/shm/php${mphp_ver}-cgi.sock" ] && unset mphp_ver
   fi
 

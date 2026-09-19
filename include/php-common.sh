@@ -3,43 +3,9 @@
 # BLOG:  https://github.com/nengfeng/lnmp
 # Description: Common functions for PHP installation
 
-# Check if PHP version is 8.4 or later
-# PHP 8.4+ can use OpenSSL's built-in Argon2 via --with-openssl-argon2
-php_ver_ge_84() {
-  local ver=$1
-  local major=$(echo "$ver" | cut -d. -f1)
-  local minor=$(echo "$ver" | cut -d. -f2)
-  [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]
-}
-
-# Check if OpenSSL version is 3.2 or later
-# OpenSSL 3.2+ has built-in Argon2 support
-openssl_ver_ge_32() {
-  local ver
-  ver=$(openssl version 2>/dev/null | awk '{print $2}')
-  if [ -z "$ver" ]; then
-    return 1
-  fi
-  local major=$(echo "$ver" | cut -d. -f1)
-  local minor=$(echo "$ver" | cut -d. -f2)
-  local patch=$(echo "$ver" | cut -d. -f3)
-  # OpenSSL 3.2+ (version format: 3.2.0, 3.2.1, etc.)
-  if [[ "$major" -ge 4 ]]; then
-    return 0
-  elif [[ "$major" -eq 3 ]]; then
-    if [[ "$minor" -ge 2 ]]; then
-      return 0
-    fi
-  fi
-  return 1
-}
-
-# Check if we can use OpenSSL built-in Argon2
-# Requires: PHP 8.4+ AND OpenSSL 3.2+
-can_use_openssl_argon2() {
-  local php_ver=$1
-  php_ver_ge_84 "${php_ver}" && openssl_ver_ge_32
-}
+# php_ver_ge_84 / openssl_ver_ge_32 / can_use_openssl_argon2 live in
+# include/common.sh: check_download.sh needs them before this file is ever
+# sourced (checkDownload runs before any Install_PHP).
 
 # Install PHP dependency libraries
 # Usage: install_php_deps [php_ver]

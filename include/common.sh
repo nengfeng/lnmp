@@ -13,6 +13,94 @@
 PHP_OPTION_MAX=3
 PHP_MINOR_MIN=3
 PHP_MINOR_MAX=5
+# Zend OPcache ships built-in since PHP 8.5 (no zend_extension .so to build);
+# include/zendopcache.sh applies the same rule to the runtime version by
+# matching "NOT ^8\.[0-4]\.".
+PHP_OPCACHE_BUILTIN_MINOR=5
+
+# ---- Derivations: everything below reads ONLY the constants above. Adding a
+# PHP version = bump the MIN/MAX values (plus its versions.txt entry) --
+# menus, mappings and install calls derive from here. Enforced by
+# tools/lint/static_checks.sh check 10.
+
+# Supported two-digit tags in menu order: "83 84 85"
+php_supported_tags() {
+  local m out=""
+  for (( m = 10#${PHP_MINOR_MIN}; m <= 10#${PHP_MINOR_MAX}; m++ )); do
+    out="${out}8${m} "
+  done
+  printf '%s' "${out% }"
+}
+
+# Tag for a 1-based php_option; rc 1 (empty output) when out of range.
+php_tag_for_option() {
+  local opt=$1
+  [[ "${opt}" =~ ^[0-9]+$ ]] || return 1
+  [ "${opt}" -ge 1 ] || return 1
+  [ "${opt}" -le "${PHP_OPTION_MAX}" ] || return 1
+  printf '8%s' "$(( 10#${PHP_MINOR_MIN} + opt - 1 ))"
+}
+
+# rc 0 when a two-digit mphp tag is inside the supported window.
+php_tag_is_supported() {
+  local tag=$1 minor
+  [[ "${tag}" =~ ^8[0-9]+$ ]] || return 1
+  minor=$(( 10#${tag#8} ))
+  [ "${minor}" -ge "$(( 10#${PHP_MINOR_MIN} ))" ] && [ "${minor}" -le "$(( 10#${PHP_MINOR_MAX} ))" ]
+}
+
+# Version variable value for a tag ("83" -> the php83_ver variable).
+php_ver_for_tag() {
+  php_tag_is_supported "$1" || return 1
+  local var="php$1_ver"
+  printf '%s' "${!var}"
+}
+
+# Dotted form of a tag ("83" -> "8.3"), for display strings.
+php_dotted_for_tag() {
+  php_tag_is_supported "$1" || return 1
+  printf '%s.%s' "${1:0:1}" "${1:1}"
+}
+
+# Check if PHP version is 8.4 or later
+# PHP 8.4+ can use OpenSSL's built-in Argon2 via --with-openssl-argon2
+# (defined here, not in php-common.sh: check_download.sh needs them before
+# php-common is ever sourced).
+php_ver_ge_84() {
+  local ver=$1
+  local major=$(echo "$ver" | cut -d. -f1)
+  local minor=$(echo "$ver" | cut -d. -f2)
+  [[ "$major" -ge 8 && "$minor" -ge 4 ]] || [[ "$major" -gt 8 ]]
+}
+
+# Check if OpenSSL version is 3.2 or later
+# OpenSSL 3.2+ has built-in Argon2 support
+openssl_ver_ge_32() {
+  local ver
+  ver=$(openssl version 2>/dev/null | awk '{print $2}')
+  if [ -z "$ver" ]; then
+    return 1
+  fi
+  local major=$(echo "$ver" | cut -d. -f1)
+  local minor=$(echo "$ver" | cut -d. -f2)
+  local patch=$(echo "$ver" | cut -d. -f3)
+  # OpenSSL 3.2+ (version format: 3.2.0, 3.2.1, etc.)
+  if [[ "$major" -ge 4 ]]; then
+    return 0
+  elif [[ "$major" -eq 3 ]]; then
+    if [[ "$minor" -ge 2 ]]; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# Check if we can use OpenSSL built-in Argon2
+# Requires: PHP 8.4+ AND OpenSSL 3.2+
+can_use_openssl_argon2() {
+  local php_ver=$1
+  php_ver_ge_84 "${php_ver}" && openssl_ver_ge_32
+}
 
 # ============================================
 # Mirror Detection (全局镜像源检测)

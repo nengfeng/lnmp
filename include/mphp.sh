@@ -17,25 +17,15 @@ Install_MPHP() {
     else
       [ -e "/lib/systemd/system/php-fpm.service" ] && /bin/mv /lib/systemd/system/php-fpm.service{,_bk}
       php_install_dir=${php_install_dir}${mphp_ver}
-      case "${mphp_ver}" in
-        83)
-          . include/php-8.3.sh
-          Install_PHP83 2>&1 | tee -a ${current_dir}/install.log
-          ;;
-        84)
-          . include/php-8.4.sh
-          Install_PHP84 2>&1 | tee -a ${current_dir}/install.log
-          ;;
-        85)
-          . include/php-8.5.sh
-          Install_PHP85 2>&1 | tee -a ${current_dir}/install.log
-          ;;
-        *)
-          echo "${CWARNING}PHP${mphp_ver} is not supported. Only PHP 8.3, 8.4, 8.5 are supported. ${CEND}"
-          restore_main_php_service
-          exit 1
-          ;;
-      esac
+      if php_tag_is_supported "${mphp_ver}"; then
+        . include/php.sh
+        Install_PHP "$(php_ver_for_tag "${mphp_ver}")" "${php_with_ssl}" 2>&1 | tee -a ${current_dir}/install.log
+      else
+        _supported=$(php_supported_tags | awk '{sep=""; for (i = 1; i <= NF; i++) { printf "%s8.%s", sep, $i; sep = ", " }}')
+        echo "${CWARNING}PHP${mphp_ver} is not supported. Only PHP ${_supported} are supported. ${CEND}"
+        restore_main_php_service
+        exit 1
+      fi
       rc=${PIPESTATUS[0]}
       if [ ${rc} -ne 0 ]; then
         echo "${CFAILURE}PHP${mphp_ver} installation failed (exit ${rc}). Aborting.${CEND}"

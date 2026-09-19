@@ -53,7 +53,7 @@ Upgrade_Script() {
     [ -n "${latest_md5}" ] && sed -i "s@^script_md5=.*@script_md5=${latest_md5}@" ./options.conf
     if [ -e "${php_install_dir}/sbin/php-fpm" ]; then
       [ -n "$(grep ^cgi.fix_pathinfo=0 ${php_install_dir}/etc/php.ini)" ] && sed -i 's@^cgi.fix_pathinfo.*@;&@' ${php_install_dir}/etc/php.ini
-      for php_ver in 83 84 85; do
+      for php_ver in $(php_supported_tags); do
         [ -e "/usr/local/php${php_ver}/etc/php.ini" ] && sed -i 's@^cgi.fix_pathinfo=0@;&@' /usr/local/php${php_ver}/etc/php.ini 2>/dev/null
       done
     fi

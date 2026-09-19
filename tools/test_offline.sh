@@ -211,6 +211,26 @@ UNIT_TYPE=simple; UNIT_STATE=failed; UNIT_SUB=failed; SVC_RC=0
 svc_start probe >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 0 ] && ok "no systemd -> re-check is skipped" || ko "re-check ran without systemd"
 
+# ---- PHP option window helpers (include/common.sh) ----
+# Fixed window values: this tests the DERIVATION logic, not the current window.
+PHP_OPTION_MAX=3; PHP_MINOR_MIN=3; PHP_MINOR_MAX=5
+php83_ver=8.3.99; php84_ver=8.4.99; php85_ver=8.5.99
+
+[ "$(php_supported_tags)" = "83 84 85" ] && ok "supported tags derive from MIN/MAX" || ko "php_supported_tags -> '$(php_supported_tags)'"
+[ "$(php_tag_for_option 1)" = "83" ] && ok "option 1 -> tag 83" || ko "option 1 -> '$(php_tag_for_option 1)'"
+[ "$(php_tag_for_option 3)" = "85" ] && ok "option 3 -> tag 85" || ko "option 3 -> '$(php_tag_for_option 3)'"
+php_tag_for_option 4 >/dev/null 2>&1; [ $? -ne 0 ] && ok "option past MAX is refused" || ko "option past MAX accepted"
+php_tag_for_option "" >/dev/null 2>&1; [ $? -ne 0 ] && ok "empty option is refused" || ko "empty option accepted"
+[ "$(php_ver_for_tag 84)" = "8.4.99" ] && ok "php_ver_for_tag resolves the version variable" || ko "php_ver_for_tag 84 -> '$(php_ver_for_tag 84)'"
+php_ver_for_tag 86 >/dev/null 2>&1; [ $? -ne 0 ] && ok "tag outside the window is refused" || ko "tag 86 accepted"
+php_tag_is_supported 85 >/dev/null 2>&1; [ $? -eq 0 ] && ok "tag 85 supported" || ko "tag 85 refused"
+php_tag_is_supported 86 >/dev/null 2>&1; [ $? -ne 0 ] && ok "tag 86 outside window refused" || ko "tag 86 accepted"
+php_tag_is_supported 90 >/dev/null 2>&1; [ $? -ne 0 ] && ok "minor overflow (90) refused" || ko "tag 90 accepted"
+[ "$(php_dotted_for_tag 85)" = "8.5" ] && ok "dotted form" || ko "php_dotted_for_tag 85 -> '$(php_dotted_for_tag 85)'"
+_tag_a=85; _tag_b=84
+[ "$(( 10#${_tag_a#8} ))" -ge "$PHP_OPCACHE_BUILTIN_MINOR" ] && [ "$(( 10#${_tag_b#8} ))" -lt "$PHP_OPCACHE_BUILTIN_MINOR" ] && ok "opcache-built-in boundary sits between 8.4 and 8.5" || ko "opcache built-in boundary wrong"
+[ "$(php_ver_ge_84 8.3.9 && echo y || echo n)" = "n" ] && [ "$(php_ver_ge_84 8.4.0 && echo y || echo n)" = "y" ] && ok "php_ver_ge_84 boundary" || ko "php_ver_ge_84 boundary wrong"
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }

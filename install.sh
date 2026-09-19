@@ -439,22 +439,26 @@ if [[ ${ARG_NUM} == 0 ]]; then
     check_installed file "${php_install_dir}/bin/phpize" "PHP" || unset php_option
     if [ -z "${php_option}" ] && [ ! -e "${php_install_dir}/bin/phpize" ]; then
       echo 'Please select a version of the PHP:'
-      printf "%b" "	${CMSG}1${CEND}. Install php-8.3\n"
-      printf "%b" "	${CMSG}2${CEND}. Install php-8.4\n"
-      printf "%b" "	${CMSG}3${CEND}. Install php-8.5\n"
+      _n=0
+      for _tag in $(php_supported_tags); do
+        _n=$((_n + 1))
+        printf "%b" "	${CMSG}${_n}${CEND}. Install php-$(php_dotted_for_tag "${_tag}")
+"
+      done
       select_number "Please input a number" php_option 1 ${PHP_OPTION_MAX} 2
     fi
 
     # PHP opcode cache
-    if [[ "${php_option}" == "3" ]]; then
-      # PHP 8.5 has Zend OPcache built in: nothing to compile or install,
-      # it is toggled via opcache.enable in php.d/02-opcache.ini. Skip the
-      # selection menu and just tell the user what happens.
+    _php_tag=$(php_tag_for_option "${php_option}") || _php_tag=""
+    if [ -n "${_php_tag}" ] && [ "$(( 10#${_php_tag#8} ))" -ge "${PHP_OPCACHE_BUILTIN_MINOR}" ]; then
+      # Zend OPcache is built in since 8.5 (PHP_OPCACHE_BUILTIN_MINOR):
+      # nothing to compile or install, it is toggled via opcache.enable in
+      # php.d/02-opcache.ini. Skip the selection menu and just say so.
       phpcache_flag=y
       if [[ "${phpcache_option}" == "1" ]]; then
-        echo "${CMSG}PHP 8.5 includes Zend OPcache built-in - no extra install step; it is enabled by default (opcache.enable=1 in php.d/02-opcache.ini).${CEND}"
+        echo "${CMSG}PHP $(php_dotted_for_tag "${_php_tag}") includes Zend OPcache built-in - no extra install step; it is enabled by default (opcache.enable=1 in php.d/02-opcache.ini).${CEND}"
       else
-        echo "${CMSG}PHP 8.5 includes Zend OPcache built-in; APCU will be installed and the built-in opcache disabled via php.d/02-opcache.ini.${CEND}"
+        echo "${CMSG}PHP $(php_dotted_for_tag "${_php_tag}") includes Zend OPcache built-in; APCU will be installed and the built-in opcache disabled via php.d/02-opcache.ini.${CEND}"
       fi
     else
       confirm "Do you want to install opcode cache of the PHP?" phpcache_flag y
@@ -545,19 +549,13 @@ OUTIP_STATE=$(ip_state)
 . ./include/check_download.sh
 
 # Set PHP version for download
-case "${php_option}" in
-  1) php_ver_to_use="${php83_ver}" ;;
-  2) php_ver_to_use="${php84_ver}" ;;
-  3) php_ver_to_use="${php85_ver}" ;;
-esac
-# Multi-PHP secondary version
-if [ -n "${mphp_ver}" ]; then
-  case "${mphp_ver}" in
-    83) mphp_php_ver="${php83_ver}" ;;
-    84) mphp_php_ver="${php84_ver}" ;;
-    85) mphp_php_ver="${php85_ver}" ;;
-  esac
+php_ver_to_use=""
+if _php_tag=$(php_tag_for_option "${php_option}"); then
+  php_ver_to_use=$(php_ver_for_tag "${_php_tag}")
 fi
+# Multi-PHP secondary version
+mphp_php_ver=""
+[ -n "${mphp_ver}" ] && mphp_php_ver=$(php_ver_for_tag "${mphp_ver}")
 
 [[ "${armplatform}" == "y" ]] && dbinstallmethod=2
 # PostgreSQL non-interactive defaults (interactive menu sets these at runtime)
@@ -669,20 +667,10 @@ case "${db_option}" in
 esac
 
 # PHP
-case "${php_option}" in
-  1)
-    . include/php-8.3.sh
-    run_step Install_PHP83 Install_PHP83
-    ;;
-  2)
-    . include/php-8.4.sh
-    run_step Install_PHP84 Install_PHP84
-    ;;
-  3)
-    . include/php-8.5.sh
-    run_step Install_PHP85 Install_PHP85
-    ;;
-esac
+if _php_tag=$(php_tag_for_option "${php_option}"); then
+  . include/php.sh
+  run_step "Install_PHP${_php_tag}" Install_PHP "$(php_ver_for_tag "${_php_tag}")" "${php_with_ssl}"
+fi
 
 PHP_addons() {
   # PHP opcode cache

@@ -218,5 +218,24 @@ else
   echo "  OK"
 fi
 
+echo "== 10. PHP version mappings stay derived from the support window [HARD] =="
+# include/common.sh owns PHP_OPTION_MAX / PHP_MINOR_MIN / PHP_MINOR_MAX and
+# derives menus, tags and version mappings (php_tag_for_option /
+# php_ver_for_tag / php_supported_tags). The literal forms below are how a
+# forgotten spot survives a version bump: the regex gates accept option 4
+# while a hardcoded case/loop silently skips it.
+GREP_EX="(^|/)\.workbuddy/|(^|/)src/"
+win_bad=1
+hits=$(grep -rnE 'for php_ver in [0-9]{2} [0-9]{2} [0-9]{2}' --include='*.sh' . | grep -vE "$GREP_EX" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' )
+if [ -n "$hits" ]; then echo "  literal 'for php_ver in <tags>' loop (use \$(php_supported_tags)):"; echo "$hits"; win_bad=0; fi
+hits=$(grep -rnE 'php_option"\]?\s*==\s*["'"'"']?[0-9]' --include='*.sh' . | grep -vE "$GREP_EX" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' )
+if [ -n "$hits" ]; then echo "  numeric php_option equality (map via php_tag_for_option):"; echo "$hits"; win_bad=0; fi
+hits=$(grep -rnE 'mphp_ver=[0-9]{2}[[:space:]]*(;;|$)' --include='*.sh' . | grep -vE "$GREP_EX" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' )
+if [ -n "$hits" ]; then echo "  literal mphp_ver=NN assignment:"; echo "$hits"; win_bad=0; fi
+hits=$(grep -rnE '(\$\{php8[0-9]_ver\}|Install_PHP8[0-9]|include/php-8\.[0-9]\.sh)' --include='*.sh' . | grep -vE "$GREP_EX" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' )
+if [ -n "$hits" ]; then echo "  literal per-version variable/function/include (use php_ver_for_tag):"; echo "$hits"; win_bad=0; fi
+[ "$win_bad" -eq 1 ] && echo "  OK" || FAIL=1
+
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then echo "STATIC CHECKS: PASS"; exit 0; else echo "STATIC CHECKS: FAIL"; exit 1; fi

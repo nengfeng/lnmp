@@ -37,7 +37,7 @@ Show_Help() {
   --postgresql                  Uninstall PostgreSQL
   --mongodb                     Uninstall MongoDB
   --php                         Uninstall PHP (PATH: ${php_install_dir})
-  --mphp_ver [83~85]            Uninstall another PHP version (PATH: ${php_install_dir}\${mphp_ver})
+  --mphp_ver [8${PHP_MINOR_MIN}~8${PHP_MINOR_MAX}]            Uninstall another PHP version (PATH: ${php_install_dir}\${mphp_ver})
   --allphp                      Uninstall all PHP
   --phpcache                    Uninstall PHP opcode cache
   --php_extensions [ext name]   Uninstall PHP extensions, include ioncube,
@@ -332,7 +332,7 @@ Print_ALLPHP() {
   [ -e "${php_install_dir}" ] && echo ${php_install_dir}
   [ -e "/etc/init.d/php-fpm" ] && echo /etc/init.d/php-fpm
   [ -e "/lib/systemd/system/php-fpm.service" ] && echo /lib/systemd/system/php-fpm.service
-  for php_ver in 83 84 85; do
+  for php_ver in $(php_supported_tags); do
     [ -e "${php_install_dir}${php_ver}" ] && echo ${php_install_dir}${php_ver}
     [ -e "/etc/init.d/php${php_ver}-fpm" ] && echo /etc/init.d/php${php_ver}-fpm
     [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && echo /lib/systemd/system/php${php_ver}-fpm.service
@@ -362,7 +362,7 @@ Uninstall_ALLPHP() {
   [ -e "/lib/systemd/system/php-fpm.service" ] && { svc_stop php-fpm > /dev/null 2>&1; svc_disable php-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php-fpm.service; }
   [ -e "${php_install_dir}" ] && { rm -rf ${php_install_dir}; echo "${CMSG}PHP uninstall completed! ${CEND}"; }
   remove_from_path "${php_install_dir}/bin"
-  for php_ver in 83 84 85; do
+  for php_ver in $(php_supported_tags); do
     [ -e "/etc/init.d/php${php_ver}-fpm" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; rm -f /etc/init.d/php${php_ver}-fpm; }
     [ -e "/lib/systemd/system/php${php_ver}-fpm.service" ] && { svc_stop php${php_ver}-fpm > /dev/null 2>&1; svc_disable php${php_ver}-fpm > /dev/null 2>&1; rm -f /lib/systemd/system/php${php_ver}-fpm.service; }
     [ -e "${php_install_dir}${php_ver}" ] && { rm -rf ${php_install_dir}${php_ver}; echo "${CMSG}PHP${php_ver} uninstall completed! ${CEND}"; }
