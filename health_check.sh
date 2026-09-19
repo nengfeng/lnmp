@@ -257,7 +257,88 @@ check_functional() {
 }
 
 # ============================================
-# 4. System Resources
+# 4. Backups & Secret Files
+# ============================================
+check_backups() {
+  check_header "Backups & Secret Files"
+
+  # options.conf holds the DB root password in plaintext; install and every
+  # writer chmod 600 it. Anything wider is a real exposure, not a nit.
+  if [ -e "${current_dir}/options.conf" ]; then
+    opts_perm=$(stat -c %a "${current_dir}/options.conf" 2>/dev/null)
+    if [ "${opts_perm}" == "600" ]; then
+      check_pass "options.conf permissions: 600"
+    else
+      check_fail "options.conf permissions: ${opts_perm} (expected 600 - it holds the DB root password). Fix: chmod 600 ${current_dir}/options.conf"
+    fi
+  fi
+
+  # Backup freshness, judged the same way the backup scripts expire by age:
+  # within the ${expired_days} retention window there must be at least one
+  # restorable archive, otherwise the backup cron has been failing silently
+  # while the oldest retained backups quietly age out.
+  if [ -z "${backup_destination}" ] || [ -z "${backup_content}" ]; then
+    check_warn "Backups: not configured (backup_destination/backup_content empty) - run backup_setup.sh"
+    return
+  fi
+  if [ ! -d "${backup_dir}" ]; then
+    check_fail "Backups: ${backup_dir} does not exist (backup.sh never ran, or the directory was deleted)"
+    return
+  fi
+  dir_perm=$(stat -c %a "${backup_dir}" 2>/dev/null)
+  if [ "${dir_perm}" == "700" ]; then
+    check_pass "Backup directory permissions: 700"
+  else
+    check_warn "Backup directory permissions: ${dir_perm} (expected 700 - it holds unencrypted DB dumps)"
+  fi
+
+  window=${expired_days:-5}
+  [[ "${window}" =~ ^[0-9]+$ ]] || window=5
+
+  if [ -n "$(echo "${backup_content}" | grep -ow 'db')" ]; then
+    if [ -z "${db_name}" ]; then
+      check_warn "DB backup: configured but db_name is empty in options.conf"
+    else
+      db_newest=$(find "${backup_dir}" -maxdepth 1 -name 'DB_*.tgz' -type f -printf '%T@\n' 2>/dev/null | sort -nr | head -1)
+      if [ -z "${db_newest}" ]; then
+        check_fail "DB backup: no DB_*.tgz archive in ${backup_dir} although db backup is configured"
+      else
+        db_age=$(( ($(date +%s) - ${db_newest%.*}) / 86400 ))
+        if [ ${db_age} -le ${window} ]; then
+          check_pass "DB backup: newest archive is ${db_age} day(s) old (retention ${window})"
+        else
+          check_fail "DB backup: newest archive is ${db_age} days old, retention is ${window} - the backup cron has been failing; check ${backup_dir}/db.log"
+        fi
+      fi
+    fi
+  fi
+
+  if [ -n "$(echo "${backup_content}" | grep -ow 'web')" ]; then
+    if [ -z "${website_name}" ]; then
+      check_warn "Web backup: configured but website_name is empty in options.conf"
+    else
+      # Sites too large to archive become rsync mirrors named after the site
+      # itself (tools/website_bk.sh), so the newest artefact is either a
+      # Web_<site>_*.tgz archive or a <site>/ directory - check both.
+      web_newest=$(for W in $(echo "${website_name}" | tr ',' ' '); do
+        [ -n "${W}" ] && find "${backup_dir}" -maxdepth 1 \( -name "Web_${W}_*.tgz" -type f -o -name "${W}" -type d \) -printf '%T@\n' 2>/dev/null
+      done | sort -nr | head -1)
+      if [ -z "${web_newest}" ]; then
+        check_fail "Web backup: no Web_*.tgz archive or site mirror in ${backup_dir} although web backup is configured"
+      else
+        web_age=$(( ($(date +%s) - ${web_newest%.*}) / 86400 ))
+        if [ ${web_age} -le ${window} ]; then
+          check_pass "Web backup: newest artefact is ${web_age} day(s) old (retention ${window})"
+        else
+          check_fail "Web backup: newest artefact is ${web_age} days old, retention is ${window} - the backup cron has been failing; check ${backup_dir}/web.log"
+        fi
+      fi
+    fi
+  fi
+}
+
+# ============================================
+# 5. System Resources
 # ============================================
 check_resources() {
   check_header "System Resources"
@@ -321,7 +402,7 @@ check_resources() {
 # ============================================
 echo "${CCYAN}"
 echo "╔════════════════════════════════════════╗"
-echo "║     LNMP Stack Health Check v1.0       ║"
+echo "║     LNMP Stack Health Check v1.1       ║"
 echo "╚════════════════════════════════════════╝"
 echo "${CEND}"
 echo "Time: $(date '+%Y-%m-%d %H:%M:%S')"
@@ -330,6 +411,7 @@ echo "Time: $(date '+%Y-%m-%d %H:%M:%S')"
 check_services
 check_ports
 check_functional
+check_backups
 check_resources
 
 # Summary
