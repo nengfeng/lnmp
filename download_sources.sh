@@ -408,8 +408,7 @@ verify_checksum() {
           # in the keyring) - the bundled keys make this abnormal: fail loud.
           log ERROR "PGP signature could not be verified for ${file} (gpg exit ${gpg_rc})"
         fi
-        printf '%s
-' "$gpg_out" | tail -n 3 | while IFS= read -r gpg_line; do log ERROR "  gpg: ${gpg_line}"; done
+        printf '%s\n' "$gpg_out" | tail -n 3 | while IFS= read -r gpg_line; do log ERROR "  gpg: ${gpg_line}"; done
         return 1
       fi
       ;;
