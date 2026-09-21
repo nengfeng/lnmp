@@ -190,7 +190,11 @@ Upgrade_DB() {
       local safe_script="${mariadb_install_dir}/bin/mariadbd-safe"
       [ ! -f "${safe_script}" ] && safe_script="${mariadb_install_dir}/bin/mysqld_safe"
       [ -f "${safe_script}" ] && [ -n "${allocator_so}" ] && sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so}"'@' ${safe_script}
-      ${mariadb_install_dir}/scripts/mysql_install_db --user=mysql --basedir=${mariadb_install_dir} --datadir=${mariadb_data_dir}
+      if ! ${mariadb_install_dir}/scripts/mysql_install_db --user=mysql --basedir=${mariadb_install_dir} --datadir=${mariadb_data_dir}; then
+        echo "${CFAILURE}mysql_install_db failed! Rolling back.${CEND}"
+        rollback_db_upgrade ${mariadb_install_dir} ${mariadb_data_dir} ${db_ts}
+        return 1
+      fi
       chown mysql:mysql -R ${mariadb_data_dir}
       svc_start mysqld
       if ! wait_for_db_ready ${mariadb_install_dir}; then
@@ -240,7 +244,14 @@ Upgrade_DB() {
       mv ${DB_filename}/* ${mysql_install_dir}/
       [ -n "${allocator_so}" ] && sed -i 's@executing mysqld_safe@executing mysqld_safe\nexport LD_PRELOAD=/usr/local/lib/'"${allocator_so}"'@' ${mysql_install_dir}/bin/mysqld_safe
       sed -i "s@/usr/local/mysql@${mysql_install_dir}@g" ${mysql_install_dir}/bin/mysqld_safe
-      ${mysql_install_dir}/bin/mysqld --initialize-insecure --user=mysql --basedir=${mysql_install_dir} --datadir=${mysql_data_dir}
+      # Guarded: a failed initialize (broken binary, permission issue) would
+      # otherwise only surface as the later startup timeout - with the new tree
+      # half in place and no clear cause.
+      if ! ${mysql_install_dir}/bin/mysqld --initialize-insecure --user=mysql --basedir=${mysql_install_dir} --datadir=${mysql_data_dir}; then
+        echo "${CFAILURE}mysqld initialization failed! Rolling back.${CEND}"
+        rollback_db_upgrade ${mysql_install_dir} ${mysql_data_dir} ${db_ts}
+        return 1
+      fi
 
       chown mysql:mysql -R ${mysql_data_dir}
       [ -e "${mysql_install_dir}/my.cnf" ] && rm -rf ${mysql_install_dir}/my.cnf

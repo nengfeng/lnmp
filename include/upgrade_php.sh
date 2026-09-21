@@ -159,8 +159,20 @@ ROLLBACK_EOF
     # Fix iconv: use glibc's iconv (bare --with-iconv, no GNU libiconv path/plug)
     configure_cmd=$(echo "${configure_cmd}" | sed 's|--with-iconv=[^ ]*|--with-iconv|g')
     # Force glibc iconv: do NOT link GNU libiconv even if present on the system
-    php_cv_iconv_errno=yes ac_cv_lib_iconv_libiconv_open=no bash -c "${configure_cmd}"
-    make -j ${THREAD}
+    if ! php_cv_iconv_errno=yes ac_cv_lib_iconv_libiconv_open=no bash -c "${configure_cmd}"; then
+      echo "${CFAILURE}PHP configure failed! Upgrade aborted, nothing was changed.${CEND}"
+      popd > /dev/null
+      rm -rf php-${NEW_php_ver}
+      exit 1
+    fi
+    # Guard make: an unchecked failure would let the verify step below run a
+    # missing binary and misreport "Compilation verification failed".
+    if ! make -j ${THREAD}; then
+      echo "${CFAILURE}PHP compilation failed! Upgrade aborted, nothing was changed.${CEND}"
+      popd > /dev/null
+      rm -rf php-${NEW_php_ver}
+      exit 1
+    fi
     
     # ========== 【新增】编译后验证 ==========
     echo "Verifying compiled PHP binary..."
@@ -184,7 +196,11 @@ ROLLBACK_EOF
       rm -rf php-${NEW_php_ver}
       exit 1
     fi
-    make install
+    if ! make install; then
+      echo "${CFAILURE}PHP installation failed! Rolling back...${CEND}"
+      _php_rollback
+      exit 1
+    fi
     
     # ========== 【新增】安装后验证 ==========
     echo "Verifying installed PHP..."

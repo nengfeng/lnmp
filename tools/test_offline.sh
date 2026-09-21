@@ -143,6 +143,39 @@ case "$out" in *"E: Unable to locate package ghostpkg"*) ok "apt's own error nam
 out="$(apt_install_packages libzip-dev ghostpkg 2>&1)"; rc=$?
 [ "$rc" -ne 0 ] && ok "a mixed list still fails on the apt failure" || ko "mixed list passed despite an apt failure"
 
+echo "== check_download.sh PGP diagnostics (verify_pgp_signature) =="
+# The install path now ships PGP keys in keys/ and imports them before
+# checkDownload, so a gpg exit >= 2 (signer key not in keyring) is abnormal
+# and must FAIL the component, not silently skip. On both failure paths the
+# diagnostic lines gpg emits must reach the log - without them a friend's
+# install dies with no explanation. The real verify_pgp_signature code path
+# is driven offline with gpg stubbed; each stub emits the exact lines real
+# gpg would for that outcome, keeping "tail -n 3" under test.
+pgp_fix="$work/pgpfix"
+mkdir -p "$pgp_fix/src"
+printf 'payload\n' > "$pgp_fix/src/artifact.tar.gz"
+: > "$pgp_fix/src/artifact.tar.gz.asc"
+if command -v gpg >/dev/null 2>&1; then
+  # The real function from the file under test
+  . "$ROOT/include/check_download.sh" >/dev/null 2>&1
+  # Case 1: verified signature -> rc 0, no diagnostic emitted
+  gpg(){ echo "gpg: Signature from LNMP PGP Fixture <pgpfix@test.invalid>"; echo "gpg: Good signature"; return 0; }
+  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz 2>&1); rc=$?
+  [ $rc -eq 0 ] && ok "good signature verifies (rc 0)" || ko "good signature failed: $out"
+  # Case 2: BAD signature -> rc 1, gpg's diagnostic lines are shown
+  gpg(){ echo "gpg: Signature made ..."; echo "gpg: Checking trust..."; echo "gpg: There is no assurance the signature is genuine"; return 1; }
+  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz 2>&1); rc=$?
+  [ $rc -ne 0 ] && ok "BAD signature fails the component" || ko "BAD signature accepted"
+  case "$out" in *"There is no assurance"*) ok "BAD-signature failure shows gpg diagnostic" ;; *) ko "BAD-signature failure lost the gpg diagnostic: $out" ;; esac
+  # Case 3: signer key not in keyring (gpg exit 2) -> rc 1, diagnostic shown
+  gpg(){ echo "gpg: Can't check signature: No public key"; return 2; }
+  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz 2>&1); rc=$?
+  [ $rc -ne 0 ] && ok "unverifiable signature (gpg exit 2) fails, not skips" || ko "gpg exit 2 was skipped"
+  case "$out" in *"No public key"*) ok "exit-2 failure shows gpg diagnostic (keyring gap is visible)" ;; *) ko "exit-2 failure lost the gpg diagnostic: $out" ;; esac
+else
+  echo "  [SKIP] gpg unavailable, PGP diagnostics not exercised"
+fi
+
 echo "== svc_start liveness for Type=simple units =="
 # The installer used to accept any unit whose `systemctl start` returned 0, but
 # systemd reports a Type=simple unit as started the moment the process is forked

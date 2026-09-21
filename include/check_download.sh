@@ -208,19 +208,30 @@ verify_pgp_signature() {
     return 1
   }
   
-  gpg --verify "${file_name}.asc" "$file_name" 2>/dev/null
+  # Capture gpg's own diagnostic: on the failure paths below it names the
+  # actual cause (unknown signer, missing key, bad signature) - without it a
+  # PGP failure in the install path is an unexplained die_hard. Mirrors the
+  # asc branch of download_sources.sh (pre-download path).
+  local gpg_out
+  gpg_out=$(gpg --verify "${file_name}.asc" "$file_name" 2>&1)
   local gpg_rc=$?
   if [ "$gpg_rc" -eq 0 ]; then
     echo "${CGREEN}${component} PGP signature verified${CEND}"
     return 0
   elif [ "$gpg_rc" -eq 1 ]; then
     echo "${CFAILURE}${component} PGP signature is BAD (file may be tampered)${CEND}"
+    printf '%s\n' "$gpg_out" | tail -n 3 | while IFS= read -r gpg_line; do
+      echo "  gpg: ${gpg_line}"
+    done
     return 1
   else
     # gpg exits 2 (and above) when it could not check at all - e.g. the
     # signer's public key is not in the keyring. The keys are imported before
     # checkDownload now, so this is abnormal: fail loudly instead of skipping.
-    echo "${CFAILURE}${component} PGP signature could not be verified (exit ${gpg_rc})${CEND}"
+    echo "${CFAILURE}${component} PGP signature could not be verified (gpg exit ${gpg_rc})${CEND}"
+    printf '%s\n' "$gpg_out" | tail -n 3 | while IFS= read -r gpg_line; do
+      echo "  gpg: ${gpg_line}"
+    done
     return 1
   fi
 }
