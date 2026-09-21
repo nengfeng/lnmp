@@ -178,6 +178,9 @@ if command -v gpg >/dev/null 2>&1; then
   case "$out" in *"No public key"*) ok "exit-2 failure shows gpg diagnostic (keyring gate is visible)" ;; *) ko "exit-2 failure lost the gpg diagnostic: $out" ;; esac
   VERIFY_CHECKSUM="${_pgp_verify_saved}"
   unset _pgp_verify_saved
+  # Drop the stub so the pre-download PGP block below can use the real gpg
+  # binary - a left-behind function would shadow /usr/bin/gpg and break it.
+  unset -f gpg
 else
   echo "  [SKIP] gpg unavailable, PGP diagnostics not exercised"
 fi

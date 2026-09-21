@@ -2,10 +2,12 @@ name: Debug offline
 
 # Temporary helper: runs tools/test_offline.sh and prints the full transcript
 # so a failing assertion can be read without authenticated log access.
-# Trigger manually from the Actions tab, delete the file when done.
+# Push-triggered while debugging; delete the file when the offline suite is
+# green again.
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   offline:
