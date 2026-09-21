@@ -158,20 +158,26 @@ printf 'payload\n' > "$pgp_fix/src/artifact.tar.gz"
 if command -v gpg >/dev/null 2>&1; then
   # The real function from the file under test
   . "$ROOT/include/check_download.sh" >/dev/null 2>&1
+  # verify_pgp_signature no-ops unless VERIFY_CHECKSUM=yes - arm it for the
+  # whole block, restore after.
+  _pgp_verify_saved="${VERIFY_CHECKSUM-}"
+  VERIFY_CHECKSUM=yes
   # Case 1: verified signature -> rc 0, no diagnostic emitted
   gpg(){ echo "gpg: Signature from LNMP PGP Fixture <pgpfix@test.invalid>"; echo "gpg: Good signature"; return 0; }
-  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz 2>&1); rc=$?
+  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz "https://example.invalid/sig.asc" "pgpfix" 2>&1); rc=$?
   [ $rc -eq 0 ] && ok "good signature verifies (rc 0)" || ko "good signature failed: $out"
   # Case 2: BAD signature -> rc 1, gpg's diagnostic lines are shown
   gpg(){ echo "gpg: Signature made ..."; echo "gpg: Checking trust..."; echo "gpg: There is no assurance the signature is genuine"; return 1; }
-  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz 2>&1); rc=$?
+  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz "https://example.invalid/sig.asc" "pgpfix" 2>&1); rc=$?
   [ $rc -ne 0 ] && ok "BAD signature fails the component" || ko "BAD signature accepted"
   case "$out" in *"There is no assurance"*) ok "BAD-signature failure shows gpg diagnostic" ;; *) ko "BAD-signature failure lost the gpg diagnostic: $out" ;; esac
   # Case 3: signer key not in keyring (gpg exit 2) -> rc 1, diagnostic shown
   gpg(){ echo "gpg: Can't check signature: No public key"; return 2; }
-  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz 2>&1); rc=$?
+  out=$(cd "$pgp_fix/src" && verify_pgp_signature artifact.tar.gz "https://example.invalid/sig.asc" "pgpfix" 2>&1); rc=$?
   [ $rc -ne 0 ] && ok "unverifiable signature (gpg exit 2) fails, not skips" || ko "gpg exit 2 was skipped"
-  case "$out" in *"No public key"*) ok "exit-2 failure shows gpg diagnostic (keyring gap is visible)" ;; *) ko "exit-2 failure lost the gpg diagnostic: $out" ;; esac
+  case "$out" in *"No public key"*) ok "exit-2 failure shows gpg diagnostic (keyring gate is visible)" ;; *) ko "exit-2 failure lost the gpg diagnostic: $out" ;; esac
+  VERIFY_CHECKSUM="${_pgp_verify_saved}"
+  unset _pgp_verify_saved
 else
   echo "  [SKIP] gpg unavailable, PGP diagnostics not exercised"
 fi
