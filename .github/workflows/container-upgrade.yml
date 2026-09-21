@@ -1,0 +1,138 @@
+name: Container upgrade
+
+# Upgrade layer of the container test net: a real install in the same
+# systemd container as the smoke layer, then upgrade.sh driven end to end
+# (MariaDB dump+restore, Nginx recompile + USR2/QUIT hot swap), an
+# idempotent re-run, and a full uninstall.
+#
+# Lives in its own workflow rather than as a ninth stage of container-smoke:
+# the upgrade recompile would push the smoke run past the 90-minute job
+# timeout on the slowest rotating distro, and a green smoke should keep
+# reading as "the install chain is clean".
+#
+# Same distro rotation as container-smoke (weekly, every Sunday 03:00 UTC).
+# The two workflows pick the same base image for a given week, so a red
+# upgrade layer and a red smoke layer on the same distro are correlated
+# signals, not coincidences.
+
+on:
+  schedule:
+    # Every Sunday at 04:00 UTC - offset from the smoke run so the two
+    # 40-90-minute jobs do not fight for runners on the same minute.
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Base image (defaults to the weekly rotation)'
+        required: false
+        type: string
+
+jobs:
+  pick:
+    name: pick this week's distro
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.rot.outputs.image }}
+    steps:
+      - name: Rotate through the supported distros
+        id: rot
+        env:
+          INPUT_IMAGE: ${{ inputs.image }}
+        run: |
+          if [ -n "$INPUT_IMAGE" ]; then
+            image="$INPUT_IMAGE"
+          else
+            # Same deterministic epoch-week rotation as container-smoke.yml,
+            # so both layers test the same distro in the same week.
+            case $(( $(date +%s) / 604800 % 4 )) in
+              0) image=debian:12 ;;
+              1) image=debian:13 ;;
+              2) image=ubuntu:24.04 ;;
+              3) image=ubuntu:26.04 ;;
+            esac
+          fi
+          echo "This week's upgrade target: $image"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+  upgrade:
+    needs: pick
+    name: upgrade (${{ needs.pick.outputs.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CONTAINER: lnmp-upgrade
+      IMAGE: lnmp-upgrade-systemd
+      BASE_IMAGE: ${{ needs.pick.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build a systemd-enabled base image
+        run: docker build --build-arg BASE_IMAGE="$BASE_IMAGE" -t "$IMAGE" -f tools/container/systemd.Dockerfile tools/container
+
+      - name: Boot it with systemd as PID 1
+        run: |
+          docker run -d --name "$CONTAINER" \
+            --privileged --cgroupns=host \
+            --tmpfs /run --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            -v "$PWD:/work" -w /work \
+            "$IMAGE"
+          for _ in $(seq 1 30); do
+            if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo false)" != "true" ]; then
+              echo "container exited before systemd came up; its log follows:" >&2
+              docker logs "$CONTAINER" >&2 || true
+              exit 1
+            fi
+            state=$(docker exec "$CONTAINER" systemctl is-system-running 2>/dev/null || true)
+            case "$state" in
+              running | degraded)
+                echo "systemd is up (state: $state)"
+                exit 0
+                ;;
+            esac
+            echo "systemd state: ${state:-<not up yet>}"
+            sleep 2
+          done
+          echo "systemd never reached a usable state; container log follows:" >&2
+          docker logs "$CONTAINER" >&2 || true
+          exit 1
+
+      - name: Upgrade smoke (install -> upgrade db+nginx -> re-run -> uninstall)
+        # tee the run's own stdout (stage verdicts, PASS/FAIL lines) into the
+        # workspace so the artifact carries them - same rationale as
+        # container-smoke.yml.
+        run: |
+          set -o pipefail
+          docker exec -w /work "$CONTAINER" bash tools/container/upgrade_smoke.sh 2>&1 | tee upgrade-smoke-stdout.log
+
+        # Reproduce the failing tail in the job log.
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          for f in upgrade-smoke-stdout.log smoke-upgrade-install.log smoke-upgrade-db.log smoke-upgrade-nginx.log smoke-upgrade-rerun.log smoke-upgrade-uninstall.log; do
+            if [ -f "$f" ]; then
+              echo "===== ${f} (tail) ====="
+              tail -n 60 "$f"
+            fi
+          done
+          echo "===== failed units ====="
+          docker exec "$CONTAINER" systemctl --failed --no-pager || true
+          for unit in nginx mariadb; do
+            echo "===== journal: ${unit} (tail) ====="
+            docker exec "$CONTAINER" journalctl -u "${unit}" -n 25 --no-pager || true
+          done
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgrade-smoke-logs
+          path: |
+            upgrade-smoke-stdout.log
+            smoke-upgrade-*.log
+          if-no-files-found: ignore
+
+      - name: Remove the container
+        if: always()
+        run: docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
