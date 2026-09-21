@@ -1,0 +1,19 @@
+name: Debug offline
+
+# Temporary helper: runs tools/test_offline.sh and prints the full transcript
+# so a failing assertion can be read without authenticated log access.
+# Trigger manually from the Actions tab, delete the file when done.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  offline:
+    name: offline-transcript
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run offline logic tests
+        run: bash tools/test_offline.sh
