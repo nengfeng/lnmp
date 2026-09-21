@@ -118,7 +118,7 @@ wait_for_db_ready() {
 install_mysql_binary() {
   local mysql_ver=$1
   local install_dir=$2
-  local tarball="mysql-${mysql_ver}-linux-glibc2.28-$SYS_ARCH_M.tar.xz"
+  local tarball="mysql-${mysql_ver}-linux-${mysql_binary_glibc_tag}-$SYS_ARCH_M.tar.xz"
 
   echo "${CMSG}[install_mysql_binary] Starting MySQL ${mysql_ver} installation...${CEND}"
   echo "${CMSG}[install_mysql_binary] Current dir: $(pwd)${CEND}"
@@ -151,7 +151,7 @@ install_mysql_binary() {
     return 1
   }
 
-  local src_dir="mysql-${mysql_ver}-linux-glibc2.28-$SYS_ARCH_M"
+  local src_dir="mysql-${mysql_ver}-linux-${mysql_binary_glibc_tag}-$SYS_ARCH_M"
   if [ ! -d "$src_dir" ]; then
     echo "${CERROR}Expected directory ${src_dir} not found after extraction${CEND}"
     echo "${CERROR}Contents of current dir: $(ls -la)${CEND}"

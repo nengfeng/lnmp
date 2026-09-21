@@ -13,6 +13,12 @@ mysql97_ver=9.7.2
 mysql84_ver=8.4.11
 mysql80_ver=8.0.46
 
+# glibc tag baked into the MySQL binary tarball filename (the -linux-glibcX.YY
+# segment). Bump here when Oracle starts shipping against a newer glibc; the
+# binary-download paths in include/check_download.sh, include/db-common.sh and
+# include/upgrade_db.sh all read this one value instead of hardcoding it.
+mysql_binary_glibc_tag=glibc2.28
+
 mariadb123_ver=12.3.3
 mariadb118_ver=11.8.9
 mariadb114_ver=11.4.13

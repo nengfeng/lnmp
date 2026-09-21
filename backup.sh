@@ -174,6 +174,14 @@ db_cloud_backup() {
     if [ $? -eq 0 ]; then
       cloud_delete_old "${dest_type}" "${bucket_name}"
       ! has_local_backup && rm -f "${backup_dir}/${DB_FILE}"
+    else
+      # A failed cloud push must not be reported as success: the whole point
+      # of backup.sh's non-zero exit is that cron/monitoring can see it. The
+      # remote (mabs.sh) path already propagates this; the cloud path was
+      # silently dropping it, so a broken ossutil token looked like a green
+      # backup run with nothing actually uploaded.
+      echo "${CFAILURE}${dest_type} upload failed for ${DB_FILE}${CEND}"
+      backup_failed=1
     fi
   done
 }
@@ -284,6 +292,9 @@ web_cloud_backup() {
     if [ $? -eq 0 ]; then
       cloud_delete_old "${dest_type}" "${bucket_name}"
       ! has_local_backup && rm -f "${PUSH_FILE}"
+    else
+      echo "${CFAILURE}${dest_type} upload failed for ${PUSH_FILE}${CEND}"
+      backup_failed=1
     fi
   done
 }

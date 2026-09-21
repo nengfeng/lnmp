@@ -159,6 +159,12 @@ load_versions() {
     value=$(echo "$value" | tr -d '[:space:]')
     VERSIONS[$key]=$value
   done < "${VERSIONS_FILE}"
+
+  # glibc tag baked into the MySQL binary tarball name (see versions.txt).
+  # Kept in sync with install.sh / include/db-common.sh / include/upgrade_db.sh
+  # so the offline pre-downloader fetches exactly the same file the install
+  # expects.
+  GLIBC_TAG="${VERSIONS[mysql_binary_glibc_tag]:-glibc2.28}"
   
   log INFO "Loaded ${#VERSIONS[@]} version definitions"
 }
@@ -592,9 +598,9 @@ download_component() {
     local rename_dir_template=$(echo "$line" | cut -d'|' -f8)
     
     # 替换架构变量
-    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
-    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
-    filename_template=$(echo "$filename_template" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
+    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g" | sed "s/{glibc_tag}/${GLIBC_TAG}/g")
+    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g" | sed "s/{glibc_tag}/${GLIBC_TAG}/g")
+    filename_template=$(echo "$filename_template" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g" | sed "s/{glibc_tag}/${GLIBC_TAG}/g")
     
     if [[ "$name" == "$component" ]]; then
       found=1
@@ -721,8 +727,8 @@ list_components() {
     local checksum_type=$(echo "$line" | cut -d'|' -f6)
     
     # 替换架构变量
-    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
-    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g")
+    official_url=$(echo "$official_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g" | sed "s/{glibc_tag}/${GLIBC_TAG}/g")
+    china_url=$(echo "$china_url" | sed "s/{arch_i}/${SYS_ARCH_I}/g" | sed "s/{arch_n}/${SYS_ARCH_N}/g" | sed "s/{arch_m}/${SYS_ARCH_M}/g" | sed "s/{glibc_tag}/${GLIBC_TAG}/g")
     local ver=$(get_version "$name")
     
     local mirror_status=""

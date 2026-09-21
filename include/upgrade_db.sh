@@ -119,7 +119,7 @@ Upgrade_DB() {
         DB_filename=mariadb-${NEW_db_ver}-linux-systemd-$SYS_ARCH_M
         DB_URL=${DOWN_ADDR}/mariadb-${NEW_db_ver}/bintar-linux-systemd-$SYS_ARCH_M/${DB_filename}.tar.gz
       elif [[ "${DB}" == MySQL ]]; then
-        DB_filename=mysql-${NEW_db_ver}-linux-glibc2.28-$SYS_ARCH_M
+        DB_filename=mysql-${NEW_db_ver}-linux-${mysql_binary_glibc_tag}-$SYS_ARCH_M
         DB_URL=${DOWN_ADDR}/MySQL-$(echo ${NEW_db_ver} | awk -F. '{print $1"."$2}')/${DB_filename}.tar.xz
       fi
       local db_archive_file=""

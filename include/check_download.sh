@@ -380,7 +380,7 @@ checkDownload() {
         # MySQL 9.7
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 9.7 binary..."
-          FILE_NAME=mysql-${mysql97_ver}-linux-glibc2.28-$(uname -m).tar.xz
+          FILE_NAME=mysql-${mysql97_ver}-linux-${mysql_binary_glibc_tag}-$(uname -m).tar.xz
         else
           echo "Download MySQL 9.7 source..."
           FILE_NAME=mysql-${mysql97_ver}.tar.gz
@@ -393,7 +393,7 @@ checkDownload() {
         # MySQL 8.4
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 8.4 binary..."
-          FILE_NAME=mysql-${mysql84_ver}-linux-glibc2.28-$(uname -m).tar.xz
+          FILE_NAME=mysql-${mysql84_ver}-linux-${mysql_binary_glibc_tag}-$(uname -m).tar.xz
         else
           echo "Download MySQL 8.4 source..."
           FILE_NAME=mysql-${mysql84_ver}.tar.gz
@@ -406,7 +406,7 @@ checkDownload() {
         # MySQL 8.0
         if [[ "${dbinstallmethod}" == "1" ]]; then
           echo "Download MySQL 8.0 binary..."
-          FILE_NAME=mysql-${mysql80_ver}-linux-glibc2.28-$(uname -m).tar.xz
+          FILE_NAME=mysql-${mysql80_ver}-linux-${mysql_binary_glibc_tag}-$(uname -m).tar.xz
         else
           echo "Download MySQL 8.0 source..."
           FILE_NAME=mysql-${mysql80_ver}.tar.gz

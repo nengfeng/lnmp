@@ -327,15 +327,19 @@ Upgrade_Tengine() {
         src_url="https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz" && Download_src "lua-cjson-${lua_cjson_ver}.tar.gz"
         src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
         src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
-        tar xzf openssl-${openssl_ver}.tar.gz
-        tar xzf pcre2-${pcre_ver}.tar.gz
-        tar xzf "ngx_brotli-master.tar.gz"
+        tar xzf openssl-${openssl_ver}.tar.gz       || { fail_msg "Tengine upgrade (extract openssl)"; }
+        tar xzf pcre2-${pcre_ver}.tar.gz             || { fail_msg "Tengine upgrade (extract pcre2)"; }
+        tar xzf "ngx_brotli-master.tar.gz"          || { fail_msg "Tengine upgrade (extract ngx_brotli)"; }
         rm -rf ngx_brotli
-        mv ngx_brotli-master ngx_brotli
-        tar xzf "brotli-${brotli_ver}.tar.gz"
+        if [ -d ngx_brotli-master ]; then
+          mv ngx_brotli-master ngx_brotli || { fail_msg "Tengine upgrade (repack ngx_brotli)"; }
+        elif [ ! -d ngx_brotli ]; then
+          fail_msg "Tengine upgrade (ngx_brotli directory not found)"
+        fi
+        tar xzf "brotli-${brotli_ver}.tar.gz"       || { fail_msg "Tengine upgrade (extract brotli)"; }
         rm -rf ngx_brotli/deps/brotli
         mkdir -p ngx_brotli/deps
-        mv brotli-${brotli_ver} ngx_brotli/deps/brotli
+        mv brotli-${brotli_ver} ngx_brotli/deps/brotli || { fail_msg "Tengine upgrade (install brotli into ngx_brotli/deps)"; }
         echo "Download [${CMSG}tengine-${NEW_tengine_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -353,9 +357,9 @@ Upgrade_Tengine() {
       echo "Press Ctrl+c to cancel or Press any key to continue..."
       char=$(get_char)
     fi
-    tar xzf tengine-${NEW_tengine_ver}.tar.gz
+    tar xzf tengine-${NEW_tengine_ver}.tar.gz || { fail_msg "Tengine upgrade (extract tengine)"; }
     pushd tengine-${NEW_tengine_ver}
-    make clean
+    make clean || true
     local tengine_v_tmp=$(mktemp "${current_dir}/src/tengine_v.XXXXXX")
     ${tengine_install_dir}/sbin/nginx -V &> "${tengine_v_tmp}"
     tengine_configure_args_tmp=$(grep 'configure arguments:' "${tengine_v_tmp}" | awk -F: '{print $2}')
@@ -387,18 +391,18 @@ Upgrade_Tengine() {
     # Build LuaJIT and install lua deps if not present
     if [ ! -e "/usr/local/lib/libluajit-5.1.so" ]; then
       src_url="https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz" && Download_src "luajit2-${luajit2_ver}.tar.gz"
-      tar xzf "luajit2-${luajit2_ver}.tar.gz"
+      tar xzf "luajit2-${luajit2_ver}.tar.gz" || { fail_msg "Tengine upgrade (extract luajit2)"; }
       pushd "luajit2-${luajit2_ver}"
-      make && make install
+      make && make install || { fail_msg "LuaJIT build (luajit2)"; }
       popd > /dev/null
       rm -rf "luajit2-${luajit2_ver}"
       ldconfig
     fi
 
     src_url="https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz" && Download_src "lua-resty-core-${lua_resty_core_ver}.tar.gz"
-    tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz"
+    tar xzf "lua-resty-core-${lua_resty_core_ver}.tar.gz" || { fail_msg "Tengine upgrade (extract lua-resty-core)"; }
     pushd "lua-resty-core-${lua_resty_core_ver}"
-    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1 || { fail_msg "Lua resty-core install"; }
     popd > /dev/null
     if [ -f "/usr/local/lib/lua/5.1/resty/core.lua" ] && [ ! -e "/usr/local/lib/lua/5.1/resty/core/init.lua" ]; then
         cp "/usr/local/lib/lua/5.1/resty/core.lua" "/usr/local/lib/lua/5.1/resty/core/init.lua"
@@ -406,18 +410,18 @@ Upgrade_Tengine() {
     rm -rf "lua-resty-core-${lua_resty_core_ver}"
 
     src_url="https://github.com/openresty/lua-resty-lrucache/archive/refs/tags/v${lua_resty_lrucache_ver}.tar.gz" && Download_src "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
-    tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz"
+    tar xzf "lua-resty-lrucache-${lua_resty_lrucache_ver}.tar.gz" || { fail_msg "Tengine upgrade (extract lua-resty-lrucache)"; }
     pushd "lua-resty-lrucache-${lua_resty_lrucache_ver}"
-    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1 || { fail_msg "Lua resty-lrucache install"; }
     popd > /dev/null
     rm -rf "lua-resty-lrucache-${lua_resty_lrucache_ver}"
 
     # Build lua-cjson (Lua C module for JSON support)
     if [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ]; then
-      tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
+      tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz" || { fail_msg "Tengine upgrade (extract lua-cjson)"; }
       pushd "lua-cjson-${lua_cjson_ver}"
       sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
-      make -j$(nproc) && make install
+      make -j$(nproc) && make install || { fail_msg "lua-cjson build"; }
       [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
       popd > /dev/null
       rm -rf "lua-cjson-${lua_cjson_ver}"
@@ -425,7 +429,7 @@ Upgrade_Tengine() {
 
     # Download lua-nginx-module for Tengine build
     src_url="https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz" && Download_src "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
-    tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+    tar xzf "lua-nginx-module-${lua_nginx_module_ver}.tar.gz" || { fail_msg "Tengine upgrade (extract lua-nginx-module)"; }
 
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
@@ -439,14 +443,14 @@ Upgrade_Tengine() {
       # baked the build host's CPU features in and risked SIGILL after a VPS
       # live migration onto older hardware. Same rationale as web-common.sh.
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_INSTALL_PREFIX=./installed ..
-      cmake --build . --config Release --target brotlienc
+        -DCMAKE_INSTALL_PREFIX=./installed .. || { fail_msg "Tengine upgrade (brotli cmake configure)"; }
+      cmake --build . --config Release --target brotlienc || { fail_msg "Tengine upgrade (brotli build)"; }
       popd > /dev/null
       popd > /dev/null
     fi
 
-    ./configure ${tengine_configure_args}
-    make
+    ./configure ${tengine_configure_args} || { fail_msg "Tengine upgrade (configure)"; }
+    compile_check
     if [ -f "objs/nginx" ]; then
       echo "Config test with new binary......"
       if ! ./objs/nginx -t; then
@@ -503,16 +507,20 @@ Upgrade_OpenResty() {
         src_url="https://github.com/openresty/lua-cjson/archive/refs/tags/${lua_cjson_ver}.tar.gz" && Download_src "lua-cjson-${lua_cjson_ver}.tar.gz"
         src_url="https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz" && Download_src "ngx_brotli-master.tar.gz"
         src_url="https://github.com/google/brotli/archive/refs/tags/v${brotli_ver}.tar.gz" && Download_src "brotli-${brotli_ver}.tar.gz"
-        tar xzf openssl-${openssl_ver}.tar.gz
-        tar xzf pcre2-${pcre_ver}.tar.gz
-        tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
-        tar xzf "ngx_brotli-master.tar.gz"
+        tar xzf openssl-${openssl_ver}.tar.gz       || { fail_msg "OpenResty upgrade (extract openssl)"; }
+        tar xzf pcre2-${pcre_ver}.tar.gz             || { fail_msg "OpenResty upgrade (extract pcre2)"; }
+        tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz" || { fail_msg "OpenResty upgrade (extract lua-cjson)"; }
+        tar xzf "ngx_brotli-master.tar.gz"          || { fail_msg "OpenResty upgrade (extract ngx_brotli)"; }
         rm -rf ngx_brotli
-        mv ngx_brotli-master ngx_brotli
-        tar xzf "brotli-${brotli_ver}.tar.gz"
+        if [ -d ngx_brotli-master ]; then
+          mv ngx_brotli-master ngx_brotli || { fail_msg "OpenResty upgrade (repack ngx_brotli)"; }
+        elif [ ! -d ngx_brotli ]; then
+          fail_msg "OpenResty upgrade (ngx_brotli directory not found)"
+        fi
+        tar xzf "brotli-${brotli_ver}.tar.gz"       || { fail_msg "OpenResty upgrade (extract brotli)"; }
         rm -rf ngx_brotli/deps/brotli
         mkdir -p ngx_brotli/deps
-        mv brotli-${brotli_ver} ngx_brotli/deps/brotli
+        mv brotli-${brotli_ver} ngx_brotli/deps/brotli || { fail_msg "OpenResty upgrade (install brotli into ngx_brotli/deps)"; }
         echo "Download [${CMSG}openresty-${NEW_openresty_ver}.tar.gz${CEND}] successfully! "
         break
       else
@@ -530,7 +538,7 @@ Upgrade_OpenResty() {
       echo "Press Ctrl+c to cancel or Press any key to continue..."
       char=$(get_char)
     fi
-    tar xzf openresty-${NEW_openresty_ver}.tar.gz
+    tar xzf openresty-${NEW_openresty_ver}.tar.gz || { fail_msg "OpenResty upgrade (extract openresty)"; }
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
@@ -541,28 +549,28 @@ Upgrade_OpenResty() {
       # baked the build host's CPU features in and risked SIGILL after a VPS
       # live migration onto older hardware. Same rationale as web-common.sh.
       cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_INSTALL_PREFIX=./installed ..
-      cmake --build . --config Release --target brotlienc
+        -DCMAKE_INSTALL_PREFIX=./installed .. || { fail_msg "OpenResty upgrade (brotli cmake configure)"; }
+      cmake --build . --config Release --target brotlienc || { fail_msg "OpenResty upgrade (brotli build)"; }
       popd > /dev/null
       popd > /dev/null
     fi
 
     # Build lua-cjson (Lua C module for JSON support)
     if [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ]; then
-      tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz"
+      tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz" || { fail_msg "OpenResty upgrade (extract lua-cjson)"; }
       pushd "lua-cjson-${lua_cjson_ver}"
       sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
-      make -j$(nproc) && make install
+      make -j$(nproc) && make install || { fail_msg "lua-cjson build"; }
       [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
       popd > /dev/null
       rm -rf "lua-cjson-${lua_cjson_ver}"
     fi
 
     pushd openresty-${NEW_openresty_ver}
-    make clean
+    make clean || true
     local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
     [ -n "$nginx_bundle_dir" ] && sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' "${nginx_bundle_dir}/auto/cc/gcc"
-    ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_v2_module --with-http_v3_module --with-http_ssl_module --with-stream --with-stream_ssl_preread_module --with-stream_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --add-module=../ngx_brotli --with-ld-opt="${allocator_ldflag--ljemalloc} -Wl,-u,pcre_version" ${nginx_modules_options}
+    ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_v2_module --with-http_v3_module --with-http_ssl_module --with-stream --with-stream_ssl_preread_module --with-stream_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --add-module=../ngx_brotli --with-ld-opt="${allocator_ldflag--ljemalloc} -Wl,-u,pcre_version" ${nginx_modules_options} || { fail_msg "OpenResty upgrade (configure)"; }
     compile_check
     local nginx_build_dir=$(ls -d build/nginx-* 2>/dev/null | head -1)
     if [ -n "$nginx_build_dir" ] && [ -f "${nginx_build_dir}/objs/nginx" ]; then
