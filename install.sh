@@ -52,10 +52,11 @@ version() {
 Show_Help() {
   version
   echo "Usage: $0  command ...[parameters]....
-  --version, -v               Show version info
+  --version, -v, -V           Show version info
+  --help, -h                  Show this help
   --nginx_option [1-3]        Install Nginx server version
   --php_option [1-${PHP_OPTION_MAX}]         Install PHP version
-  --mphp_ver [8${PHP_MINOR_MIN}~${PHP_MINOR_MAX}]          Install another PHP version (PATH: ${php_install_dir}\${mphp_ver})
+  --mphp_ver [8${PHP_MINOR_MIN}~8${PHP_MINOR_MAX}]          Install another PHP version (PATH: ${php_install_dir}\${mphp_ver})
   --mphp_addons               Only install another PHP addons
   --phpcache_option [1-2]     Install PHP opcode cache, default: 1 opcache
   --php_extensions [ext name] Install PHP extensions, include ioncube,
@@ -147,7 +148,7 @@ parse_args() {
         ;;
       --mphp_ver)
         mphp_ver=$2; mphp_flag=y; shift 2
-        [[ ! "${mphp_ver}" =~ ^8[${PHP_MINOR_MIN}-${PHP_MINOR_MAX}]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 8${PHP_MINOR_MIN}~${PHP_MINOR_MAX}${CEND}"; exit 1; }
+        [[ ! "${mphp_ver}" =~ ^8[${PHP_MINOR_MIN}-${PHP_MINOR_MAX}]$ ]] && { echo "${CWARNING}mphp_ver input error! Please only input number 8${PHP_MINOR_MIN}~8${PHP_MINOR_MAX}${CEND}"; exit 1; }
         ;;
       --mphp_addons)
         mphp_addons_flag=y; shift 1
