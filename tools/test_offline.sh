@@ -612,6 +612,28 @@ got=$(detect_backup_engine "" "$_eng/noexec"); _rc=$?
 
 rm -rf "$_eng"
 
+echo "== Upgrade_DB on a PostgreSQL-only host (include/upgrade_db.sh) =="
+# The reporting bug: db_install_dir is empty on such a host, so the generic
+# probe reported "MySQL/MariaDB is not installed" - identical to a box with no
+# database at all - and never hinted that PostgreSQL was present. The upgrade
+# itself stays out of scope (see the README roadmap); what has to change is
+# that the script admits what it found and says what to do instead.
+_pgup="$work/pgonly"; rm -rf "$_pgup"; mkdir -p "$_pgup/bin"
+printf '#!/bin/bash\necho "psql (PostgreSQL) 16.4"\n' > "$_pgup/bin/psql"
+chmod +x "$_pgup/bin/psql"
+# check_dir.sh leaves db_install_dir unset with no MySQL/MariaDB tree present
+db_install_dir=""; pgsql_install_dir="$_pgup"
+( Upgrade_DB ) > "$work/pgup.log" 2>&1; _rc=$?
+[ $_rc -ne 0 ] && ok "PostgreSQL-only host: Upgrade_DB exits non-zero" || ko "rc=$_rc"
+grep -q 'PostgreSQL 16.4' "$work/pgup.log" && ok "message names the installed PostgreSQL version" || ko "no version in: $(cat "$work/pgup.log")"
+if grep -q 'MySQL/MariaDB is not installed' "$work/pgup.log"; then
+  ko "still claims MySQL/MariaDB is missing"
+else
+  ok "no longer claims MySQL/MariaDB is missing"
+fi
+grep -q 'pg_dumpall' "$work/pgup.log" && ok "message says how to back up before upgrading" || ko "no pg_dumpall guidance in: $(cat "$work/pgup.log")"
+unset db_install_dir pgsql_install_dir
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }

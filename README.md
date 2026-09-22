@@ -479,7 +479,7 @@ systemctl {start|stop|restart} redis-server
 
 | 层级 | 工作流 | 内容 |
 |------|--------|------|
-| L0 静态/离线 | `lint.yml` | `bash -n` 全量语法检查、ShellCheck 静态分析（warning 级为门禁，info 级为 advisory）、12 项自定义静态护栏（`tools/lint/static_checks.sh`，含 README 与 `install.sh` 数据库菜单一致性检查）、离线逻辑测试 131 用例（`tools/test_offline.sh`）与发行版门禁决策表 21 用例（`tools/lint/os_gate_checks.sh`） |
+| L0 静态/离线 | `lint.yml` | `bash -n` 全量语法检查、ShellCheck 静态分析（warning 级为门禁，info 级为 advisory）、12 项自定义静态护栏（`tools/lint/static_checks.sh`，含 README 与 `install.sh` 数据库菜单一致性检查）、离线逻辑测试 135 用例（`tools/test_offline.sh`）与发行版门禁决策表 21 用例（`tools/lint/os_gate_checks.sh`） |
 | L1 发行版矩阵 | `container.yml` | 在 Debian 12/13、Ubuntu 24.04/26.04 四个容器内跑 `install.sh --preflight`，真装依赖、验证包名是否漂移 |
 | L2 全量冒烟 | `container.yml` | systemd 容器内跑 `tools/container/smoke.sh`：完整安装 → 幂等复跑 → `uninstall` 卸载，33 条断言闭环 |
 | L3 升级链 | `container-upgrade.yml` | systemd 容器内跑 `tools/container/upgrade_smoke.sh`：安装 Nginx/MariaDB/PHP/Redis → `upgrade.sh --db/--nginx/--php/--redis` → 幂等复跑 → 卸载。PHP 升级必然完整重编译，故超时放宽至 240 分钟，且可用 `UPGRADE_SMOKE_PHP=0` / `UPGRADE_SMOKE_REDIS=0` 关闭对应链路 |
@@ -488,6 +488,7 @@ systemctl {start|stop|restart} redis-server
 
 1. **配置验证** — 安装前自动校验 `options.conf` 参数合法性
 2. **多语言支持** — 支持中英文双语提示信息
+3. **PostgreSQL 自动升级** — `upgrade.sh --db` 目前只覆盖 MySQL/MariaDB。PostgreSQL 需先 `pg_dumpall` 备份，再用 `pg_upgrade`（源码安装）或发行版的 `pg_upgradecluster`（APT 安装）手动升级。在 PostgreSQL 主机上运行 `upgrade.sh --db` 会明确说明这一点并给出上述步骤，而不是误报 "MySQL/MariaDB is not installed"。
 
 ## 参与贡献与安全
 
@@ -496,7 +497,7 @@ systemctl {start|stop|restart} redis-server
 
   ```bash
   bash tools/lint/static_checks.sh      # 12 项静态护栏
-  bash tools/test_offline.sh            # 131 用例离线逻辑测试
+  bash tools/test_offline.sh            # 135 用例离线逻辑测试
   bash tools/lint/os_gate_checks.sh     # 21 用例发行版门禁
   shellcheck -S warning $(find . -name '*.sh' -not -path './src/*')
   ```

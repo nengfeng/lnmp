@@ -63,6 +63,15 @@ Work merged after v1.7.5 and not yet cut into a release.
   MySQL/MariaDB-only by design: `pg_dump` emits no footer, but its non-zero
   exit already rejects a full disk or a killed run. Adds 8 offline tests for
   the probe (123 → 131).
+- **`upgrade.sh --db` claimed no database was installed on a PostgreSQL host.**
+  `Upgrade_DB` probed `${db_install_dir}/bin/mysql`, which is never assigned on
+  such a host, so a perfectly working PostgreSQL reported "MySQL/MariaDB is not
+  installed on your system!" — indistinguishable from a box with nothing
+  installed, and with no hint that PostgreSQL had been found but is
+  unsupported. It now detects PostgreSQL first, names the running version, and
+  points at `pg_dumpall` plus `pg_upgrade` / `pg_upgradecluster`. The upgrade
+  itself is not implemented and is recorded under the README's roadmap. Adds 4
+  offline tests (131 → 135).
 
 ### Changed
 

@@ -50,6 +50,21 @@ rollback_db_upgrade() {
 }
 
 Upgrade_DB() {
+  # PostgreSQL has no automated upgrade path in this script. Detect it BEFORE
+  # the MySQL/MariaDB probe below: db_install_dir is never assigned on a
+  # PostgreSQL-only host (include/check_dir.sh only ever fills it from a
+  # MySQL/MariaDB tree), so that probe expanded to /bin/mysql and the user was
+  # told "MySQL/MariaDB is not installed on your system!" while PostgreSQL was
+  # sitting right there - indistinguishable from a box with no database at
+  # all, and with no hint of what to do instead.
+  if [ ! -e "${db_install_dir}/bin/mysql" ] && [ -e "${pgsql_install_dir}/bin/psql" ]; then
+    local pg_cur
+    pg_cur=$("${pgsql_install_dir}/bin/psql" --version 2>/dev/null | awk '{print $NF}')
+    [ -z "${pg_cur}" ] && pg_cur="(version unknown)"
+    echo "${CFAILURE}PostgreSQL ${pg_cur} is installed, but upgrade.sh --db only upgrades MySQL/MariaDB.${CEND}"
+    echo "${CWARNING}Automated PostgreSQL upgrade is not implemented yet. Back up first with pg_dumpall, then use pg_upgrade (source install) or your distribution's pg_upgradecluster (APT install).${CEND}"
+    exit 1
+  fi
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${db_install_dir}/bin/mysql" ] && echo "${CWARNING}MySQL/MariaDB is not installed on your system! ${CEND}" && exit 1
   [[ "${armplatform}" == y ]] && echo "${CWARNING}The arm architecture operating system does not support upgrading MySQL/MariaDB! ${CEND}" && exit 1
