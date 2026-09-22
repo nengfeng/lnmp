@@ -51,6 +51,18 @@ Work merged after v1.7.5 and not yet cut into a release.
   as one quoted word instead of `eval`'d).
 - **Entrypoint scripts exited non-zero on success** where a bare `trap`/`popd`
   was the last statement.
+- **PostgreSQL databases were never backed up.** `tools/db_bk.sh` only ever
+  asked MySQL, and `db_install_dir` is never assigned on a PostgreSQL-only
+  host (`include/check_dir.sh` derives it from the MySQL/MariaDB tree alone),
+  so the existence probe ran against `/bin/mysql`, logged `[dbname] not exist`
+  and set `backup_failed=1` — every scheduled run failed while backing up
+  nothing. The engine is now chosen by a `detect_backup_engine` helper, and
+  PostgreSQL is dumped with `pg_dump` over `127.0.0.1`, because `pg_hba.conf`
+  runs both `local` and host lines in md5 mode and this script is root rather
+  than the `postgres` role. The `-- Dump completed` truncation guard remains
+  MySQL/MariaDB-only by design: `pg_dump` emits no footer, but its non-zero
+  exit already rejects a full disk or a killed run. Adds 8 offline tests for
+  the probe (123 → 131).
 
 ### Changed
 

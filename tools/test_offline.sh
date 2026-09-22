@@ -556,6 +556,62 @@ grep -q '_old_20250104' "$work/rb4.log" && ok "failure message tells the user wh
 rm -rf "$_dbi" "$_dbd" "${_dbi}_old_"* "${_dbd}_old_"*
 unset -f wait_for_db_ready pidof
 
+echo "== detect_backup_engine (include/check_dir.sh) =="
+# The bug this function exists for: on a PostgreSQL-only host db_install_dir
+# is EMPTY (check_dir.sh only ever assigns it from a MySQL/MariaDB tree), so
+# the old tools/db_bk.sh built "/bin/mysql", the existence probe never matched
+# and every PostgreSQL database was reported as missing - i.e. never backed up.
+pushd "$ROOT" > /dev/null || exit 97
+. ./include/check_dir.sh
+popd > /dev/null
+
+_eng="$work/engine"; rm -rf "$_eng"
+_mk_mysqldump(){ mkdir -p "$1/bin"; : > "$1/bin/mysqldump"; chmod +x "$1/bin/mysqldump"; }
+_mk_pgsql(){ mkdir -p "$1/bin"; : > "$1/bin/pg_dump"; : > "$1/bin/psql"; chmod +x "$1/bin/pg_dump" "$1/bin/psql"; }
+
+# The exact failing shape: no MySQL/MariaDB dir at all, so the first argument
+# is the empty string a PostgreSQL-only box really passes.
+_mk_pgsql "$_eng/pgsql"
+got=$(detect_backup_engine "" "$_eng/pgsql"); _rc=$?
+[ "$got" = "pgsql" ] && [ $_rc -eq 0 ] && ok "PostgreSQL-only host selects pgsql (db_install_dir empty)" || ko "got [$got] rc=$_rc"
+
+# Nothing installed at all must be an explicit, non-zero answer - the caller
+# turns "none" into a logged failure instead of a silent skip.
+got=$(detect_backup_engine "" ""); _rc=$?
+[ "$got" = "none" ] && [ $_rc -ne 0 ] && ok "no engine -> 'none' and rc!=0" || ko "got [$got] rc=$_rc"
+
+_mk_mysqldump "$_eng/mysql8"
+got=$(detect_backup_engine "$_eng/mysql8" "")
+[ "$got" = "mysql" ] && ok "MySQL tree selects mysql" || ko "got [$got]"
+
+_mk_mysqldump "$_eng/mariadb"
+got=$(detect_backup_engine "$_eng/mariadb" "")
+[ "$got" = "mysql" ] && ok "MariaDB tree maps to the same mysql bucket" || ko "got [$got]"
+
+# Historical default pinned: when both trees exist MySQL must keep winning,
+# otherwise an existing backup job would silently switch engines.
+got=$(detect_backup_engine "$_eng/mysql8" "$_eng/pgsql")
+[ "$got" = "mysql" ] && ok "mysql wins when both trees exist (historical default)" || ko "got [$got]"
+
+# A MySQL dir without mysqldump must not shadow a perfectly good PostgreSQL
+# install: the probe is on the binary, not on the directory.
+mkdir -p "$_eng/brokenmysql"
+got=$(detect_backup_engine "$_eng/brokenmysql" "$_eng/pgsql")
+[ "$got" = "pgsql" ] && ok "dir without mysqldump falls through to pgsql" || ko "got [$got]"
+
+# Half a PostgreSQL tree (pg_dump but no psql) is unusable for both the probe
+# and the dump - reject it rather than start a dump we cannot verify.
+mkdir -p "$_eng/partial/bin"; : > "$_eng/partial/bin/pg_dump"; chmod +x "$_eng/partial/bin/pg_dump"
+got=$(detect_backup_engine "" "$_eng/partial"); _rc=$?
+[ "$got" = "none" ] && [ $_rc -ne 0 ] && ok "pgsql tree missing psql is rejected" || ko "got [$got] rc=$_rc"
+
+# -x not -e: a non-executable file present in the tree must not count.
+mkdir -p "$_eng/noexec/bin"; : > "$_eng/noexec/bin/pg_dump"; : > "$_eng/noexec/bin/psql"
+got=$(detect_backup_engine "" "$_eng/noexec"); _rc=$?
+[ "$got" = "none" ] && [ $_rc -ne 0 ] && ok "non-executable pg binaries do not count" || ko "got [$got] rc=$_rc"
+
+rm -rf "$_eng"
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }
