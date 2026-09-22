@@ -552,7 +552,7 @@ rm -rf "$_dbi" "$_dbd"; mkdir -p "$_dbi" "$_dbd" "${_dbi}_old_20250104" "${_dbd}
 rollback_db_upgrade "$_dbi" "$_dbd" "20250104" > "$work/rb4.log" 2>&1; _rc=$?
 [ $_rc -ne 0 ] && ok "rollback fails when the restored server will not start" || ko "reported success over a database that cannot start"
 grep -q 'could not be restarted' "$work/rb4.log" && ok "unstartable-restore failure names the cause" || ko "message missing: $(cat "$work/rb4.log")"
-grep -q '_old_20250104' "$work/rb4.log" && ok "failure message tells the user where the data still is" || ko "data location not mentioned in the failure message"
+grep -Fq "$_dbi" "$work/rb4.log" && grep -Fq "$_dbd" "$work/rb4.log" && ok "failure message points at the restored install and data dirs" || ko "restored data location not mentioned in: $(cat "$work/rb4.log")"
 rm -rf "$_dbi" "$_dbd" "${_dbi}_old_"* "${_dbd}_old_"*
 unset -f wait_for_db_ready pidof
 

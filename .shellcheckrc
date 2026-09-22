@@ -13,4 +13,4 @@
 # Subtle behavioral bugs (swallowed pipeline exits, CWD leaks, unguarded
 # extractions) are caught by tools/lint/static_checks.sh and
 # tools/test_offline.sh instead.
-disable=SC1072,SC073,SC2034,SC2068,SC2086,SC2144,SC2154,SC2155,SC2164,SC2183
+disable=SC1072,SC1073,SC2034,SC2068,SC2086,SC2144,SC2154,SC2155,SC2164,SC2183

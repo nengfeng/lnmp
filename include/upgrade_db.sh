@@ -45,7 +45,7 @@ rollback_db_upgrade() {
     echo "${CSUCCESS}Rollback complete: restored ${OLD_db_ver}.${CEND}"
     return 0
   fi
-  echo "${CFAILURE}Rollback failed: previous ${DB} could not be restarted. Data is preserved at ${install_dir}_old_${ts} / ${data_dir}_old_${ts}.${CEND}"
+  echo "${CFAILURE}Rollback failed: previous ${DB} could not be restarted. The restored data is preserved at ${install_dir} / ${data_dir}.${CEND}"
   return 1
 }
 
@@ -57,7 +57,11 @@ Upgrade_DB() {
   # told "MySQL/MariaDB is not installed on your system!" while PostgreSQL was
   # sitting right there - indistinguishable from a box with no database at
   # all, and with no hint of what to do instead.
-  if [ ! -e "${db_install_dir}/bin/mysql" ] && [ -e "${pgsql_install_dir}/bin/psql" ]; then
+  # `-z` first: on a PostgreSQL-only host db_install_dir is EMPTY (check_dir.sh
+  # only ever fills it from a MySQL/MariaDB tree), and an empty dir would expand
+  # to /bin/mysql -- which a preinstalled mysql-client makes exist, hiding the
+  # real situation and falling through to the MySQL password prompt below.
+  if { [ -z "${db_install_dir}" ] || [ ! -e "${db_install_dir}/bin/mysql" ]; } && [ -e "${pgsql_install_dir}/bin/psql" ]; then
     local pg_cur
     pg_cur=$("${pgsql_install_dir}/bin/psql" --version 2>/dev/null | awk '{print $NF}')
     [ -z "${pg_cur}" ] && pg_cur="(version unknown)"
@@ -66,7 +70,7 @@ Upgrade_DB() {
     exit 1
   fi
   pushd ${current_dir}/src > /dev/null
-  [ ! -e "${db_install_dir}/bin/mysql" ] && echo "${CWARNING}MySQL/MariaDB is not installed on your system! ${CEND}" && exit 1
+  { [ -z "${db_install_dir}" ] || [ ! -e "${db_install_dir}/bin/mysql" ]; } && echo "${CWARNING}MySQL/MariaDB is not installed on your system! ${CEND}" && exit 1
   [[ "${armplatform}" == y ]] && echo "${CWARNING}The arm architecture operating system does not support upgrading MySQL/MariaDB! ${CEND}" && exit 1
 
   # check db passwd
