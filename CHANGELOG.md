@@ -99,6 +99,15 @@ Work merged after v1.7.5 and not yet cut into a release.
   installer's default (`mysql97`, `db_option 1`); every other version stays a
   named download away. Two offline tests assert that the list resolves
   against `sources.conf` and that a database is present (161 → 163).
+- **`install.sh --help` advertised a value the parser would refuse.**
+  `--mphp_ver` rendered as `[83~5]`: the echo interpolated `PHP_MINOR_MIN`
+  and `PHP_MINOR_MAX` with no second leading `8`, so the range read 83~5
+  instead of 83~85 — and the parser's own rejection message repeated the
+  typo ("Please only input number 83~5") while it accepts 83/84/85 (the
+  test is `^8[3-5]$`, and `mphp_ver` is the install-dir suffix, e.g.
+  `php84`). The help text also omitted `-V` and `-h|--help`, both accepted
+  by the parser, so the help flag could not be discovered from `--help`
+  itself.
 
 ### Changed
 
@@ -124,6 +133,13 @@ Work merged after v1.7.5 and not yet cut into a release.
   minutes to accommodate PHP's mandatory source recompile.
 - Project governance docs: `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`
   and GitHub issue templates.
+- **Complete `install.sh` parameter table in the README** — all 23 options the
+  parser accepts, with their value ranges, defaults and per-option semantics
+  (`--md5sum` verifies the installer script itself against upstream
+  `md5sum.txt`, `--mphp_ver` takes `83`/`84`/`85`, `--dbrootpwd` feeds both
+  the MySQL and the PostgreSQL superuser). The README previously showed a
+  single example invocation, and 15 of those 23 options appeared nowhere in
+  it — including `--help`.
 
 ## [1.7.5] - 2026-09-19
 

@@ -60,6 +60,36 @@ vim options.conf
 ./install.sh --nginx_option 1 --db_option 1 --php_option 2 --dbrootpwd "YourPassword"
 ```
 
+### 4. install.sh 命令行参数
+
+不带参数运行 `./install.sh` 进入交互式安装；无人值守安装使用下表参数，`bash install.sh --help` 打印同一份清单：
+
+| 参数 | 取值 | 说明 |
+|------|------|------|
+| `--version, -v, -V` | - | 显示版本信息后退出 |
+| `--help, -h` | - | 显示帮助后退出 |
+| `--nginx_option` | `1-3` | Web 服务器：1=Nginx、2=Tengine、3=OpenResty |
+| `--php_option` | `1-3` | PHP 版本：1=8.3、2=8.4、3=8.5 |
+| `--mphp_ver` | `83`~`85` | 另装一个 PHP（83=8.3、84=8.4、85=8.5），装入 `${php_install_dir}` 拼上该值的目录，如 `php84` |
+| `--mphp_addons` | - | 只为 `--mphp_ver` 那套并行 PHP 安装扩展 |
+| `--phpcache_option` | `1-2` | opcode 缓存：1=opcache（默认）、2=APCu |
+| `--php_extensions` | 扩展名列表 | 逗号或空格分隔，可选：ioncube、imagick、fileinfo、imap、ldap、phalcon、yaf、redis、memcached、memcache、mongodb、swoole、xdebug |
+| `--nodejs` | - | 安装 Node.js（已安装则跳过） |
+| `--db_option` | `1-8` | 数据库，取值见上文「主要配置项」中的 `db_option` |
+| `--dbrootpwd` | 密码 | 数据库超级密码，MySQL/MariaDB 的 `root` 与 PostgreSQL 的 `postgres` 共用；不可含 `+`、`\|`、`&` |
+| `--dbinstallmethod` | `1-2` | MySQL/MariaDB 安装方式：1=二进制包（默认）、2=源码编译；ARM 上强制 2 |
+| `--pgsqlinstallmethod` | `1-2` | PostgreSQL 安装方式：1=APT 源（默认）、2=源码编译 |
+| `--pgsql_ver` | 版本号 | PostgreSQL 版本，默认取最新（18.x）；交互菜单给 18/17/16 |
+| `--pureftpd` | - | 安装 Pure-FTPd |
+| `--redis` | - | 安装 Redis |
+| `--memcached` | - | 安装 Memcached |
+| `--phpmyadmin` | - | 安装 phpMyAdmin |
+| `--ssh_port` | 端口 | 设置 SSH 端口：22 或 1025~65534 |
+| `--firewall` | - | 启用防火墙 |
+| `--md5sum` | - | 校验安装脚本自身与上游 `md5sum.txt` 的 md5/sha256 |
+| `--reboot` | - | 安装完成后重启服务器 |
+| `--preflight` | - | 只校验本发行版能否满足安装依赖（APT 解析）即退出，不下载、不编译；会实际安装依赖包，供 CI / 试跑用 |
+
 ## 架构设计
 
 ### 目录结构
