@@ -72,6 +72,14 @@ Work merged after v1.7.5 and not yet cut into a release.
   points at `pg_dumpall` plus `pg_upgrade` / `pg_upgradecluster`. The upgrade
   itself is not implemented and is recorded under the README's roadmap. Adds 4
   offline tests (131 → 135).
+- **Offline pre-downloads missed several installable database versions.**
+  `sources.conf` carried `mariadb123`/`mariadb118` but nothing for MariaDB 11.4
+  or 10.11, `mysql-src` was pinned to 9.7, and a single `postgresql` key
+  resolved to `pgsql18_ver` — so `--db_option 6/7`, a source build of MySQL
+  8.4/8.0 (`--dbinstallmethod 2`), and `--pgsql_ver` 17/16 all had nothing to
+  pre-download and an offline install died on a missing source.
+  `sources.conf` and `get_version` now agree on every version `install.sh` can
+  choose, guarded by an 18-case matrix test (135 → 153).
 
 ### Changed
 

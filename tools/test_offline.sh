@@ -634,6 +634,58 @@ fi
 grep -q 'pg_dumpall' "$work/pgup.log" && ok "message says how to back up before upgrading" || ko "no pg_dumpall guidance in: $(cat "$work/pgup.log")"
 unset db_install_dir pgsql_install_dir
 
+echo "== offline prefetch covers every installable database version =="
+# The gap: sources.conf carried mariadb123/mariadb118 but nothing for 11.4 or
+# 10.11, mysql-src was pinned to 9.7, and one "postgresql" key resolved to
+# pgsql18_ver - so db_option 6/7, a source build of MySQL 8.4/8.0, and
+# pgsql_option 2/3 left nothing to pre-download, and an offline install then
+# died on a missing source. The check is two-sided on purpose: a key with no
+# get_version case, or the reverse, only fails at download time.
+set +e
+. "$ROOT/download_sources.sh" >/dev/null 2>&1
+set +e
+# download_sources.sh derives VERSIONS_FILE from $0, which points at this test
+# script (tools/), so point it at the real versions.txt before loading.
+VERSIONS_FILE="$ROOT/versions.txt"
+load_versions >/dev/null 2>&1
+. "$ROOT/versions.txt"
+
+_pf(){  # _pf <component> <expected version>
+  local comp=$1 want=$2 keys got
+  keys=$(grep -c "^${comp}|" "$ROOT/sources.conf")
+  got=$(get_version "$comp")
+  if [ "${keys:-0}" -ge 1 ] && [ "${got}" = "${want}" ]; then
+    ok "${comp} -> ${want}"
+  else
+    ko "${comp}: sources.conf keys=${keys}, get_version=[${got}], want=[${want}]"
+  fi
+}
+
+# MySQL: binary and source (db_option 1-3, dbinstallmethod 1/2)
+_pf mysql97     "${mysql97_ver}"
+_pf mysql84     "${mysql84_ver}"
+_pf mysql80     "${mysql80_ver}"
+_pf mysql-src   "${mysql97_ver}"
+_pf mysql84-src "${mysql84_ver}"
+_pf mysql80-src "${mysql80_ver}"
+
+# MariaDB: binary and source (db_option 4-7, dbinstallmethod 1/2)
+_pf mariadb123      "${mariadb123_ver}"
+_pf mariadb118      "${mariadb118_ver}"
+_pf mariadb         "${mariadb118_ver}"
+_pf mariadb114      "${mariadb114_ver}"
+_pf mariadb1011     "${mariadb1011_ver}"
+_pf mariadb-src     "${mariadb118_ver}"
+_pf mariadb114-src  "${mariadb114_ver}"
+_pf mariadb1011-src "${mariadb1011_ver}"
+
+# PostgreSQL source builds (db_option 8, pgsqlinstallmethod 2, pgsql_option 1-3)
+_pf postgresql   "${pgsql18_ver}"
+_pf postgresql18 "${pgsql18_ver}"
+_pf postgresql17 "${pgsql17_ver}"
+_pf postgresql16 "${pgsql16_ver}"
+unset -f _pf
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }
