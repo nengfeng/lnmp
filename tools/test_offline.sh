@@ -210,7 +210,7 @@ systemctl(){
 }
 
 UNIT_TYPE=simple;  svc_unit_is_simple probe && ok "Type=simple is gated for re-check"   || ko "simple not gated"
-UNIT_TYPE=exec;    svc_unit_is_simple probe && ok "Type=exec is gated for re-check"     || ko "exec not gated"
+UNIT_TYPE='exec';  svc_unit_is_simple probe && ok "Type=exec is gated for re-check"     || ko "exec not gated"
 UNIT_TYPE=notify;  svc_unit_is_simple probe && ko "notify wrongly gated"                || ok "notify is not gated"
 UNIT_TYPE=forking; svc_unit_is_simple probe && ko "forking wrongly gated"               || ok "forking is not gated"
 UNIT_TYPE="";      svc_unit_is_simple probe && ko "empty Type wrongly gated"            || ok "unknown Type is not gated"
@@ -337,6 +337,224 @@ pgp_run "$work/pgp/no-such-home" "$pgp_dir/keys"; pgp_rc=$?; [ "$pgp_rc" -ne 0 ]
 pgp_rc=$?
 [ "$pgp_rc" -ne 0 ] && ok "missing gpg fails verification instead of passing" || ko "missing gpg PASSED verification"
 unset GNUPGHOME
+
+# ---- db-common / php-common / upgrade_* : previously untested units ----
+# Sourced from $ROOT because upgrade_web.sh and upgrade_db.sh carry their own
+# RELATIVE `. include/...` lines, which only resolve when cwd is the repo root.
+pushd "$ROOT" > /dev/null || exit 97
+. ./include/db-common.sh
+. ./include/php-common.sh
+. ./include/upgrade_web.sh     # re-pulls include/common.sh
+. ./include/upgrade_php.sh
+. ./include/upgrade_db.sh      # re-pulls include/db-common.sh
+popd > /dev/null
+# Sourcing pulled common.sh in again and redefined the hard exitters - restore
+# the stubs exactly as the block at the top of this file does.
+die_hard(){ echo "STUB die_hard: $*" >&2; exit 43; }
+fail_msg(){ echo "STUB fail_msg: $*" >&2; }
+
+echo "== set_ld_opt (include/upgrade_web.sh) =="
+# The bug class this function exists for: rewriting --with-ld-opt with
+# `sed s@--with-ld-opt=[^ ]*@...@` stops at the first space, so an ld-opt whose
+# value holds several tokens (the allocator supplies exactly that) left the
+# tail of the OLD value stranded in the configure string.
+_ld_args='--prefix=/usr/local/nginx --with-ld-opt=-L/usr/local/lib -Wl,-u,pcre_version --with-http_ssl_module'
+got=$(set_ld_opt "$_ld_args" "-Wl,-rpath,/opt/lib")
+want='--prefix=/usr/local/nginx --with-ld-opt=-Wl,-rpath,/opt/lib --with-http_ssl_module'
+[ "$got" = "$want" ] && ok "multi-token old value fully replaced, no orphaned tail" || ko "got [$got]"
+got=$(set_ld_opt "$_ld_args" "")
+want='--prefix=/usr/local/nginx --with-http_ssl_module'
+[ "$got" = "$want" ] && ok "empty new value drops --with-ld-opt entirely" || ko "got [$got]"
+got=$(set_ld_opt "--with-ld-opt=-old --with-http_ssl_module" "-new")
+[ "$got" = "--with-ld-opt=-new --with-http_ssl_module" ] && ok "single-token value replaced" || ko "got [$got]"
+# Contract: set_ld_opt only ever REMOTES/REPLACES. Appending when the flag is
+# absent is the CALLER's job (upgrade_web.sh checks the result and appends), so
+# a no-op here is correct - pin it so a future "helpful" append cannot silently
+# double the flag next to the caller's own append.
+got=$(set_ld_opt "--prefix=/opt/x --with-http_v2_module" "-L/foo")
+[ "$got" = "--prefix=/opt/x --with-http_v2_module" ] && ok "absent flag is left alone (caller appends)" || ko "got [$got]"
+
+echo "== cleanup_mysql_files / cleanup_mariadb_files (include/db-common.sh) =="
+_cdir="$work/cleanup"; mkdir -p "$_cdir"; pushd "$_cdir" > /dev/null
+export SYS_ARCH_M=x86_64
+mkdir -p "mysql-8.4.11-linux-glibc2.28-x86_64" keepme boost_1_85_0 boost_9_9_9
+cleanup_mysql_files "8.4.11" "1" >/dev/null 2>&1
+[ ! -d "mysql-8.4.11-linux-glibc2.28-x86_64" ] && ok "method 1: glob'd binary tree removed" || ko "method 1 left the tree behind"
+[ -d keepme ] && ok "method 1: unrelated dir untouched" || ko "method 1 removed something it should not"
+# method 2 must take the boost dir THAT VERSION extracted and leave every other
+# boost_* alone - the old unquoted form interpolated whatever was in the var.
+cleanup_mysql_files "8.4.11" "2" "1.85.0" >/dev/null 2>&1
+[ ! -d boost_1_85_0 ] && ok "method 2: matching boost dir removed" || ko "method 2 left boost_1_85_0"
+[ -d boost_9_9_9 ] && ok "method 2: non-matching boost dir preserved" || ko "method 2 deleted boost_9_9_9"
+# Regression guard for the empty-boost case: with boost_ver unset the guard
+# must short-circuit BEFORE rm, so an unrelated boost_* is never in reach.
+mkdir -p "mysql-8.4.11" boost_9_9_9
+cleanup_mysql_files "8.4.11" "2" "" >/dev/null 2>&1
+[ ! -d "mysql-8.4.11" ] && ok "method 2: tree removed even with empty boost_ver" || ko "empty boost_ver blocked the tree cleanup"
+[ -d boost_9_9_9 ] && ok "empty boost_ver does NOT reach any boost_* dir" || ko "empty boost_ver deleted boost_9_9_9"
+# NOTE the '-linux-systemd-' infix: mariadb's binary tarball layout differs
+# from mysql's (mysql-<ver>-*-<arch>), so a test that omits it matches nothing
+# and would pass vacuously while the real cleanup path went untested.
+mkdir -p "mariadb-11.4.13-linux-systemd-x86_64"
+cleanup_mariadb_files "11.4.13" "1" >/dev/null 2>&1
+[ ! -d "mariadb-11.4.13-linux-systemd-x86_64" ] && ok "mariadb method 1: tree removed" || ko "mariadb method 1 left the tree"
+popd > /dev/null
+
+echo "== init_mysql_data / init_mariadb_data (include/db-common.sh) =="
+# These are the two callbacks that replaced the old `eval "${init_cmd}"` string
+# path. They take NO arguments - every path is read from the globals - so the
+# only thing worth pinning is that the binary receives exactly the basedir and
+# datadir it should. A fake binary records its argv.
+_idir="$work/initdb"; mkdir -p "$_idir/bin" "$_idir/scripts" "$_idir/data"
+_ARGLOG="$_idir/argv"
+for _fake in "$_idir/bin/mysqld" "$_idir/scripts/mysql_install_db"; do
+  printf '#!/bin/bash\nprintf "%%s\\n" "$@" > "%s"\nexit 0\n' "$_ARGLOG" > "$_fake"
+  chmod +x "$_fake"
+done
+mysql_install_dir="$_idir"; mysql_data_dir="$_idir/data"
+init_mysql_data >/dev/null 2>&1; _rc=$?
+[ $_rc -eq 0 ] && ok "init_mysql_data exits 0" || ko "init_mysql_data rc=$_rc"
+grep -qx -- "--initialize-insecure" "$_ARGLOG" && ok "mysqld got --initialize-insecure" || ko "missing --initialize-insecure"
+grep -qx -- "--user=mysql" "$_ARGLOG" && ok "mysqld got --user=mysql" || ko "missing --user=mysql"
+grep -qx -- "--basedir=$_idir" "$_ARGLOG" && ok "mysqld basedir = mysql_install_dir" || ko "wrong basedir: $(tr '\n' ' ' < "$_ARGLOG")"
+grep -qx -- "--datadir=$_idir/data" "$_ARGLOG" && ok "mysqld datadir = mysql_data_dir" || ko "wrong datadir: $(tr '\n' ' ' < "$_ARGLOG")"
+# init_mariadb_data reads mariadb_data_dir (NOT mysql_data_dir): setting only
+# the mysql one leaves --datadir empty, which the assertion below catches.
+mariadb_install_dir="$_idir"; mariadb_data_dir="$_idir/data"
+init_mariadb_data >/dev/null 2>&1; _rc=$?
+[ $_rc -eq 0 ] && ok "init_mariadb_data exits 0" || ko "init_mariadb_data rc=$_rc"
+grep -qx -- "--user=mysql" "$_ARGLOG" && ok "mysql_install_db got --user=mysql" || ko "missing --user=mysql"
+grep -qx -- "--basedir=$_idir" "$_ARGLOG" && ok "mysql_install_db basedir = mariadb_install_dir" || ko "wrong basedir"
+grep -qx -- "--datadir=$_idir/data" "$_ARGLOG" && ok "mysql_install_db datadir = mysql_data_dir" || ko "wrong datadir"
+unset mysql_install_dir mysql_data_dir mariadb_install_dir mariadb_data_dir
+
+echo "== config_my_cnf_memory (include/db-common.sh) =="
+_mkcnf(){ printf 'innodb_buffer_pool_size = 8G\nmax_connections = 999\n' > "$1"; }
+_grepval(){ grep -E "^$2" "$1" | head -1; }
+_mkcnf "$work/c.cnf"; config_my_cnf_memory "$work/c.cnf" 512 >/dev/null 2>&1
+[ "$(_grepval "$work/c.cnf" innodb_buffer_pool_size)" = "innodb_buffer_pool_size = 128M" ] && ok "512M box -> buffer pool 128M" || ko "got [$(_grepval "$work/c.cnf" innodb_buffer_pool_size)]"
+[ "$(_grepval "$work/c.cnf" max_connections)" = "max_connections = 20" ] && ok "512M box -> max_connections 20" || ko "got [$(_grepval "$work/c.cnf" max_connections)]"
+_mkcnf "$work/c.cnf"; config_my_cnf_memory "$work/c.cnf" 1024 >/dev/null 2>&1
+[ "$(_grepval "$work/c.cnf" max_connections)" = "max_connections = 20" ] && ok "boundary 1024 still uses the low-memory branch (-le)" || ko "got [$(_grepval "$work/c.cnf" max_connections)]"
+_mkcnf "$work/c.cnf"; config_my_cnf_memory "$work/c.cnf" 1025 >/dev/null 2>&1
+[ "$(_grepval "$work/c.cnf" innodb_buffer_pool_size)" = "innodb_buffer_pool_size = 512M" ] && ok "1025M steps up to the 1-2G branch" || ko "got [$(_grepval "$work/c.cnf" innodb_buffer_pool_size)]"
+_mkcnf "$work/c.cnf"; config_my_cnf_memory "$work/c.cnf" 2048 >/dev/null 2>&1
+[ "$(_grepval "$work/c.cnf" max_connections)" = "max_connections = 50" ] && ok "boundary 2048 still in the 1-2G branch" || ko "got [$(_grepval "$work/c.cnf" max_connections)]"
+_mkcnf "$work/c.cnf"; config_my_cnf_memory "$work/c.cnf" 8192 >/dev/null 2>&1
+[ "$(_grepval "$work/c.cnf" innodb_buffer_pool_size)" = "innodb_buffer_pool_size = 8G" ] && ok "8G box: no override (branches are <=2G only)" || ko "8G box was rewritten to [$(_grepval "$work/c.cnf" innodb_buffer_pool_size)]"
+
+echo "== config_php_fpm_pool (include/php-common.sh) =="
+_mkfpm(){ mkdir -p "$1/etc"; { echo "pm.max_children = 1"; echo "pm.start_servers = 1"; echo "pm.min_spare_servers = 1"; echo "pm.max_spare_servers = 1"; echo "rlimit_files = 1024"; } > "$1/etc/php-fpm.conf"; }
+_fpmval(){ grep -E "^$2" "$1/etc/php-fpm.conf" | head -1; }
+# VPS tier: the <=1024 / <=2048 / <=3000 thresholds and the arithmetic branch
+_mkfpm "$work/f1"; config_php_fpm_pool "$work/f1" 1024 vps >/dev/null 2>&1
+[ "$(_fpmval "$work/f1" pm.max_children)" = "pm.max_children = 5" ] && ok "vps 1G -> max_children 5" || ko "got [$(_fpmval "$work/f1" pm.max_children)]"
+[ "$(_fpmval "$work/f1" rlimit_files)" = "rlimit_files = 1024" ] && ok "vps tier does not touch rlimit_files" || ko "vps tier rewrote rlimit_files"
+_mkfpm "$work/f2"; config_php_fpm_pool "$work/f2" 2048 vps >/dev/null 2>&1
+[ "$(_fpmval "$work/f2" pm.max_children)" = "pm.max_children = 10" ] && ok "vps 2G -> max_children 10" || ko "got [$(_fpmval "$work/f2" pm.max_children)]"
+_mkfpm "$work/f3"; config_php_fpm_pool "$work/f3" 3000 vps >/dev/null 2>&1
+# 3000/3/20 = 50
+[ "$(_fpmval "$work/f3" pm.max_children)" = "pm.max_children = 50" ] && ok "vps 3000M -> arithmetic branch yields 50" || ko "got [$(_fpmval "$work/f3" pm.max_children)]"
+# Dedicated tier: separate thresholds, and it DOES raise rlimit_files
+_mkfpm "$work/f4"; config_php_fpm_pool "$work/f4" 4000 dedicated >/dev/null 2>&1
+[ "$(_fpmval "$work/f4" pm.max_children)" = "pm.max_children = 80" ] && ok "dedicated 4G -> max_children 80" || ko "got [$(_fpmval "$work/f4" pm.max_children)]"
+[ "$(_fpmval "$work/f4" rlimit_files)" = "rlimit_files = 65535" ] && ok "dedicated tier raises rlimit_files to 65535" || ko "got [$(_fpmval "$work/f4" rlimit_files)]"
+_mkfpm "$work/f5"; config_php_fpm_pool "$work/f5" 8000 dedicated >/dev/null 2>&1
+[ "$(_fpmval "$work/f5" pm.max_children)" = "pm.max_children = 120" ] && ok "dedicated boundary 8000 -> 120 (-le)" || ko "got [$(_fpmval "$work/f5" pm.max_children)]"
+_mkfpm "$work/f6"; config_php_fpm_pool "$work/f6" 17000 dedicated >/dev/null 2>&1
+[ "$(_fpmval "$work/f6" pm.max_children)" = "pm.max_children = 300" ] && ok "dedicated 17G -> max_children 300" || ko "got [$(_fpmval "$work/f6" pm.max_children)]"
+_mkfpm "$work/f7"; config_php_fpm_pool "$work/f7" 2048 >/dev/null 2>&1
+[ "$(_fpmval "$work/f7" pm.max_children)" = "pm.max_children = 10" ] && ok "scenario defaults to vps when omitted" || ko "got [$(_fpmval "$work/f7" pm.max_children)]"
+
+echo "== generate_php_ini / generate_opcache_ini (include/php-common.sh) =="
+_pdir="$work/php"; mkdir -p "$_pdir/etc/php.d"
+{ echo "memory_limit = 128M"; echo "output_buffering = 4096"; echo "short_open_tag = Off"; echo "expose_php = On"; echo "request_order = GP"; echo ";date.timezone ="; echo "post_max_size = 8M"; echo "upload_max_filesize = 2M"; echo "max_execution_time = 30"; echo ";realpath_cache_size = 4K"; echo "disable_functions ="; } > "$_pdir/etc/php.ini"
+Memory_limit=256; timezone=Asia/Shanghai; with_old_openssl_flag=n
+generate_php_ini "$_pdir" >/dev/null 2>&1
+grep -q '^memory_limit = 256M' "$_pdir/etc/php.ini" && ok "memory_limit follows Memory_limit" || ko "got [$(grep '^memory_limit' "$_pdir/etc/php.ini")]"
+grep -q '^date.timezone = Asia/Shanghai' "$_pdir/etc/php.ini" && ok "date.timezone follows timezone" || ko "got [$(grep 'date.timezone' "$_pdir/etc/php.ini")]"
+grep -q '^expose_php = Off' "$_pdir/etc/php.ini" && ok "expose_php hardened to Off" || ko "expose_php not hardened"
+# proc_open / symlink must NOT be in disable_functions: Symfony Process and
+# Laravel storage:link both die without them (that was a real breakage).
+grep -q '^disable_functions = .*proc_open' "$_pdir/etc/php.ini" && ko "proc_open must stay ENABLED (Composer/Symfony Process dies without it)" || ok "proc_open absent from disable_functions (Composer works)"
+grep -q '^disable_functions = .*pcntl_fork' "$_pdir/etc/php.ini" && ok "pcntl_* still disabled" || ko "pcntl_* no longer disabled"
+grep -q '^disable_functions = .*symlink' "$_pdir/etc/php.ini" && ko "symlink must stay ENABLED (Laravel storage:link)" || ok "symlink absent from disable_functions"
+# opcache: option 1 writes, anything else writes nothing
+rm -f "$_pdir/etc/php.d/02-opcache.ini"
+phpcache_option=1; Memory_limit=256
+generate_opcache_ini "$_pdir" >/dev/null 2>&1
+[ -f "$_pdir/etc/php.d/02-opcache.ini" ] && ok "phpcache_option=1 writes 02-opcache.ini" || ko "opcache ini not written"
+grep -q '^opcache.memory_consumption=256' "$_pdir/etc/php.d/02-opcache.ini" && ok "opcache memory_consumption follows Memory_limit" || ko "got [$(grep memory_consumption "$_pdir/etc/php.d/02-opcache.ini" 2>/dev/null)]"
+grep -q '^zend_extension=opcache.so' "$_pdir/etc/php.d/02-opcache.ini" && ok "default zend_extension is opcache.so" || ko "wrong zend_extension"
+rm -f "$_pdir/etc/php.d/02-opcache.ini"
+phpcache_option=2
+generate_opcache_ini "$_pdir" >/dev/null 2>&1
+[ ! -f "$_pdir/etc/php.d/02-opcache.ini" ] && ok "phpcache_option=2 writes nothing" || ko "option 2 wrote an opcache ini"
+# an explicitly supplied zend_extension must win over the default opcache.so
+phpcache_option=1; rm -f "$_pdir/etc/php.d/02-opcache.ini"; generate_opcache_ini "$_pdir" "opcache.ext.so" >/dev/null 2>&1
+grep -q '^zend_extension=opcache.ext.so' "$_pdir/etc/php.d/02-opcache.ini" && ok "explicit zend_extension argument wins" || ko "explicit zend_extension ignored"
+unset phpcache_option
+
+echo "== _php_rollback (include/upgrade_php.sh) =="
+# The property this rollback was rewritten for: it must be REVERSIBLE. The old
+# `rm -rf $php_install_dir && cp -a backup ...` destroyed the install before
+# the restore was known to work, so a failed restore (disk full) left nothing.
+# pidof/wait_for_db_ready ARE stubbed; svc_start/svc_stop deliberately are not.
+# The two functions under test never read svc_*'s exit status (_php_rollback
+# returns 0 unconditionally after the call, rollback_db_upgrade branches solely
+# on wait_for_db_ready), so stubbing them would buy nothing - and a svc_start
+# defined HERE is exactly what SC2218 rejects: svc_start is already called
+# directly at line ~221 by the Type=simple liveness tests, which need the REAL
+# common.sh implementation. Any later redefinition flags those earlier calls.
+pidof(){ return 1; }
+_php_install="$work/php_install"; _php_backup="$work/php_backup"
+mkdir -p "$_php_install" "$_php_backup"; echo broken > "$_php_install/state"; echo good > "$_php_backup/state"
+php_install_dir="$_php_install"; backup_php_dir="$_php_backup"; BACKUP_DIR="$work/bk"; CYELLOW=""; CFAILURE=""; CEND=""
+_php_rollback >/dev/null 2>&1; _rc=$?
+[ $_rc -eq 0 ] && ok "rollback succeeds when the backup restores" || ko "rollback rc=$_rc"
+[ "$(cat "$_php_install/state" 2>/dev/null)" = "good" ] && ok "install dir now holds the backup content" || ko "install dir holds [$(cat "$_php_install/state" 2>/dev/null)]"
+ls -d "$_php_install".broken_* >/dev/null 2>&1 && ok "broken install preserved for inspection (not deleted)" || ko "broken install was deleted, nothing to inspect"
+# Failure path: restore fails -> the ORIGINAL must be moved back, not lost.
+# Clear .broken_* first: the suffix is date +%m%d%H%M%S (one-second resolution),
+# so a second rollback landing in the same second as the first would have
+# /bin/mv -f move this install INTO the still-existing first broken dir, and the
+# revert would then restore the wrong content. Real rollbacks are minutes apart;
+# the test is not, so it must scrub the namespace itself.
+rm -rf "$_php_install".broken_*
+rm -rf "$_php_install"; mkdir -p "$_php_install"; echo broken2 > "$_php_install/state"
+backup_php_dir="$work/does-not-exist"
+_php_rollback >/dev/null 2>&1; _rc=$?
+[ $_rc -ne 0 ] && ok "rollback reports failure when the backup is missing" || ko "rollback claimed success with no backup"
+[ "$(cat "$_php_install/state" 2>/dev/null)" = "broken2" ] && ok "failed restore is undone: original moved back (reversible)" || ko "original content lost on failed restore: [$(cat "$_php_install/state" 2>/dev/null)]"
+unset php_install_dir backup_php_dir BACKUP_DIR
+
+echo "== rollback_db_upgrade (include/upgrade_db.sh) =="
+# The invariants: a missing *_old_<ts> backup must abort with rc!=0 and say so,
+# and a rollback whose old server won't come back must also fail loudly rather
+# than report success over a dead database.
+wait_for_db_ready(){ return 0; }
+_dbi="$work/dbinstall"; _dbd="$work/dbdata"
+DB=MySQL; OLD_db_ver="8.4.10"; CSUCCESS=""; CFAILURE=""; CEND=""
+rm -rf "$_dbi" "$_dbd"; mkdir -p "$_dbi" "$_dbd" "${_dbi}_old_20250101" "${_dbd}_old_20250101"
+rollback_db_upgrade "$_dbi" "$_dbd" "20250101" > "$work/rb1.log" 2>&1; _rc=$?
+[ $_rc -eq 0 ] && ok "rollback succeeds with both backups present" || ko "rollback rc=$_rc: $(cat "$work/rb1.log")"
+[ -d "$_dbi" ] && [ ! -d "${_dbi}_old_20250101" ] && ok "old install tree moved back into place" || ko "install tree not restored"
+[ -d "$_dbd" ] && [ ! -d "${_dbd}_old_20250101" ] && ok "old data dir moved back into place" || ko "data dir not restored"
+rm -rf "$_dbi" "$_dbd" "${_dbi}_old_"* "${_dbd}_old_"*; mkdir -p "$_dbi" "$_dbd"
+rollback_db_upgrade "$_dbi" "$_dbd" "20250102" > "$work/rb2.log" 2>&1; _rc=$?
+[ $_rc -ne 0 ] && ok "rollback aborts when the *_old_* install tree is absent" || ko "rollback reported success with no backup tree"
+grep -q 'Rollback failed' "$work/rb2.log" && ok "missing-backup failure is reported to the user" || ko "no 'Rollback failed' message: $(cat "$work/rb2.log")"
+rm -rf "$_dbi" "$_dbd" "${_dbi}_old_"* ; mkdir -p "$_dbi" "$_dbd" "${_dbi}_old_20250103"
+rollback_db_upgrade "$_dbi" "$_dbd" "20250103" > "$work/rb3.log" 2>&1; _rc=$?
+[ $_rc -ne 0 ] && ok "rollback aborts when the *_old_* data dir is absent" || ko "rollback reported success with no data backup"
+wait_for_db_ready(){ return 1; }
+rm -rf "$_dbi" "$_dbd"; mkdir -p "$_dbi" "$_dbd" "${_dbi}_old_20250104" "${_dbd}_old_20250104"
+rollback_db_upgrade "$_dbi" "$_dbd" "20250104" > "$work/rb4.log" 2>&1; _rc=$?
+[ $_rc -ne 0 ] && ok "rollback fails when the restored server will not start" || ko "reported success over a database that cannot start"
+grep -q 'could not be restarted' "$work/rb4.log" && ok "unstartable-restore failure names the cause" || ko "message missing: $(cat "$work/rb4.log")"
+grep -q '_old_20250104' "$work/rb4.log" && ok "failure message tells the user where the data still is" || ko "data location not mentioned in the failure message"
+rm -rf "$_dbi" "$_dbd" "${_dbi}_old_"* "${_dbd}_old_"*
+unset -f wait_for_db_ready pidof
 
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"

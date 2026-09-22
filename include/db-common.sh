@@ -235,9 +235,34 @@ cleanup_mysql_files() {
   if [[ "${method}" == "1" ]]; then
     rm -rf mysql-${mysql_ver}-*-$SYS_ARCH_M
   elif [[ "${method}" == "2" ]]; then
-    rm -rf mysql-${mysql_ver}
-    [ -n "${boost_ver}" ] && rm -rf boost_$(echo ${boost_ver} | awk -F. '{print $1"_"$2"_"$3}')
+    rm -rf "mysql-${mysql_ver}"
+    # quoted both ways: an empty boost_ver must not degrade to `rm -rf boost_`,
+    # which would match nothing today but is one typo away from a real target.
+    [ -n "${boost_ver}" ] && rm -rf "boost_$(echo "${boost_ver}" | awk -F. '{print $1"_"$2"_"$3}')"
   fi
+}
+
+# Initialize the MySQL data directory
+# Usage: init_mysql_data
+#
+# Takes no arguments: the paths come from options.conf, exactly like
+# cleanup_mysql_files above. Defined as a function rather than a command string
+# passed in as init_cmd because the caller previously handed install_db_common a
+# pre-built string that was run through `eval` - a needless eval for what is a
+# fixed binary plus fixed flags, and the odd one out in a signature whose other
+# two callbacks (cleanup_func, root_setup_func) are already plain function names.
+init_mysql_data() {
+  "${mysql_install_dir}/bin/mysqld" --initialize-insecure --user=mysql \
+    --basedir="${mysql_install_dir}" --datadir="${mysql_data_dir}"
+}
+
+# Initialize the MariaDB data directory
+# Usage: init_mariadb_data
+#
+# Same rationale as init_mysql_data: a function name, not an eval'd string.
+init_mariadb_data() {
+  "${mariadb_install_dir}/scripts/mysql_install_db" --user=mysql \
+    --basedir="${mariadb_install_dir}" --datadir="${mariadb_data_dir}"
 }
 
 # Setup MySQL root user
@@ -1078,14 +1103,14 @@ EOF
 # Post-install MySQL/MariaDB setup
 # Unified database installation workflow
 # Handles common installation steps for both MySQL and MariaDB
-# Usage: install_db_common db_type install_dir data_dir install_method boost_ver thread_count init_cmd cleanup_func root_setup_func [mysql_ver] [mariadb_ver]
+# Usage: install_db_common db_type install_dir data_dir install_method boost_ver thread_count init_func cleanup_func root_setup_func [mysql_ver] [mariadb_ver]
 #   db_type: mysql or mariadb
 #   install_dir: installation directory
 #   data_dir: data directory
 #   install_method: 1 (binary) or 2 (source)
 #   boost_ver: boost version for source install
 #   thread_count: number of threads for compilation
-#   init_cmd: initialization command (callback)
+#   init_func: initialization function name (callback; no arguments, paths come from options.conf)
 #   cleanup_func: cleanup function name (callback)
 #   root_setup_func: root setup function name (callback)
 install_db_common() {
@@ -1095,7 +1120,7 @@ install_db_common() {
   local install_method=$4
   local boost_ver=$5
   local thread_count=$6
-  local init_cmd=$7
+  local init_func=$7
   local cleanup_func=$8
   local root_setup_func=$9
   local mysql_ver=${10:-}
@@ -1191,8 +1216,11 @@ install_db_common() {
   fi
 
   # Initialize database
+  # A plain function call, not `eval "${init_cmd}"`: the other two callbacks in
+  # this signature were already function names, and an eval here bought nothing
+  # but a shell-parsing layer over a fixed binary + fixed flags.
   if [ ${rc} -eq 0 ]; then
-    eval "${init_cmd}" || rc=$?
+    ${init_func} || rc=$?
   fi
 
   if [ ${rc} -eq 0 ]; then

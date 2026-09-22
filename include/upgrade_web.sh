@@ -230,7 +230,7 @@ Upgrade_Nginx() {
       tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz" || { fail_msg "Nginx upgrade (extract lua-cjson)"; }
       pushd "lua-cjson-${lua_cjson_ver}"
       sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
-      make -j$(nproc) && make install || { fail_msg "lua-cjson build"; }
+      make -j"$(nproc)" && make install || { fail_msg "lua-cjson build"; }
       [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
       popd > /dev/null
       rm -rf "lua-cjson-${lua_cjson_ver}"
@@ -421,7 +421,7 @@ Upgrade_Tengine() {
       tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz" || { fail_msg "Tengine upgrade (extract lua-cjson)"; }
       pushd "lua-cjson-${lua_cjson_ver}"
       sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
-      make -j$(nproc) && make install || { fail_msg "lua-cjson build"; }
+      make -j"$(nproc)" && make install || { fail_msg "lua-cjson build"; }
       [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
       popd > /dev/null
       rm -rf "lua-cjson-${lua_cjson_ver}"
@@ -560,7 +560,7 @@ Upgrade_OpenResty() {
       tar xzf "lua-cjson-${lua_cjson_ver}.tar.gz" || { fail_msg "OpenResty upgrade (extract lua-cjson)"; }
       pushd "lua-cjson-${lua_cjson_ver}"
       sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
-      make -j$(nproc) && make install || { fail_msg "lua-cjson build"; }
+      make -j"$(nproc)" && make install || { fail_msg "lua-cjson build"; }
       [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && { fail_msg "lua-cjson"; }
       popd > /dev/null
       rm -rf "lua-cjson-${lua_cjson_ver}"

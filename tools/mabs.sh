@@ -57,6 +57,15 @@ BWLIMIT=1024000
 TEMP=$(getopt -o hvVl:c:t:T:L:n --long help,version,iplist:,config:,sshtimeout:,fttimeout:,bwlimit:,log:,ignore -- "$@" 2>/dev/null)
 
 
+# getopt's own documented idiom, and the one place in this codebase where an
+# eval is the correct tool: getopt(1) emits its result already shell-quoted so
+# that it can be handed straight to `set --`, which is the only way to get
+# GNU-style long options (--iplist, --sshtimeout, ...) into positional params
+# in bash without a hand-rolled parser (bash's builtin getopts is short-only).
+# The quoting is what makes it safe - getopt escapes every metacharacter in the
+# user's values, so nothing from "$@" can break out and run as code. If
+# long-option support is ever dropped, replacing this with getopts removes the
+# last eval in the tree.
 eval set -- "$TEMP"
 
 while :; do
@@ -117,8 +126,8 @@ do
   do
     #[ -z "$(echo $IP | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|CNS')" ] && continue
     if [[ "$(conn_port --host ${IP} --port ${PORT})" == "false" ]]; then
-      [ ! -e ipnologin.txt ] && > ipnologin.txt
-      [ -z "$(grep "$IP" ipnologin.txt | grep $(date +%F))" ] && echo "$(date +%F_%H%M) $IP" >> ipnologin.txt
+      [ ! -e ipnologin.txt ] && : > ipnologin.txt
+      [ -z "$(grep "$IP" ipnologin.txt | grep "$(date +%F)")" ] && echo "$(date +%F_%H%M) $IP" >> ipnologin.txt
       continue
     fi
 

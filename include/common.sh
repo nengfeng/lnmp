@@ -194,12 +194,19 @@ die() {
   exit ${code}
 }
 
-# Kill current process (used for critical failures)
+# Abort the whole script on a critical failure.
 # Usage: die_hard "Error message"
+#
+# Deliberately NOT `kill -9 $$`: SIGKILL cannot be caught, so every EXIT trap
+# registered by the caller is skipped -- backup_setup.sh's temp dirs,
+# upgrade_script.sh's UPGRADE_TMP_DIR and pureftpd_vhost.sh's plaintext
+# password file would all be left on disk. A plain `exit 1` runs those traps
+# and still aborts every caller (die_hard is never used where a caller
+# recovers).
 die_hard() {
   local msg=$1
   echo "${CFAILURE}${msg}${CEND}" >&2
-  kill -9 $$; exit 1
+  exit 1
 }
 
 # ============================================

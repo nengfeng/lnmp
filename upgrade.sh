@@ -45,8 +45,17 @@ OUTIP_STATE=$(ip_state)
 # ============================================
 
 # Check if a component is installed
-# Usage: check_installed <install_dir> <binary> <name>
-check_installed() {
+# Usage: upgrade_target_installed <install_dir> <binary> <name>
+#
+# Deliberately NOT named check_installed: include/common.sh, which this script
+# sources a few lines above, already defines check_installed with a DIFFERENT
+# signature - (type, path, name), where the type argument selects between a
+# file and a directory probe, and a return of 1 means "already installed,
+# skip it". This one is (dir, binary, name) and a return of 1 means "not
+# installed, skip the upgrade". Two opposite contracts on one name only
+# worked because this definition happened to come later and shadowed the
+# other; renaming removes the ordering dependency for good.
+upgrade_target_installed() {
   local dir=$1 bin=$2 name=$3
   if [ ! -e "${dir}/${bin}" ]; then
     echo "${CWARNING}${name} is not installed${CEND}"
@@ -173,21 +182,21 @@ What Are You Doing?
     else
       case "${Upgrade_flag}" in
         1)
-          check_installed "${nginx_install_dir}/sbin" "nginx" "Nginx" && Upgrade_Nginx
-          check_installed "${tengine_install_dir}/sbin" "nginx" "Tengine" && Upgrade_Tengine
-          check_installed "${openresty_install_dir}/nginx/sbin" "nginx" "OpenResty" && Upgrade_OpenResty
+          upgrade_target_installed "${nginx_install_dir}/sbin" "nginx" "Nginx" && Upgrade_Nginx
+          upgrade_target_installed "${tengine_install_dir}/sbin" "nginx" "Tengine" && Upgrade_Tengine
+          upgrade_target_installed "${openresty_install_dir}/nginx/sbin" "nginx" "OpenResty" && Upgrade_OpenResty
           ;;
         2)
           Upgrade_DB
           ;;
         3)
-          check_installed "${php_install_dir}/bin" "php" "PHP" && Upgrade_PHP
+          upgrade_target_installed "${php_install_dir}/bin" "php" "PHP" && Upgrade_PHP
           ;;
         4)
-          check_installed "${redis_install_dir}/bin" "redis-server" "Redis" && Upgrade_Redis
+          upgrade_target_installed "${redis_install_dir}/bin" "redis-server" "Redis" && Upgrade_Redis
           ;;
         5)
-          check_installed "${memcached_install_dir}/bin" "memcached" "Memcached" && Upgrade_Memcached
+          upgrade_target_installed "${memcached_install_dir}/bin" "memcached" "Memcached" && Upgrade_Memcached
           ;;
         6)
           Upgrade_phpMyAdmin

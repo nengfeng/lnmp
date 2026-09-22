@@ -2,7 +2,15 @@
 # The codebase intentionally leaves config/flag variables unquoted (they are
 # word-split into arguments / case patterns) and shares variables across
 # sourced files, so the noisy cross-file & unquoted classes are disabled.
-# We check at ERROR severity (syntax / obvious defects). Subtle behavioral bugs
-# (swallowed pipeline exits, CWD leaks, unguarded extractions) are caught by
-# tools/lint/static_checks.sh and tools/test_offline.sh instead.
-disable=SC1072,SC1073,SC2034,SC2068,SC2086,SC2144,SC2154,SC2155,SC2164,SC2183
+#
+# Gating severities (see .github/workflows/lint.yml):
+#   error   - fails the gate (syntax / obvious defects)
+#   warning - fails the gate; the 28 historical findings were fixed, not
+#             silenced, and the ratchet was tightened to keep it there
+#   info    - reported, advisory only (SC2162 read without -r, SC2015 a &&
+#             b || c, ... 252 findings across 86 files - style, not signal)
+#
+# Subtle behavioral bugs (swallowed pipeline exits, CWD leaks, unguarded
+# extractions) are caught by tools/lint/static_checks.sh and
+# tools/test_offline.sh instead.
+disable=SC1072,SC073,SC2034,SC2068,SC2086,SC2144,SC2154,SC2155,SC2164,SC2183

@@ -1,0 +1,134 @@
+name: "🐛 Bug 报告"
+description: "安装、升级或运行时出错 / 行为与预期不符"
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！
+
+        > **⚠️ 安全漏洞请勿在此公开提交。**
+        > 请改用 [私密安全报告](https://github.com/nengfeng/lnmp/security/advisories/new)，
+        > 详见 [SECURITY.md](https://github.com/nengfeng/lnmp/blob/main/SECURITY.md)。
+
+        提交前请先搜索 [已有 Issue](https://github.com/nengfeng/lnmp/issues)，
+        避免重复。日志中的**密码、密钥请先打码**。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题概述
+      description: 一句话说明发生了什么。
+      placeholder: "例如：执行 install.sh --db_option 2 后，MySQL 启动失败"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请给出能让我们原样重跑的完整命令，而不是「我就是正常安装的」。
+      placeholder: |
+        1. git clone ... && cd lnmp
+        2. ./install.sh --nginx_option 1 --db_option 2 --dbrootpwd '...'
+        3. 观察到 …
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 你认为正确的结果应该是什么。
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么，请附上**完整的错误输出**（已打码）。
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 发行版与版本
+      description: 必须是支持范围内的版本，见 README 的支持策略。
+      placeholder: "Debian 12 / Debian 13 / Ubuntu 24.04 / Ubuntu 26.04"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: CPU 架构
+      options:
+        - x86_64
+        - aarch64
+        - armv7
+        - 其他 / 不确定
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 项目版本
+      description: "./install.sh --version 的输出，或你 clone 的 commit。"
+      placeholder: "1.7.5 或 dde0679"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: 出问题的阶段
+      options:
+        - 预下载组件 (download_sources.sh)
+        - 安装 (install.sh)
+        - 升级 (upgrade.sh)
+        - 添加/删除站点 (vhost.sh)
+        - 备份 / 恢复 (backup_setup.sh)
+        - 卸载 (uninstall.sh)
+        - 健康检查 / 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: |
+        安装日志位于当前目录 `*.log`，服务日志可用
+        `journalctl -u nginx -u mariadb -n 200` 获取。
+        **请先删除密码、密钥等敏感信息。**
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他信息
+      description: 可能相关的上下文，例如是否使用了镜像源、是否为容器/WSL 环境等。
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索过现有 Issue，没有重复的报告
+          required: true
+        - label: 我使用的发行版在支持范围内（Debian 12/13、Ubuntu 24.04/26.04）
+          required: true
+        - label: 我已对日志中的密码与密钥打码
+          required: true
+        - label: 这不是安全漏洞（安全问题请走 SECURITY.md 的私密渠道）
+          required: true

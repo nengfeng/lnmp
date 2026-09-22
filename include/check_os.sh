@@ -83,17 +83,19 @@ case "${Family}" in
     ;;
 esac
 
-# Probe gcc defensively: on a minimal image it is absent AND the package index
-# is still empty at this point (the dependency stage runs 'apt-get update'
-# later), so the install attempt fails. That must not abort the run --
-# build-essential brings gcc in during that stage -- and an unknown version
-# simply skips the redis downgrade below.
-command -v gcc > /dev/null 2>&1 || $PM -y install gcc > /dev/null 2>&1
-gcc_ver=$(gcc -dumpversion 2>/dev/null | awk -F. '{print $1}')
-
-if [ -n "${gcc_ver}" ] && [ "${gcc_ver}" -lt 5 ] 2>/dev/null; then
-  redis_ver=6.2.14
-fi
+# gcc is NOT probed here. This used to carry a `gcc -dumpversion` probe whose
+# only consumer was a "gcc < 5 -> redis_ver=6.2.14" downgrade; that branch is
+# unreachable and has been deleted rather than left as a trap:
+#   - the OS gate above has already refused everything except Debian 12/13 and
+#     Ubuntu 24.04/26.04, whose gcc are 12/14/13/15 - none is below 5, so the
+#     condition could never fire;
+#   - redis_ver is owned by versions.txt (currently 8.10.2) and is reconciled
+#     by the version-drift workflow, so a hard-coded 6.2.14 outside that file
+#     was a second, silently-diverging source of truth;
+#   - the early `$PM -y install gcc` it guarded could not succeed at this point
+#     anyway (the package index is still empty; apt-get update runs in the
+#     dependency stage), and install.sh installs gcc during that stage.
+# Nothing between here and that stage compiles anything.
 
 if uname -m | grep -Eqi "arm|aarch64"; then
   armplatform="y"

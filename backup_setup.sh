@@ -41,7 +41,10 @@ while :; do echo
   printf "%b" "\t${CMSG}8${CEND}. Dropbox\n"
   read -e -p "Please input numbers:(Default 1 press Enter) " desc_bk
   desc_bk=${desc_bk:-'1'}
-  array_desc=(${desc_bk})
+  array_desc=()
+  # read -a, not ( ${desc_bk} ): an unquoted expansion would also split on
+  # glob characters the user might type (SC2206)
+  read -ra array_desc <<< "${desc_bk}"
   array_all=(1 2 3 4 5 6 7 8)
   for v in ${array_desc[@]}
   do
@@ -147,7 +150,8 @@ echo "You have to backup the content:"
 [ "${content_bk}" != '1' ] && echo "Website: ${CMSG}${website_name}${CEND}"
 
 if [ -n "$(echo ${desc_bk} | grep -w 2)" ]; then
-  > tools/iplist.txt
+  # truncate, not a bare '>' redirection with no command (SC2188)
+  : > tools/iplist.txt
   # Contains remote SSH passwords in plaintext - never world-readable
   chmod 600 tools/iplist.txt
   while :; do echo
@@ -354,10 +358,12 @@ fi
 if [ -n "$(echo ${desc_bk} | grep -w 5)" ]; then
   if [ ! -e "/usr/local/bin/upx" ]; then
     UPX_TMP_DIR=$(mktemp -d /tmp/lnmp_upx.XXXXXX)
-    trap "rm -rf $UPX_TMP_DIR" EXIT
-    wget -qc https://collection.b0.upaiyun.com/softwares/upx/upx_0.4.8_linux_${M_ARCH}.tar.gz -O $UPX_TMP_DIR/upx_0.4.8_linux_${M_ARCH}.tar.gz
-    tar xzf $UPX_TMP_DIR/upx_0.4.8_linux_${M_ARCH}.tar.gz -C $UPX_TMP_DIR/
-    /bin/mv $UPX_TMP_DIR/upx /usr/local/bin/upx
+    # single quotes: the trap must expand the variable when it FIRES, not when
+    # it is registered (SC2064), and every path inside must stay quoted.
+    trap 'rm -rf "${UPX_TMP_DIR}"' EXIT
+    wget -qc "https://collection.b0.upaiyun.com/softwares/upx/upx_0.4.8_linux_${M_ARCH}.tar.gz" -O "${UPX_TMP_DIR}/upx_0.4.8_linux_${M_ARCH}.tar.gz"
+    tar xzf "${UPX_TMP_DIR}/upx_0.4.8_linux_${M_ARCH}.tar.gz" -C "${UPX_TMP_DIR}/"
+    /bin/mv "${UPX_TMP_DIR}/upx" /usr/local/bin/upx
     chmod +x /usr/local/bin/upx
     rm -rf $UPX_TMP_DIR
     trap - EXIT
@@ -386,13 +392,14 @@ fi
 if [ -n "$(echo ${desc_bk} | grep -w 6)" ]; then
   if [ ! -e "/usr/local/bin/qshell" ]; then
     QSHELL_TMP_DIR=$(mktemp -d /tmp/lnmp_qshell.XXXXXX)
-    trap "rm -rf $QSHELL_TMP_DIR" EXIT
+    # single quotes + quoted paths: expand at fire time, survive a space in TMPDIR (SC2064/SC2046)
+    trap 'rm -rf "${QSHELL_TMP_DIR}"' EXIT
     if [[ "${1}" == y ]]; then
-      wget -qc https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-arm64.tar.gz -O $QSHELL_TMP_DIR/qshell-v2.15.0-linux-arm64.tar.gz
-      tar xzf $QSHELL_TMP_DIR/qshell-v2.15.0-linux-arm64.tar.gz -C /usr/local/bin/
+      wget -qc "https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-arm64.tar.gz" -O "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-arm64.tar.gz"
+      tar xzf "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-arm64.tar.gz" -C /usr/local/bin/
     else
-      wget -qc https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-${M_ARCH}.tar.gz -O $QSHELL_TMP_DIR/qshell-v2.15.0-linux-${M_ARCH}.tar.gz
-      tar xzf $QSHELL_TMP_DIR/qshell-v2.15.0-linux-${M_ARCH}.tar.gz -C /usr/local/bin/
+      wget -qc "https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-${M_ARCH}.tar.gz" -O "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-${M_ARCH}.tar.gz"
+      tar xzf "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-${M_ARCH}.tar.gz" -C /usr/local/bin/
     fi
     chmod +x /usr/local/bin/qshell
     rm -rf $QSHELL_TMP_DIR
@@ -442,10 +449,11 @@ fi
 if [ -n "$(echo ${desc_bk} | grep -w 7)" ]; then
   if [ ! -e "/usr/local/bin/aws" ] && [ ! -e "/usr/bin/aws" ]; then
     AWS_TMP_DIR=$(mktemp -d /tmp/lnmp_aws.XXXXXX)
-    trap "rm -rf $AWS_TMP_DIR" EXIT
-    wget -qc https://awscli.amazonaws.com/awscli-exe-linux-$(arch).zip -O $AWS_TMP_DIR/awscliv2.zip
-    unzip $AWS_TMP_DIR/awscliv2.zip -d $AWS_TMP_DIR/
-    $AWS_TMP_DIR/aws/install
+    # single quotes + quoted paths: expand at fire time, survive a space in TMPDIR (SC2064/SC2046)
+    trap 'rm -rf "${AWS_TMP_DIR}"' EXIT
+    wget -qc "https://awscli.amazonaws.com/awscli-exe-linux-$(arch).zip" -O "${AWS_TMP_DIR}/awscliv2.zip"
+    unzip "${AWS_TMP_DIR}/awscliv2.zip" -d "${AWS_TMP_DIR}/"
+    "${AWS_TMP_DIR}/aws/install"
     rm -rf $AWS_TMP_DIR
     trap - EXIT
   fi

@@ -53,6 +53,7 @@ install_php_ext() {
   local func1=$(echo "$spec" | cut -d'|' -f2)
   local func2=$(echo "$spec" | cut -d'|' -f3)
 
+  # shellcheck disable=SC1090  # include/${script} is built from EXT_SCRIPTS
   . include/${script}
   local rc
   ${func1} 2>&1 | tee -a ${current_dir}/install.log
@@ -78,6 +79,7 @@ uninstall_php_ext() {
 
   local script=$(echo "$spec" | cut -d'|' -f1)
 
+  # shellcheck disable=SC1090  # include/${script} is built from EXT_SCRIPTS
   . include/${script}
   # Uninstall functions may appear at any field; only run fields named Uninstall_*
   local i=1

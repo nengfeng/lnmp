@@ -80,7 +80,7 @@ MIRROR_BASE_URL="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}"
 log() {
   local level=$1
   shift
-  local msg="$@"
+  local msg="$*"
   local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
   echo "[${timestamp}] [${level}] ${msg}" >> "${LOG_FILE}"
   case $level in

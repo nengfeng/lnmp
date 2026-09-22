@@ -20,7 +20,7 @@ Install_MySQL() {
   local reset_master=${3:-no}
   local boost_ver_use=${4-}
 
-  local init_cmd="${mysql_install_dir}/bin/mysqld --initialize-insecure --user=mysql --basedir=${mysql_install_dir} --datadir=${mysql_data_dir}"
+  local init_func="init_mysql_data"
   local cleanup_func="cleanup_mysql_files"
 
   install_db_common \
@@ -30,7 +30,7 @@ Install_MySQL() {
     "${dbinstallmethod}" \
     "${boost_ver_use}" \
     "${THREAD}" \
-    "${init_cmd}" \
+    "${init_func}" \
     "${cleanup_func}" \
     "setup_mysql_root" \
     "${mysql_ver}" ""

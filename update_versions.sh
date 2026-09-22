@@ -121,7 +121,21 @@ check_latest() {
   total=$((total + 1))
 
   local latest
-  latest=$(curl -sL --connect-timeout 10 --max-time 20 "$url" 2>/dev/null | grep -oP "$regex" | eval "$sort_cmd")
+  # No `eval "$sort_cmd"` here. All 11 call sites pass the identical literal
+  # pipeline, so the eval bought no flexibility - only a code path where a
+  # future caller-supplied string would be executed as shell. Map the one
+  # accepted value explicitly and REFUSE anything else loudly, so adding a
+  # new sorter is a deliberate edit rather than something that silently works
+  # through eval (or silently executes something).
+  case "${sort_cmd}" in
+    "sort -V | tail -1"|"") ;;
+    *)
+      results="${results}⚠️  ${name}: unsupported sort_cmd '${sort_cmd}'\n"
+      check_failed=$((check_failed + 1))
+      return
+      ;;
+  esac
+  latest=$(curl -sL --connect-timeout 10 --max-time 20 "$url" 2>/dev/null | grep -oP "$regex" | sort -V | tail -1)
 
   if [ -z "$latest" ]; then
     results="${results}⚠️  ${name}: 无法获取最新版本 (当前: ${current})\n"
@@ -231,7 +245,9 @@ stable=[r['release_number'] for r in rels
         if r.get('status')=='stable' and str(r.get('release_number','')).startswith(series+'.')]
 if stable:
     print(max(stable, key=lambda v:[int(x) for x in v.split('.')]))" 2>/dev/null)
-    eval "mdb_current=\$mariadb${mdb_series/./}_ver"
+    # ${!name} indirect read, not `eval "x=\$..."` - same result, no eval
+    _mdb_var="mariadb${mdb_series/./}_ver"
+    mdb_current="${!_mdb_var}"
     if [ -n "$mdb_latest" ]; then
       if [[ "$mdb_current" == "$mdb_latest" ]]; then
         results="${results}✅ MariaDB ${mdb_series}: ${mdb_current} (最新)\n"
@@ -264,7 +280,9 @@ if [ -n "$pgsql_json" ]; then
 import json,sys
 for v in json.load(sys.stdin):
     if v['major']=='${pg_major}': print(v['major']+'.'+v.get('latestMinor','0'))" 2>/dev/null)
-    eval "pg_current=\$pgsql${pg_major}_ver"
+    # ${!name} indirect read, not `eval "x=\$..."` - same result, no eval
+    _pg_var="pgsql${pg_major}_ver"
+    pg_current="${!_pg_var}"
     if [ -n "$pg_latest" ]; then
       if [[ "$pg_current" == "$pg_latest" ]]; then
         results="${results}✅ PostgreSQL ${pg_major}: ${pg_current} (最新)\n"
@@ -295,7 +313,9 @@ for php_major in "8.3" "8.4" "8.5"; do
   php_latest=$(echo "$php_atom" | grep "<title>" | grep -vE "(alpha|beta|RC|rc|dev)" | \
     grep -oP "<title>(php-|PHP )\K${php_major}\.[0-9]+" | \
     sort -V | tail -1)
-  eval "php_current=\$php${php_major/./}_ver"
+  # ${!name} indirect read, not `eval "x=\$..."` - same result, no eval
+  _php_var="php${php_major/./}_ver"
+  php_current="${!_php_var}"
   if [ -n "$php_latest" ]; then
     if [[ "$php_current" == "$php_latest" ]]; then
       results="${results}✅ PHP ${php_major}: ${php_current} (最新)\n"

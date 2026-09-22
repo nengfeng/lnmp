@@ -103,4 +103,5 @@ svc_restart ssh || echo "Warning: Failed to restart ssh" >&2
 
 . /etc/profile
 # See init_Debian.sh: swallow bashrc's exit status, it must not abort the install
+# shellcheck disable=SC1090  # the path is a user file, not a constant
 . ~/.bashrc || true

@@ -13,7 +13,7 @@ Install_MariaDB() {
   local mariadb_ver=$1
   local root_cmd=${2:-mariadb}
 
-  local init_cmd="${mariadb_install_dir}/scripts/mysql_install_db --user=mysql --basedir=${mariadb_install_dir} --datadir=${mariadb_data_dir}"
+  local init_func="init_mariadb_data"
   local cleanup_func="cleanup_mariadb_files"
 
   install_db_common \
@@ -23,7 +23,7 @@ Install_MariaDB() {
     "${dbinstallmethod}" \
     "" \
     "${THREAD}" \
-    "${init_cmd}" \
+    "${init_func}" \
     "${cleanup_func}" \
     "setup_mariadb_root" \
     "" "${mariadb_ver}"

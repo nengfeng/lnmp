@@ -216,13 +216,25 @@ If you enter '.', the field will be left blank.
         if [ "$valid_format" -ne 1 ]; then
           continue
         fi
-        # Execute the validated input (safe: all statements validated)
-        eval "${DNS_PAR}"
-        if [[ $? == 0 ]]; then
-          break
-        else
-          echo "${CWARNING}Syntax error! PS: export Ali_Key=LTq ; export Ali_Secret=0q5E${CEND}"
-        fi
+        # Assign every validated statement WITHOUT eval'ing the line. Each
+        # statement is re-matched against `export <identifier>=<text>` and the
+        # two capture groups are handed to export as ONE word: `export
+        # "NAME=VALUE"` neither word-splits nor re-expands the value, so a key
+        # containing spaces survives intact and nothing in it can be re-read as
+        # shell syntax - which is the point, since a loosened regex above would
+        # otherwise turn this line into arbitrary code execution.
+        #
+        # The "Syntax error!" re-prompt that used to follow the eval was
+        # unreachable anyway: the validation above already guarantees a form
+        # that always parses (no $, backticks, operators or newlines anywhere),
+        # so eval never actually failed and the user never saw that branch.
+        for pair in "${EXPORT_PAIRS[@]}"; do
+          pair=$(echo "$pair" | xargs)
+          [ -z "$pair" ] && continue
+          [[ "$pair" =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+          export "${BASH_REMATCH[1]}=${BASH_REMATCH[2]}"
+        done
+        break
       done
       [[ "${moredomainame_flag}" == y ]] && moredomainame_D="$(for D in ${moredomainame}; do echo -d ${D}; done)"
       "${HOME}/.acme.sh/acme.sh" --force --issue -k ${CERT_KEYLENGTH} --dns dns_${DNS_PRO} -d ${domain} ${moredomainame_D}
@@ -400,7 +412,9 @@ What Are You Doing?
     # Map the menu number back to its tag; skipped when the menu did not run
     # (--mphp_ver came from the command line and _mphptags stayed empty).
     if [ -n "${_mphptags}" ] && [[ "${php_option}" =~ ^[0-9]+$ ]] && [ "${php_option}" -ge 1 ]; then
-      _mphptags_a=(${_mphptags})
+      _mphptags_a=()
+      # read -a rather than an unquoted array literal: no glob expansion (SC2206)
+      read -ra _mphptags_a <<< "${_mphptags}"
       mphp_ver=${_mphptags_a[$((php_option - 1))]}
     fi
     [ ! -e "/dev/shm/php${mphp_ver}-cgi.sock" ] && unset mphp_ver

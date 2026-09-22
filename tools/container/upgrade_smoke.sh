@@ -17,10 +17,24 @@
 #
 # Combination under test (keep it to ONE per run, depth not breadth):
 #   install:  Nginx from source + MariaDB 11.8 binary tarball
+#             + PHP 8.5 + Redis   (both gated, see UPGRADE_SMOKE_PHP/REDIS)
 #   upgrade:  MariaDB (same-series, dump+restore path)
 #             Nginx (recompile + hot swap + backup-binary mv rollback path)
-#   idempotent re-run of both upgrades
+#             PHP (full source recompile + backup/rollback machinery)
+#             Redis (recompile + service restart, or the already-latest no-op)
+#   idempotent re-run of the db+nginx upgrades
 #   uninstall
+#
+# Runtime gates - both default ON, set to anything but y to skip:
+#   UPGRADE_SMOKE_PHP=0    skip installing and upgrading PHP
+#   UPGRADE_SMOKE_REDIS=0  skip installing and upgrading Redis
+# They exist because --php has NO early-out: once the installed series matches
+# the target series it always re-downloads and recompiles PHP from source
+# (~15-25 min on the slow rotating distro, ~+10-15 min for the PHP install on
+# top). That pushed the job's realistic ceiling from 40-90 min to roughly
+# 75-145 min, which is why container-upgrade.yml now allows 240 min rather
+# than 120. If a given distro proves slower than that, flip these two off to
+# get a green run immediately without editing the script.
 #
 # systemd is REQUIRED, same as smoke.sh: the installer starts services via
 # systemctl, and _nginx_hot_swap relies on /var/run/nginx.pid + SIGUSR2.
@@ -48,13 +62,21 @@ fi
 # shellcheck disable=SC1091
 . /etc/os-release
 
-# Same combination as smoke.sh where they overlap (nginx 1, mariadb 11.8),
-# but PHP is deliberately NOT installed: the upgrade layer's value is the
-# MariaDB dump+restore + Nginx recompile/hot-swap chains, and a PHP
-# install adds 10-15 min without exercising anything the upgrades touch.
+# Same combination as smoke.sh where they overlap (nginx 1, mariadb 11.8,
+# php_option 3 = PHP 8.5). PHP and Redis used to be skipped here to keep the
+# job short; they are now installed and upgraded too, each behind a gate (see
+# the header) so a slow distro can drop them without touching this script.
 NGINX_OPTION=1
-DB_OPTION=5        # MariaDB 11.8 binary tarball
+PHP_OPTION=3        # 1 = 8.3, 2 = 8.4, 3 = 8.5  (same value smoke.sh uses)
+DB_OPTION=5         # MariaDB 11.8 binary tarball
 DB_ROOT_PWD='LnmpUpgrade2026'
+
+# Gates, default ON. Anything other than 'y' skips that chain end to end -
+# install flag AND upgrade stage - so the two can never get out of sync and
+# leave upgrade.sh --php pointed at a PHP that was never installed (which
+# would exit 1, because Upgrade_PHP treats a missing install as fatal).
+UPGRADE_SMOKE_PHP="${UPGRADE_SMOKE_PHP:-y}"
+UPGRADE_SMOKE_REDIS="${UPGRADE_SMOKE_REDIS:-y}"
 
 # Upgrade targets come from versions.txt (single source of truth for this
 # tree): same-series MariaDB bump and the latest Nginx stable.
@@ -105,14 +127,25 @@ opt() { sed -n "s/^$1=//p" options.conf | tail -n 1; }
 
 echo "=== target distro ==="
 echo "${PRETTY_NAME:-unknown}"
-echo "=== combination: nginx=${NGINX_OPTION} db=${DB_OPTION} upgrade-target db=${DB_TARGET_VER} ==="
+echo "=== combination: nginx=${NGINX_OPTION} php=${PHP_OPTION}(${UPGRADE_SMOKE_PHP}) db=${DB_OPTION} redis=${UPGRADE_SMOKE_REDIS} upgrade-target db=${DB_TARGET_VER} ==="
 
-# ---------------------------------------------------------------- 1/5 install
-stage "1/5 install (Nginx + MariaDB ${DB_TARGET_VER})"
-./install.sh \
-  --nginx_option "${NGINX_OPTION}" \
-  --db_option "${DB_OPTION}" \
-  --dbrootpwd "${DB_ROOT_PWD}" \
+# --------------------------------------------------------------- 1/7 install
+# Flags are assembled up front so the install and the matching upgrade stage
+# are decided by ONE test each. install.sh only shows its interactive menu when
+# ARG_NUM==0 ($# at line 85), so passing anything here also guarantees the
+# `confirm` prompts never run - in particular the redis one, whose confirm
+# unconditionally re-declares redis_flag from user input (default n) and would
+# otherwise silently discard --redis.
+INSTALL_ARGS=(
+  --nginx_option "${NGINX_OPTION}"
+  --db_option "${DB_OPTION}"
+  --dbrootpwd "${DB_ROOT_PWD}"
+)
+[ "${UPGRADE_SMOKE_PHP}" = "y" ] && INSTALL_ARGS+=(--php_option "${PHP_OPTION}")
+[ "${UPGRADE_SMOKE_REDIS}" = "y" ] && INSTALL_ARGS+=(--redis)
+
+stage "1/7 install (Nginx + MariaDB ${DB_TARGET_VER}, php=${UPGRADE_SMOKE_PHP}, redis=${UPGRADE_SMOKE_REDIS})"
+./install.sh "${INSTALL_ARGS[@]}" \
   > smoke-upgrade-install.log 2>&1
 rc=$?
 if [ "${rc}" -eq 0 ]; then
@@ -122,6 +155,29 @@ else
   tail -n 40 smoke-upgrade-install.log
   echo "=== UPGRADE SMOKE FAILED during install ==="
   exit 1
+fi
+
+# Prove the gated components landed BEFORE spending tens of minutes on the
+# upgrade stages: Upgrade_PHP and Upgrade_Redis both `exit 1` when their
+# install directory is missing, so a silently-skipped install would otherwise
+# surface much later as a baffling "upgrade failed".
+# php-config is read (not `php -v`) because that is the exact string
+# Upgrade_PHP captures as OLD_php_ver, and it only proceeds when the target
+# shares that minor series - using a different source here could assert a
+# version the upgrade logic never sees.
+if [ "${UPGRADE_SMOKE_PHP}" = "y" ]; then
+  assert_exists /usr/local/php/bin/php
+  assert_run "php -v works" /usr/local/php/bin/php -v
+  assert_run "php-fpm -t accepts the generated config" /usr/local/php/sbin/php-fpm -t
+  assert_running "php-fpm is running after install" php-fpm
+  OLD_PHP_VER="$(/usr/local/php/bin/php-config --version 2>/dev/null)"
+  echo "  installed PHP: ${OLD_PHP_VER:-unknown}"
+fi
+if [ "${UPGRADE_SMOKE_REDIS}" = "y" ]; then
+  assert_exists /usr/local/redis/bin/redis-server
+  assert_running "redis-server is running after install" redis-server
+  OLD_REDIS_VER="$(/usr/local/redis/bin/redis-cli --version 2>/dev/null | awk '{print $2}')"
+  echo "  installed Redis: ${OLD_REDIS_VER:-unknown}"
 fi
 
 MARIADB_CLI="$(command -v /usr/local/mariadb/bin/mariadb || echo /usr/local/mariadb/bin/mysql)"
@@ -143,7 +199,7 @@ OLD_DB_VER="$(env MYSQL_PWD="${DB_ROOT_PWD}" "${MARIADB_CLI}" -uroot -N -B -e 's
 echo "  installed DB version: ${OLD_DB_VER:-unknown}"
 
 # ------------------------------------------------------------- 2/5 upgrade DB
-stage "2/5 upgrade.sh --db ${DB_TARGET_VER} (dump+restore)"
+stage "2/7 upgrade.sh --db ${DB_TARGET_VER} (dump+restore)"
 ./upgrade.sh --db "${DB_TARGET_VER}" > smoke-upgrade-db.log 2>&1
 rc=$?
 if [ "${rc}" -eq 0 ]; then
@@ -169,7 +225,7 @@ else
 fi
 
 # ---------------------------------------------------------- 3/5 upgrade Nginx
-stage "3/5 upgrade.sh --nginx (recompile + hot swap)"
+stage "3/7 upgrade.sh --nginx (recompile + hot swap)"
 OLD_NGINX_VER="$(/usr/local/nginx/sbin/nginx -v 2>&1 | awk -F/ '{print $2}')"
 echo "  installed nginx: ${OLD_NGINX_VER}"
 # Give Nginx a little breathing room after the DB upgrade before we recompile.
@@ -205,11 +261,82 @@ else
   bad "no nginx.bak* backup binary found - the mv-aside step did not run"
 fi
 
-# --------------------------------------------------- 4/5 idempotent re-upgrade
+# --------------------------------------------------------- 4/7 upgrade PHP
+# Unlike --db/--nginx this chain has NO "already at this version" early-out:
+# once the requested version shares the installed minor series, Upgrade_PHP
+# re-downloads the tarball and recompiles PHP from source every single run.
+# That is the expense the header warns about, and it is also the only place
+# PHP's backup/rollback machinery (BACKUP_DIR copy + generated rollback.sh)
+# actually gets exercised.
+if [ "${UPGRADE_SMOKE_PHP}" = "y" ]; then
+  stage "4/7 upgrade.sh --php (source recompile + backup)"
+  ./upgrade.sh --php > smoke-upgrade-php.log 2>&1
+  rc=$?
+  if [ "${rc}" -eq 0 ]; then
+    ok "upgrade.sh --php exited 0"
+  else
+    bad "upgrade.sh --php exited ${rc}"
+    tail -n 60 smoke-upgrade-php.log
+  fi
+  NEW_PHP_VER="$(/usr/local/php/bin/php-config --version 2>/dev/null)"
+  echo "  PHP after upgrade: ${NEW_PHP_VER:-unknown}"
+  [ -n "${NEW_PHP_VER}" ] && ok "php-config answered after upgrade (${NEW_PHP_VER})" \
+    || bad "php-config produced no version after upgrade"
+  assert_run "php -v works after upgrade" /usr/local/php/bin/php -v
+  assert_run "php-fpm -t accepts the config after upgrade" /usr/local/php/sbin/php-fpm -t
+  assert_running "php-fpm is running after upgrade" php-fpm
+  # Upgrade_PHP copies the whole install into /data/backup/php_backup_* and
+  # writes rollback.sh beside it - its presence proves the pre-upgrade backup
+  # ran, which is what makes a failed upgrade recoverable at all.
+  PHP_BAK=$(command ls -1dt /data/backup/php_backup_* 2>/dev/null | head -n 1)
+  if [ -n "${PHP_BAK}" ] && [ -f "${PHP_BAK}/rollback.sh" ]; then
+    ok "PHP backup + rollback.sh present at ${PHP_BAK} (rollback armed)"
+  else
+    bad "no php_backup_*/rollback.sh found - the pre-upgrade backup did not run"
+  fi
+fi
+
+# ------------------------------------------------------- 5/7 upgrade Redis
+if [ "${UPGRADE_SMOKE_REDIS}" = "y" ]; then
+  stage "5/7 upgrade.sh --redis"
+  ./upgrade.sh --redis > smoke-upgrade-redis.log 2>&1
+  rc=$?
+  if [ "${rc}" -eq 0 ]; then
+    ok "upgrade.sh --redis exited 0"
+  else
+    bad "upgrade.sh --redis exited ${rc}"
+    tail -n 60 smoke-upgrade-redis.log
+  fi
+  NEW_REDIS_VER="$(/usr/local/redis/bin/redis-cli --version 2>/dev/null | awk '{print $2}')"
+  echo "  Redis after upgrade: ${NEW_REDIS_VER:-unknown} (was ${OLD_REDIS_VER:-unknown})"
+  # Deliberately NOT asserted as "version must change". Upgrade_Redis resolves
+  # its target from GitHub's releases feed, while versions.txt (what install
+  # built) is reconciled against upstream by the version-drift workflow - so
+  # the two are frequently EQUAL, and the chain then takes its documented
+  # "same as the old version" branch: exit 0, nothing rebuilt. Asserting a
+  # version change would flip this stage red or green depending only on where
+  # the week sits relative to the last drift run. The invariant that holds
+  # either way is a clean exit plus a healthy server, so that is what is
+  # asserted; which branch ran is reported for the human reading the log.
+  if [ -n "${NEW_REDIS_VER}" ]; then
+    if [ "${NEW_REDIS_VER}" != "${OLD_REDIS_VER}" ]; then
+      ok "redis version changed (${OLD_REDIS_VER} -> ${NEW_REDIS_VER}) - full rebuild path"
+    else
+      ok "redis already at target (${NEW_REDIS_VER}) - no-op path"
+    fi
+  else
+    bad "redis-cli produced no version after upgrade"
+  fi
+  assert_running "redis-server is running after upgrade" redis-server
+fi
+
+# ------------------------------------------------- 6/7 idempotent re-upgrade
 # Re-running against the same target version must succeed: the MariaDB chain
 # takes the "already at this version" path and the Nginx chain re-runs the
-# extraction/build with everything already in place.
-stage "4/5 idempotent re-run: upgrade.sh --db + --nginx again"
+# extraction/build with everything already in place. PHP and Redis are
+# deliberately NOT repeated here - --php would mean a second full source
+# recompile, ~15-25 min to re-prove what stage 4 just proved.
+stage "6/7 idempotent re-run: upgrade.sh --db + --nginx again"
 ./upgrade.sh --db "${DB_TARGET_VER}" --nginx > smoke-upgrade-rerun.log 2>&1
 rc=$?
 if [ "${rc}" -eq 0 ]; then
@@ -222,7 +349,7 @@ assert_running "nginx survived the re-run" nginx
 assert_running "mariadb survived the re-run" mariadbd mysqld
 
 # --------------------------------------------------------------- 5/5 uninstall
-stage "5/5 uninstall: --quiet --yes --all"
+stage "7/7 uninstall: --quiet --yes --all"
 ./uninstall.sh --quiet --yes --all > smoke-upgrade-uninstall.log 2>&1
 rc=$?
 if [ "${rc}" -eq 0 ]; then
@@ -236,6 +363,17 @@ assert_absent /usr/local/mariadb
 assert_absent /lib/systemd/system/nginx.service
 assert_not_running "no nginx process remains" nginx
 assert_not_running "no mariadb process remains" mariadbd mysqld
+# uninstall.sh --all sets allphp_flag and redis_flag too, so these must be
+# gone as well - guarded only so a run with the gates off does not report
+# components it was never asked to install.
+if [ "${UPGRADE_SMOKE_PHP}" = "y" ]; then
+  assert_absent /usr/local/php
+  assert_not_running "no php-fpm process remains" php-fpm
+fi
+if [ "${UPGRADE_SMOKE_REDIS}" = "y" ]; then
+  assert_absent /usr/local/redis
+  assert_not_running "no redis-server process remains" redis-server
+fi
 
 # ------------------------------------------------------------------------ done
 echo

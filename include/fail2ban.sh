@@ -53,7 +53,13 @@ EOF
     endscript
 }
 EOF
-  kill -9 $(ps -ef | grep fail2ban | grep -v grep | awk '{print $2}') > /dev/null 2>&1
+  # pgrep -f anchored on the real daemon, not `grep fail2ban` over ps: the old
+  # pipeline matched its OWN grep line, and with no match at all it handed
+  # `kill` an empty argument list (exit 1). -x keeps a stray 'fail2ban-client'
+  # from being killed as collateral.
+  if pkill -9 -x fail2ban-server 2>/dev/null || pkill -9 -f '/fail2ban[^/]*$' 2>/dev/null; then
+    sleep 1
+  fi
   svc_start fail2ban
   popd > /dev/null
   if [ -e "/usr/local/bin/fail2ban-server" ]; then

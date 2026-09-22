@@ -50,7 +50,7 @@ EOF
 
 # /etc/hosts
 if [ "$(hostname -i | awk '{print $1}')" != "127.0.0.1" ]; then
-  [ -z "$(grep $(hostname) /etc/hosts)" ] && sed -i "s@127.0.0.1.*localhost@&\n127.0.0.1 $(hostname)@g" /etc/hosts
+  [ -z "$(grep "$(hostname)" /etc/hosts)" ] && sed -i "s@127.0.0.1.*localhost@&\n127.0.0.1 $(hostname)@g" /etc/hosts
 fi
 
 # Set timezone
@@ -109,4 +109,5 @@ svc_restart ssh || echo "Warning: Failed to restart ssh" >&2
 # Source bashrc for this session but do NOT let its last command's exit
 # status become the step's status: run_step would abort the whole install
 # over an unrelated line in the user's bashrc
+# shellcheck disable=SC1090  # the path is a user file, not a constant
 . ~/.bashrc || true

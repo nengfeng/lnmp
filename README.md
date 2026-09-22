@@ -10,8 +10,8 @@
 - 支持 TLS 1.2/1.3、HTTP/2、OCSP Stapling、HSTS Preload
 
 ### 数据库
-- MySQL 8.0 / 8.4
-- MariaDB 10.11 / 11.4 / 11.8
+- MySQL 8.0 / 8.4 / 9.7
+- MariaDB 10.11 / 11.4 / 11.8 / 12.3
 - PostgreSQL 16 / 17 / 18
 
 ### PHP
@@ -34,7 +34,7 @@ vim options.conf
 
 主要配置项：
 - `nginx_option`: Web 服务器 (1=Nginx, 2=Tengine, 3=OpenResty)
-- `db_option`: 数据库 (1=MySQL 9.7, 2=MySQL 8.4, 3=MySQL 8.0, 4-7=MariaDB, 8=PostgreSQL)
+- `db_option`: 数据库 (1=MySQL 9.7, 2=MySQL 8.4, 3=MySQL 8.0, 4=MariaDB 12.3, 5=MariaDB 11.8, 6=MariaDB 11.4, 7=MariaDB 10.11, 8=PostgreSQL)
 - `php_option`: PHP 版本 (1=8.3, 2=8.4, 3=8.5)
 - `allocator_option`: 内存分配器 (1=无, 2=tcmalloc, 3=jemalloc，默认 jemalloc)
 - `server_scenario`: 服务器场景 (vps=资源受限, dedicated=独立服务器)
@@ -344,10 +344,10 @@ MySQL 官方二进制包兼容性更好，对旧 CPU 支持更完善。
 
 ```bash
 # 方案1: 使用 MySQL 替代
-./install.sh --db_option 1  # MySQL 8.4
+./install.sh --db_option 2  # MySQL 8.4
 
 # 方案2: 源码编译 MariaDB
-./install.sh --dbinstallmethod 2 --db_option 3  # MariaDB 10.11
+./install.sh --dbinstallmethod 2 --db_option 7  # MariaDB 10.11
 ```
 
 **检查 CPU 支持的指令集：**
@@ -479,14 +479,31 @@ systemctl {start|stop|restart} redis-server
 
 | 层级 | 工作流 | 内容 |
 |------|--------|------|
-| L0 静态/离线 | `lint.yml` | `bash -n` 全量语法检查、ShellCheck 静态分析、9 项自定义静态护栏（`tools/lint/static_checks.sh`）、离线逻辑测试 37 用例（`tools/test_offline.sh`）与发行版门禁决策表 21 用例（`tools/lint/os_gate_checks.sh`） |
+| L0 静态/离线 | `lint.yml` | `bash -n` 全量语法检查、ShellCheck 静态分析（warning 级为门禁，info 级为 advisory）、12 项自定义静态护栏（`tools/lint/static_checks.sh`，含 README 与 `install.sh` 数据库菜单一致性检查）、离线逻辑测试 123 用例（`tools/test_offline.sh`）与发行版门禁决策表 21 用例（`tools/lint/os_gate_checks.sh`） |
 | L1 发行版矩阵 | `container.yml` | 在 Debian 12/13、Ubuntu 24.04/26.04 四个容器内跑 `install.sh --preflight`，真装依赖、验证包名是否漂移 |
 | L2 全量冒烟 | `container.yml` | systemd 容器内跑 `tools/container/smoke.sh`：完整安装 → 幂等复跑 → `uninstall` 卸载，33 条断言闭环 |
+| L3 升级链 | `container-upgrade.yml` | systemd 容器内跑 `tools/container/upgrade_smoke.sh`：安装 Nginx/MariaDB/PHP/Redis → `upgrade.sh --db/--nginx/--php/--redis` → 幂等复跑 → 卸载。PHP 升级必然完整重编译，故超时放宽至 240 分钟，且可用 `UPGRADE_SMOKE_PHP=0` / `UPGRADE_SMOKE_REDIS=0` 关闭对应链路 |
 
 **未来改进方向：**
 
 1. **配置验证** — 安装前自动校验 `options.conf` 参数合法性
 2. **多语言支持** — 支持中英文双语提示信息
+
+## 参与贡献与安全
+
+- **[CHANGELOG.md](CHANGELOG.md)** — 版本变更记录，按 `Fixed` / `Changed` / `Added` 分组，覆盖 v1.6.5 至今
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — 提交规范（Conventional Commits），以及推送前必须全绿的四项检查：
+
+  ```bash
+  bash tools/lint/static_checks.sh      # 12 项静态护栏
+  bash tools/test_offline.sh            # 123 用例离线逻辑测试
+  bash tools/lint/os_gate_checks.sh     # 21 用例发行版门禁
+  shellcheck -S warning $(find . -name '*.sh' -not -path './src/*')
+  ```
+
+- **[SECURITY.md](SECURITY.md)** — 支持版本与漏洞报告方式。**安全问题请勿公开提交 Issue**，请改用 GitHub 的[私密安全报告](https://github.com/nengfeng/lnmp/security/advisories/new)。
+
+提交问题请使用仓库内置的 **Bug 报告 / 功能建议** 模板，其中已包含复现步骤、发行版、架构与日志打码等必填项。
 
 ## 致谢
 

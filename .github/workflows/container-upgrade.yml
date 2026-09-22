@@ -2,13 +2,19 @@ name: Container upgrade
 
 # Upgrade layer of the container test net: a real install in the same
 # systemd container as the smoke layer, then upgrade.sh driven end to end
-# (MariaDB dump+restore, Nginx recompile + USR2/QUIT hot swap), an
-# idempotent re-run, and a full uninstall.
+# (MariaDB dump+restore, Nginx recompile + USR2/QUIT hot swap, PHP source
+# recompile + backup, Redis rebuild or already-latest no-op), an idempotent
+# re-run, and a full uninstall.
 #
 # Lives in its own workflow rather than as a ninth stage of container-smoke:
 # the upgrade recompile would push the smoke run past the 90-minute job
 # timeout on the slowest rotating distro, and a green smoke should keep
 # reading as "the install chain is clean".
+#
+# This job itself is the expensive one, so the PHP and Redis chains can be
+# switched off from the repository's Actions variables (UPGRADE_SMOKE_PHP /
+# UPGRADE_SMOKE_REDIS, value 0) without editing either file - see the
+# timeout-minutes comment below for why the ceiling is 240.
 #
 # Same distro rotation as container-smoke (weekly, every Sunday 03:00 UTC).
 # The two workflows pick the same base image for a given week, so a red
@@ -58,11 +64,23 @@ jobs:
     needs: pick
     name: upgrade (${{ needs.pick.outputs.image }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # 240, not 120: the run now installs and upgrades PHP and Redis too, and
+    # upgrade.sh --php has no early-out - it recompiles PHP from source on
+    # every invocation (~15-25 min extra, plus ~10-15 min to install PHP).
+    # Realistic ceiling went from 40-90 min to roughly 75-145 min. GitHub's
+    # cap for hosted runners is 360, so this still leaves headroom. If a
+    # rotating distro ever blows past it, set the two env vars below to 0 for
+    # an immediate green run - they gate the install flag and the upgrade
+    # stage together, so they cannot get out of sync.
+    timeout-minutes: 240
     env:
       CONTAINER: lnmp-upgrade
       IMAGE: lnmp-upgrade-systemd
       BASE_IMAGE: ${{ needs.pick.outputs.image }}
+      # Default ON (the script applies the same :-y default if these are ever
+      # dropped). Flip to 0 to drop that chain end to end.
+      UPGRADE_SMOKE_PHP: ${{ vars.UPGRADE_SMOKE_PHP || 'y' }}
+      UPGRADE_SMOKE_REDIS: ${{ vars.UPGRADE_SMOKE_REDIS || 'y' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -98,19 +116,27 @@ jobs:
           docker logs "$CONTAINER" >&2 || true
           exit 1
 
-      - name: Upgrade smoke (install -> upgrade db+nginx -> re-run -> uninstall)
+      - name: Upgrade smoke (install -> upgrade db+nginx+php+redis -> re-run -> uninstall)
         # tee the run's own stdout (stage verdicts, PASS/FAIL lines) into the
         # workspace so the artifact carries them - same rationale as
         # container-smoke.yml.
+        #
+        # The -e flags are load-bearing: this job's `env:` block lives on the
+        # RUNNER, but `docker exec` starts a fresh process INSIDE the container
+        # which does not inherit it. Without an explicit `-e VAR` (pass-through
+        # form, no value) the gates would silently fall back to the script's
+        # own :-y defaults and the workflow-side switches would do nothing.
         run: |
           set -o pipefail
-          docker exec -w /work "$CONTAINER" bash tools/container/upgrade_smoke.sh 2>&1 | tee upgrade-smoke-stdout.log
+          docker exec -w /work \
+            -e UPGRADE_SMOKE_PHP -e UPGRADE_SMOKE_REDIS \
+            "$CONTAINER" bash tools/container/upgrade_smoke.sh 2>&1 | tee upgrade-smoke-stdout.log
 
         # Reproduce the failing tail in the job log.
       - name: Show logs on failure
         if: failure()
         run: |
-          for f in upgrade-smoke-stdout.log smoke-upgrade-install.log smoke-upgrade-db.log smoke-upgrade-nginx.log smoke-upgrade-rerun.log smoke-upgrade-uninstall.log; do
+          for f in upgrade-smoke-stdout.log smoke-upgrade-install.log smoke-upgrade-db.log smoke-upgrade-nginx.log smoke-upgrade-php.log smoke-upgrade-redis.log smoke-upgrade-rerun.log smoke-upgrade-uninstall.log; do
             if [ -f "$f" ]; then
               echo "===== ${f} (tail) ====="
               tail -n 60 "$f"
@@ -118,7 +144,7 @@ jobs:
           done
           echo "===== failed units ====="
           docker exec "$CONTAINER" systemctl --failed --no-pager || true
-          for unit in nginx mariadb; do
+          for unit in nginx mariadb php-fpm redis-server; do
             echo "===== journal: ${unit} (tail) ====="
             docker exec "$CONTAINER" journalctl -u "${unit}" -n 25 --no-pager || true
           done

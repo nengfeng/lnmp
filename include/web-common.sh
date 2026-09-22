@@ -185,7 +185,7 @@ install_web_server() {
   if [ ! -e "/usr/local/lib/libluajit-5.1.so" ] || [ ! -f "/usr/local/include/luajit-2.1/luajit.h" ]; then
     _extract_tar "luajit2-${luajit2_ver}.tar.gz" "luajit2-${luajit2_ver}" || fail_msg "${server_type}"
     pushd "luajit2-${luajit2_ver}" > /dev/null
-    make -j$(nproc) && make install || fail_msg "LuaJIT"
+    make -j"$(nproc)" && make install || fail_msg "LuaJIT"
     popd > /dev/null
     rm -rf "luajit2-${luajit2_ver}"
     ldconfig
@@ -226,7 +226,7 @@ install_web_server() {
     _extract_tar "lua-cjson-${lua_cjson_ver}.tar.gz" || fail_msg "${server_type}"
     pushd "lua-cjson-${lua_cjson_ver}" > /dev/null
     sed -i 's@^LUA_INCLUDE_DIR.*@&/luajit-2.1@' Makefile
-    make -j$(nproc) && make install
+    make -j"$(nproc)" && make install
     [ ! -e "/usr/local/lib/lua/5.1/cjson.so" ] && fail_msg "lua-cjson"
     popd > /dev/null
     rm -rf "lua-cjson-${lua_cjson_ver}"
@@ -268,7 +268,7 @@ install_web_server() {
   
   # Close debug for nginx and openresty
   if [[ "${server_type}" == "nginx" ]]; then
-    close_gcc_debug $(pwd)
+    close_gcc_debug "$(pwd)"
   elif [[ "${server_type}" == "openresty" ]]; then
     local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
     [ -n "$nginx_bundle_dir" ] && close_gcc_debug "$nginx_bundle_dir"

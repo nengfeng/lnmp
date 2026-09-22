@@ -95,7 +95,9 @@ echo "== 6. entry-point scripts must not end on a bare '&&' compound [HARD] =="
 # last statement whose final operator is '&&' leaves the script exposed.
 # include/*.sh are sourced libraries, so their last statement is not an exit code.
 tail_ok=1
-for f in $(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*'); do
+# while read, not `for f in $(find ...)`: filenames with whitespace would be
+# split into two bogus paths and the rule would silently pass them (SC2044).
+while IFS= read -r f; do
   last=$(grep -vE '^[[:space:]]*(#|$)' "$f" 2>/dev/null | tail -1)
   case "$last" in
     *'&&'*)
@@ -106,7 +108,7 @@ for f in $(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -no
            tail_ok=0 ;;
       esac ;;
   esac
-done
+done < <(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*')
 [ "$tail_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
 echo "== 7. svc_start must re-verify Type=simple units [HARD] =="
@@ -250,7 +252,8 @@ echo "== 11. entry-point scripts must end on an explicit exit [HARD] =="
 # and pureftpd_vhost.sh had the same class. Requiring an explicit exit
 # forces the author to own the exit status.
 exit_ok=1
-for f in $(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*' -not -path './tools/lint/static_checks.sh'); do
+# while read, not `for f in $(find ...)` (SC2044) - see rule 6 above.
+while IFS= read -r f; do
   last=$(grep -vE '^[[:space:]]*(#|$)' "$f" 2>/dev/null | tail -1)
   case "$last" in
     *exit*) : ;;
@@ -263,8 +266,49 @@ for f in $(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -no
         exit_ok=0
       fi ;;
   esac
-done
+done < <(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*' -not -path './tools/lint/static_checks.sh')
 [ "$exit_ok" -eq 1 ] && echo "  OK" || FAIL=1
+
+echo "== 12. README db facts must match the install.sh menu [HARD] =="
+# install.sh owns the menu; README describes it in three separate places, and
+# all three have drifted before (options 1/3 documented as the wrong database,
+# MariaDB 12.3 and MySQL 9.7 missing from the component list). Cheap to derive
+# both sides from the menu and diff them, so a renumber or a new release cannot
+# silently desync the docs again.
+db_doc_ok=1
+menu_map=$(grep -ohE '\$\{CMSG\}[0-9]+\$\{CEND\}\. Install (MySQL|MariaDB)-[0-9]+\.[0-9]+' install.sh | sed -E 's/.*\$\{CMSG\}([0-9]+)\$\{CEND\}\. Install (MySQL|MariaDB)-([0-9]+\.[0-9]+)/\1 \2 \3/' | sort -u)
+readme_map=$(grep -E '^- `db_option`:' README.md | grep -oE '[0-9]+=(MySQL|MariaDB) [0-9]+\.[0-9]+' | sed 's/=/ /' | sort -u)
+if [ "$menu_map" != "$readme_map" ]; then
+  echo "  README db_option numbering does not match the install.sh menu:"
+  comm -3 <(echo "$menu_map") <(echo "$readme_map") | sed 's/^/      menu-only|readme-only: /'
+  db_doc_ok=0
+fi
+# Component list: every database version the menu offers must appear in the
+# README's family bullet (and the bullet must not list one the menu does not).
+for family in MySQL MariaDB; do
+  menu_v=$(grep -ohE "Install ${family}-[0-9]+\.[0-9]+" install.sh | sed "s/Install ${family}-//" | sort -u)
+  readme_v=$(grep -E "^- ${family} " README.md | tr '/' '\n' | grep -oE '[0-9]+\.[0-9]+' | sort -u)
+  if [ "$menu_v" != "$readme_v" ]; then
+    echo "  README '- ${family}' component list does not match the menu:"
+    comm -3 <(echo "$menu_v") <(echo "$readme_v") | sed 's/^/      menu-only|readme-only: /'
+    db_doc_ok=0
+  fi
+done
+# Example commands: `--db_option N  # Family Ver` must name the database the
+# menu actually puts at N - this is the drift that sent users to the wrong
+# database from the troubleshooting section.
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  opt=$(grep -oE '\-\-db_option [0-9]+' <<< "$line" | grep -oE '[0-9]+')
+  want=$(grep -oE '# *(MySQL|MariaDB) [0-9]+\.[0-9]+' <<< "$line" | sed 's/# *//')
+  [ -z "$want" ] && continue   # examples without a comment make no claim
+  actual=$(grep -E "^${opt} " <<< "$menu_map" | awk '{print $2" "$3}')
+  if [ "$want" != "$actual" ]; then
+    echo "  README example claims '--db_option ${opt}' is ${want}, menu says ${actual:-<none>}: ${line}"
+    db_doc_ok=0
+  fi
+done < <(grep -E -- '--db_option [0-9]+.*#' README.md)
+[ "$db_doc_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
 echo ""
 [ "$FAIL" -eq 0 ] && { echo "STATIC CHECKS: PASS"; exit 0; } || { echo "STATIC CHECKS: FAIL"; exit 1; }

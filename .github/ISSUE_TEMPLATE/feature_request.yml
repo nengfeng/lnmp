@@ -1,0 +1,72 @@
+name: "✨ 功能建议"
+description: "提议新组件、新选项或行为改进"
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提建议！请先搜索 [已有 Issue](https://github.com/nengfeng/lnmp/issues)
+        确认没有重复。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决什么问题
+      description: |
+        请从「遇到的不便」说起，而不是直接描述方案。
+        「我想在 2C2G 的机器上跑两个 PHP 版本」比「请加一个 --mphp 选项」更有用。
+      placeholder: "现在……，导致我不得不手动……"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议的方案
+      description: 你期望的行为或接口是什么样。
+      placeholder: "例如：希望 install.sh 支持 --xxx，在非交互模式下也能……"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及范围
+      options:
+        - 安装 / 组件选择
+        - 升级链 (upgrade.sh)
+        - 站点与 HTTPS (vhost.sh)
+        - 备份 / 恢复
+        - 性能调优
+        - 文档 / 提示信息
+        - CI / 测试
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 目前的替代做法
+      description: 你现在是怎么绕过的？如果没有任何变通办法也请说明。
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他上下文
+      description: 相关链接、截图，或你已经想过的实现思路。
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索过现有 Issue，没有重复的建议
+          required: true
+        - label: 我理解本项目以 Debian/Ubuntu 为目标，且不接受与上游组件自身缺陷相关的建议
+          required: true

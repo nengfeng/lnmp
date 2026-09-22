@@ -57,17 +57,32 @@ jobs:
           done
           exit $rc
 
-      # 2. shellcheck at ERROR severity (calibrated exclusions in .shellcheckrc).
-      #    No -x/-s: the scripts are #!/bin/bash, so shellcheck auto-detects bash.
+      # 2. shellcheck at WARNING severity (calibrated exclusions in .shellcheckrc).
+      #    No -S/-s: the scripts are #!/bin/bash, so shellcheck auto-detects bash.
+      #
+      #    This used to be an advisory `continue-on-error` step reporting at
+      #    -S warning while the gate below ran at -S error. The advisory sat
+      #    at 28 findings indefinitely, which is what advisory steps do. All
+      #    28 were real (SC2064 traps that expanded at registration time,
+      #    `rm -rf boost_$(...)` that degraded to `rm -rf boost_` on an empty
+      #    var, `kill -9 $(ps | grep ...)` with no match handing `kill` an
+      #    empty argument list) and were fixed instead of being silenced, so
+      #    the ratchet the comment below called for has been tightened:
+      #    warnings now fail the gate.
+      #
+      #    -S info stays out on purpose: it flags style opinions (quoted
+      #    redirections, `local x=$(...)`) across 86 files with no signal-to-
+      #    noise payoff. Revisit if the warning gate has been clean for a
+      #    release cycle.
       - name: Shellcheck
-        run: shellcheck -S error $(find . -name '*.sh' -not -path './src/*')
+        run: shellcheck -S warning $(find . -name '*.sh' -not -path './src/*')
 
-      # 2b. Ratchet: warnings are reported but do not fail. When this step has
-      #     been clean for a while, tighten .shellcheckrc / move -S warning
-      #     into the gate above and downgrade this step to -S info.
-      - name: Shellcheck (warning severity, advisory)
+      # Advisory-only remainder: style-level findings that are reported but do
+      # not gate. When this has been clean for a while, move -S info into the
+      # gate above and delete this step.
+      - name: Shellcheck (info severity, advisory)
         continue-on-error: true
-        run: shellcheck -S warning $(find . -name '*.sh' -not -path './src/*') || true
+        run: shellcheck -S info $(find . -name '*.sh' -not -path './src/*') || true
 
       # 3. Anti-regression static checks (swallowed exits, unguarded extractions, CWD balance)
       - name: Static checks

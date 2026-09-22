@@ -408,7 +408,10 @@ Menu_PHPext() {
     read -e -p "Please input a number:(Default 0 press Enter) " phpext_option
     phpext_option=${phpext_option:-0}
     [ "${phpext_option}" = '0' ] && break
-    array_phpext=(${phpext_option})
+    array_phpext=()
+    # read -a, not ( ${phpext_option} ): an unquoted expansion would also
+    # split on glob characters the user might type (SC2206)
+    read -ra array_phpext <<< "${phpext_option}"
     array_all=(1 2 3 4 5 6 7 8 9 10 11 12 13)
     for v in ${array_phpext[@]}
     do

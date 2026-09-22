@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "🔒 报告安全漏洞"
+    url: https://github.com/nengfeng/lnmp/security/advisories/new
+    about: "安全问题请走私密渠道，切勿公开提交。详见 SECURITY.md"
+  - name: "📚 使用文档 / 快速开始"
+    url: https://github.com/nengfeng/lnmp#快速开始
+    about: "安装与配置的常见问题，先看 README 与 MYSQL_TUNING.md"
+  - name: "🤝 参与贡献 / 本地自检"
+    url: https://github.com/nengfeng/lnmp/blob/main/CONTRIBUTING.md
+    about: "提交代码前需要跑哪些检查，以及本项目的提交规范"
