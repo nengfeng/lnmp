@@ -250,11 +250,11 @@ VERIFY_CHECKSUM=no ./download_sources.sh nginx
 ## 更新
 
 ```bash
-./upgrade.sh script              # 更新脚本本身
-./upgrade.sh nginx 1.28.2        # 更新 Nginx
-./upgrade.sh php 8.4.10          # 更新 PHP
-./upgrade.sh db 8.4.3            # 更新数据库
-./upgrade.sh redis 7.4.1         # 更新 Redis
+./upgrade.sh --script            # 更新脚本本身
+./upgrade.sh --nginx 1.28.2      # 更新 Nginx
+./upgrade.sh --php 8.4.10        # 更新 PHP
+./upgrade.sh --db 8.4.3          # 更新数据库
+./upgrade.sh --redis 7.4.1       # 更新 Redis
 ./upgrade.sh --cacert            # 更新 CA 根证书 (建议每 3-6 个月)
 ```
 
