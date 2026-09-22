@@ -890,6 +890,11 @@ fi
 
 if [[ ${ARG_NUM} == 0 ]]; then
   echo "${CMSG}Please restart the server and see if the services start up fine.${CEND}"
+  # health_check.sh existed but nothing pointed at it: the README's command
+  # list did not mention it and neither did this summary, so a fresh install
+  # gave no way to learn the stack could be verified (or auto-repaired) in
+  # one command.
+  echo "${CMSG}Then run ./health_check.sh to verify services, ports, functional tests, backups and resources (add --fix to auto-restart failed services).${CEND}"
   confirm "Do you want to restart OS?" reboot_flag n
 fi
 # NOTE: keep this an `if` statement, not `<test> && reboot`.  As the last

@@ -390,6 +390,10 @@ PHP 从 8.0 开始完全内置 PCRE2，不再依赖系统 PCRE 库：
 ## 常用命令
 
 ```bash
+# 健康检查
+./health_check.sh             # 服务/端口/功能/备份/资源 五项检查，存在 FAIL 时退出码为 1
+./health_check.sh --fix       # 同上，并自动尝试重启故障服务
+
 # 服务管理
 systemctl {start|stop|restart|reload} nginx
 systemctl {start|stop|restart|reload} php-fpm
