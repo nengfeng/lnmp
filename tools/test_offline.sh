@@ -686,6 +686,36 @@ _pf postgresql17 "${pgsql17_ver}"
 _pf postgresql16 "${pgsql16_ver}"
 unset -f _pf
 
+echo "== download_common: every name resolves, and a database is included =="
+# --common is what include/download.sh points at when a download fails, so it
+# has to stand on its own: every component it names must reach a real
+# sources.conf key with a version, and at least one must be a database. A
+# "common" set with no database cannot install the M in LNMP, which is why
+# following that hint used to fail a second time on the very same file.
+_common_list=$(sed -n '/^download_common() {/,/^}/p' "$ROOT/download_sources.sh" | grep -oE '"[a-z0-9._-]+"' | tr -d '"')
+_missing=""
+_n=0
+while IFS= read -r _c; do
+  [ -z "${_c}" ] && continue
+  _n=$((_n + 1))
+  if ! grep -q "^${_c}|" "$ROOT/sources.conf"; then
+    _missing="${_missing} ${_c}(no sources.conf key)"
+  elif [ -z "$(get_version "${_c}")" ]; then
+    _missing="${_missing} ${_c}(no version)"
+  fi
+done <<< "${_common_list}"
+if [ -z "${_missing}" ] && [ "${_n}" -gt 0 ]; then
+  ok "--common: all ${_n} components resolve to a sources.conf key and a version"
+else
+  ko "--common: parsed ${_n} components, problems:${_missing:- list came back empty}"
+fi
+if echo "${_common_list}" | grep -qE '^(mysql|mariadb|postgresql)'; then
+  ok "--common includes a database component"
+else
+  ko "--common contains no database, so it cannot produce a working LNMP: ${_common_list}"
+fi
+unset _common_list _missing _n _c
+
 echo "== upgrade.sh validates every parser-assigned version =="
 # Each option's parser test is a PREFIX match (^N.N.N with no trailing
 # anchor), so it accepts "8.4.3.1" and only validate_version's ANCHORED

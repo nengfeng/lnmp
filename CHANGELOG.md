@@ -91,6 +91,14 @@ Work merged after v1.7.5 and not yet cut into a release.
   asserts the invariant for every variable the parser fills from `$2`,
   leaving the two literal `=latest` assignments correctly exempt
   (153 → 161).
+- **`download_common` contained no database.** `--common` is what
+  `include/download.sh` tells you to run when a download fails, and it is
+  advertised as "commonly used components", yet it held 22 web-side entries
+  and not one database — so following that hint after a failed database
+  download still left you unable to install the M in LNMP. It now carries the
+  installer's default (`mysql97`, `db_option 1`); every other version stays a
+  named download away. Two offline tests assert that the list resolves
+  against `sources.conf` and that a database is present (161 → 163).
 
 ### Changed
 

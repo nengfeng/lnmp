@@ -825,6 +825,13 @@ download_common() {
     "pecl-memcached"
     "phpmyadmin"
     "cacert"
+    # Database: the installer's default (db_option 1 = MySQL 9.7). Without a
+    # database this set cannot install the M in LNMP, and --common is exactly
+    # what include/download.sh points a failed downloader at - so following
+    # that hint on a failed DB download used to fail a second time on the
+    # same file. Other versions remain one named download away:
+    #   ./download_sources.sh mariadb118
+    "mysql97"
   )
   
   for comp in "${components[@]}"; do
