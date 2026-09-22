@@ -140,6 +140,10 @@ Work merged after v1.7.5 and not yet cut into a release.
   the MySQL and the PostgreSQL superuser). The README previously showed a
   single example invocation, and 15 of those 23 options appeared nowhere in
   it — including `--help`.
+- **CLI surface guard**: the `install.sh` parser, its `--help` text and the
+  new README parameter table are asserted to list the same options, in both
+  directions — `--help` used to omit `-V`/`-h`, and the help text advertised
+  a `--mphp_ver` range the parser refuses (163 → 166).
 
 ## [1.7.5] - 2026-09-19
 

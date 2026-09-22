@@ -736,6 +736,24 @@ while IFS= read -r _v; do
 done < <(grep -oE 'NEW_[A-Za-z_]*=\$2' "$ROOT/upgrade.sh" | sed 's/=.*//' | sort -u)
 unset _validated _v
 
+echo "== install.sh CLI surface: parser, --help and README agree =="
+# Three surfaces describe the same command line: parse_args' case labels
+# (what is accepted), Show_Help (what --help prints) and the README parameter
+# table (what the docs promise). Each has drifted alone before -- the help
+# text omitted -V and -h, advertised a --mphp_ver range the parser refuses,
+# and 15 of the 23 options were missing from the README. Tokens keep digits
+# or --md5sum would be compared as --md.
+_parser_opts=$(sed -n '/^parse_args() {/,/^}/p' "$ROOT/install.sh" | grep -E '^[[:space:]]+(-[a-zA-Z]|--)' | grep -oE '\-\-[a-z0-9_]+' | sort -u)
+_help_opts=$(sed -n '/^Show_Help() {/,/^}/p' "$ROOT/install.sh" | grep -oE '(^|[[:space:]])--[a-z0-9_]+' | tr -d ' ' | sort -u)
+_readme_opts=$(grep -E '^\| `--' "$ROOT/README.md" | grep -oE '\-\-[a-z0-9_]+' | sort -u)
+_gap=$(comm -23 <(echo "$_parser_opts") <(echo "$_help_opts") | tr '\n' ' ')
+[ -z "${_gap}" ] && ok "every option the parser accepts is printed by --help" || ko "accepted by the parser but absent from --help: ${_gap}"
+_gap=$(comm -13 <(echo "$_parser_opts") <(echo "$_help_opts") | tr '\n' ' ')
+[ -z "${_gap}" ] && ok "--help advertises no option the parser rejects" || ko "--help lists options the parser does not accept: ${_gap}"
+_gap=$(comm -23 <(echo "$_parser_opts") <(echo "$_readme_opts") | tr '\n' ' ')
+[ -z "${_gap}" ] && ok "README parameter table covers every parser option" || ko "parser options with no README row: ${_gap}"
+unset _parser_opts _help_opts _readme_opts _gap
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }
