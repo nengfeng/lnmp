@@ -686,6 +686,26 @@ _pf postgresql17 "${pgsql17_ver}"
 _pf postgresql16 "${pgsql16_ver}"
 unset -f _pf
 
+echo "== upgrade.sh validates every parser-assigned version =="
+# Each option's parser test is a PREFIX match (^N.N.N with no trailing
+# anchor), so it accepts "8.4.3.1" and only validate_version's ANCHORED
+# pattern can reject that. A variable the parser fills from $2 but the validate
+# block never checks is therefore silently unvalidated - which is how --db and
+# --phpmyadmin shipped: `--db 8.4.3.1` reached the upgrade untouched while
+# `--nginx 1.28.2.1` was refused. Assert it per variable so a newly parsed
+# flag cannot regress, and let literal assignments (NEW_*_ver=latest) exempt
+# themselves by never matching the parser pattern.
+_validated=$(grep -oE 'validate_version "\$\{NEW_[A-Za-z_]*\}' "$ROOT/upgrade.sh" | grep -oE 'NEW_[A-Za-z_]*' | sort -u)
+while IFS= read -r _v; do
+  [ -z "${_v}" ] && continue
+  if grep -qx "${_v}" <<< "${_validated}"; then
+    ok "${_v}: parsed from \$2 and checked by validate_version"
+  else
+    ko "${_v}: parsed from \$2 but never passed to validate_version"
+  fi
+done < <(grep -oE 'NEW_[A-Za-z_]*=\$2' "$ROOT/upgrade.sh" | sed 's/=.*//' | sort -u)
+unset _validated _v
+
 echo ""
 echo "Offline tests: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "FAILURES"; exit 1; }

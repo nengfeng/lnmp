@@ -323,14 +323,22 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Validate version formats
+# Validate version formats.
+# Every variable the parser fills from $2 has to appear here. The parser's own
+# per-option test is a PREFIX match - ^[0-9]+\.[0-9]+\.[0-9]+ with no trailing
+# anchor - so it accepts "8.4.3.1"; validate_version's anchored pattern is the
+# only layer that can reject that. --db and --phpmyadmin were missing, so
+# `upgrade.sh --db 8.4.3.1` sailed past both layers and into the upgrade with
+# a malformed version while `--nginx 1.28.2.1` was correctly refused.
 validate_failed=0
 [ -n "${NEW_nginx_ver}" ] && { validate_version "${NEW_nginx_ver}" "Nginx" || validate_failed=1; }
 [ -n "${NEW_tengine_ver}" ] && { validate_version "${NEW_tengine_ver}" "Tengine" || validate_failed=1; }
 [ -n "${NEW_openresty_ver}" ] && { validate_version "${NEW_openresty_ver}" "OpenResty" || validate_failed=1; }
+[ -n "${NEW_db_ver}" ] && { validate_version "${NEW_db_ver}" "MySQL/MariaDB" || validate_failed=1; }
 [ -n "${NEW_php_ver}" ] && { validate_version "${NEW_php_ver}" "PHP" || validate_failed=1; }
 [ -n "${NEW_redis_ver}" ] && { validate_version "${NEW_redis_ver}" "Redis" || validate_failed=1; }
 [ -n "${NEW_memcached_ver}" ] && { validate_version "${NEW_memcached_ver}" "Memcached" || validate_failed=1; }
+[ -n "${NEW_phpmyadmin_ver}" ] && { validate_version "${NEW_phpmyadmin_ver}" "phpMyAdmin" || validate_failed=1; }
 [ "${validate_failed}" -eq 1 ] && exit 1
 
 if [[ "${ARG_NUM}" == 0 ]]; then

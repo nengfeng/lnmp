@@ -80,6 +80,17 @@ Work merged after v1.7.5 and not yet cut into a release.
   pre-download and an offline install died on a missing source.
   `sources.conf` and `get_version` now agree on every version `install.sh` can
   choose, guarded by an 18-case matrix test (135 → 153).
+- **`upgrade.sh` never validated the database or phpMyAdmin version it was
+  given.** Each option's parser test is a *prefix* match
+  (`^[0-9]+\.[0-9]+\.[0-9]+`, no trailing anchor), so `--db 8.4.3.1` is
+  accepted by the parser and only `validate_version`'s anchored pattern can
+  reject it — but `NEW_db_ver` and `NEW_phpmyadmin_ver` were never passed to
+  it, while the other six parsed versions were. A malformed database version
+  therefore reached the upgrade untouched (`--nginx 1.28.2.1` was correctly
+  refused by the same layer). Both are now validated, and an 8-case guard
+  asserts the invariant for every variable the parser fills from `$2`,
+  leaving the two literal `=latest` assignments correctly exempt
+  (153 → 161).
 
 ### Changed
 
