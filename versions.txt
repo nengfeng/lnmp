@@ -29,9 +29,9 @@ pgsql17_ver=17.11
 pgsql16_ver=16.15
 
 # PHP
-php83_ver=8.3.33
-php84_ver=8.4.25
-php85_ver=8.5.10
+php83_ver=8.3.35
+php84_ver=8.4.26
+php85_ver=8.5.11
 
 # Nodejs
 nodejs_ver=20.20.2
@@ -49,10 +49,10 @@ imagemagick_ver=7.1.2-13
 imagick_ver=3.8.1
 zendopcache_ver=7.0.5
 apcu_ver=5.1.28
-phalcon_ver=5.21.0
+phalcon_ver=5.22.0
 yaf_ver=3.3.6
 yar_ver=2.3.4
-swoole_ver=6.2.2
+swoole_ver=6.2.3
 xdebug_ver=3.5.3
 
 # Ftp
