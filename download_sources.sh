@@ -483,6 +483,24 @@ url_available() {
   return $?
 }
 
+# Probe a URL's transfer speed with a short ranged curl sample.
+# Prints bytes/sec on success; non-zero exit if curl is unavailable or the
+# probe does not finish in time. Kept in sync with include/download.sh.
+_url_speed_curl() {
+  local url="$1"
+  local sample_bytes="${2:-${GITHUB_SPEED_SAMPLE_BYTES:-2097152}}"
+  local max_time="${3:-${GITHUB_SPEED_TEST_SECONDS:-10}}"
+  local range_end=$((sample_bytes - 1))
+
+  command -v curl >/dev/null 2>&1 || return 1
+
+  local raw
+  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null)
+  [ -n "${raw}" ] || return 1
+
+  printf '%d\n' "${raw%.*}"
+}
+
 download_file() {
   local url=$1
   local filename=$2
@@ -491,20 +509,15 @@ download_file() {
   
   pushd "${SRC_DIR}" > /dev/null
 
-  # Fail fast before downloading when the source is missing/unreachable.
-  # Probe failures that are not clearly HTTP errors (network, DNS, TLS) still
-  # fall through to wget, which has its own retry behaviour.
+  # Fail fast only for HTTP error responses (wget exit >= 8, e.g. 404). Keep
+  # transient network/DNS/TLS probe failures (exit 4-7) on the normal wget
+  # retry path below, matching include/download.sh.
   local probe_rc=0
   if command -v wget >/dev/null 2>&1; then
     url_available "$url" || probe_rc=$?
   fi
-  if [ ${probe_rc} -ge 4 ] && [ ${probe_rc} -lt 8 ]; then
-    log WARN "Source not found (wget exit ${probe_rc}): ${url}"
-    popd > /dev/null
-    return 1
-  fi
-  if [ ${probe_rc} -eq 8 ]; then
-    log WARN "Source returned HTTP error (wget exit 8): ${url}"
+  if [ ${probe_rc} -ge 8 ]; then
+    log WARN "Source returned HTTP error (wget exit ${probe_rc}): ${url}"
     popd > /dev/null
     return 1
   fi
@@ -512,13 +525,13 @@ download_file() {
   # GitHub can be reachable but painfully slow. Do a quick sample and prefer
   # the accelerator when the official source is lagging behind.
   if [[ "${url}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
-    local _gh_primary_speed _gh_accel_url _gh_accel_speed _gh_min_kbps
+    local _gh_primary_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
     _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
     _gh_min_speed=$(( _gh_min_kbps * 1024 ))
     _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
-    _gh_primary_speed=$(_url_speed_curl "${url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}")
+    _gh_primary_speed=$(_url_speed_curl "${url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_primary_speed=""
     if [ -n "${_gh_primary_speed}" ] && [ "${_gh_primary_speed}" -lt "${_gh_min_speed}" ]; then
-      _gh_accel_speed=$(_url_speed_curl "${_gh_accel_url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}")
+      _gh_accel_speed=$(_url_speed_curl "${_gh_accel_url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_accel_speed=""
       if [ -n "${_gh_accel_speed}" ] && [ "${_gh_accel_speed}" -ge "${_gh_min_speed}" ]; then
         log WARN "Official GitHub looks slow (${_gh_primary_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed} B/s)"
         url="${_gh_accel_url}"
@@ -701,9 +714,9 @@ download_component() {
         return 1
       fi
       
-      # 选择镜像源
+      # 选择镜像源（国内镜像缺失时回退官方源，避免空 URL 走一次注定失败的下载）
       local url_template
-      if [[ "$mirror_mode" == "china" ]]; then
+      if [[ "$mirror_mode" == "china" ]] && [ -n "$china_url" ]; then
         url_template="$china_url"
       else
         url_template="$official_url"
@@ -730,8 +743,8 @@ download_component() {
         return 0
       fi
       
-      # 如果国内镜像失败，尝试官方源
-      if [[ "$mirror_mode" == "china" ]] && [ "$china_url" != "$official_url" ]; then
+      # 如果国内镜像失败，尝试官方源（国内镜像非空才需要这次回退）
+      if [[ "$mirror_mode" == "china" ]] && [ -n "$china_url" ] && [ "$china_url" != "$official_url" ]; then
         log WARN "China mirror failed, trying official source..."
         download_info=$(build_download_url "$official_url" "$filename_template" "$ver")
         url=$(echo "$download_info" | cut -d'|' -f1)
