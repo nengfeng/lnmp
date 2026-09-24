@@ -291,7 +291,12 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
   tool_file_name=${tool_file##*/}
   if [ -e "${tool_file}" ]; then
     now_script_md5=$(md5sum "${tool_file}" | awk '{print $1}')
-    latest_script_md5=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" 2>/dev/null | awk -v f="${tool_file_name}" '$2==f {print $1}')
+    md5_url="https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt"
+    md5_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${md5_url}" 2>/dev/null || true)
+    if [ -z "${md5_tmp}" ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+      md5_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${GITHUB_ACCELERATOR_URL%/}/${md5_url}" 2>/dev/null || true)
+    fi
+    latest_script_md5=$(printf '%s\n' "${md5_tmp}" | awk -v f="${tool_file_name}" '$2==f {print $1}')
     if [ -z "${latest_script_md5}" ]; then
       echo "${CWARNING}Warning: unable to verify md5 online (no entry for ${tool_file_name} or network failure), skipping.${CEND}"
     elif [ "${now_script_md5}" != "${latest_script_md5}" ]; then
@@ -304,7 +309,12 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
     # sha256sum.txt; verify it in addition whenever an entry exists, so the
     # check tightens automatically for artifacts published after v1.7.2
     # without breaking older packages that only have an md5 entry.
-    latest_script_sha=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/sha256sum.txt" 2>/dev/null | awk -v f="${tool_file_name}" '$2==f {print $1}')
+    sha_url="https://raw.githubusercontent.com/nengfeng/lnmp/main/sha256sum.txt"
+    sha_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${sha_url}" 2>/dev/null || true)
+    if [ -z "${sha_tmp}" ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+      sha_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${GITHUB_ACCELERATOR_URL%/}/${sha_url}" 2>/dev/null || true)
+    fi
+    latest_script_sha=$(printf '%s\n' "${sha_tmp}" | awk -v f="${tool_file_name}" '$2==f {print $1}')
     if [ -n "${latest_script_sha}" ]; then
       now_script_sha=$(sha256sum "${tool_file}" | awk '{print $1}')
       if [ "${now_script_sha}" != "${latest_script_sha}" ]; then
@@ -716,6 +726,7 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
 
   _dl() {
     local expected="$1" url="$2" china_url="${3:-}"
+    local official_url="${url}"
     # Prefer the China mirror when one exists (get_mirror_url reads
     # USE_CHINA_MIRROR, which checkDownload has already initialised).
     [ -n "${china_url}" ] && url=$(get_mirror_url "${url}" "${china_url}" "${USE_CHINA_MIRROR}")
@@ -726,6 +737,7 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
     pushd "${current_dir}/src" > /dev/null || return 1
     src_url="${url}"
     src_url_fallback=""
+    [ "${src_url}" != "${official_url}" ] && src_url_fallback="${official_url}"
     src_expected_dir=""
     Download_src "${expected}"
     local rc=$?
@@ -738,7 +750,8 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
     2) _dl "tengine-${tengine_ver}.tar.gz" "https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz" || exit 1 ;;
     3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" "${MIRROR_BASE_URL}/openresty/openresty-${openresty_ver}.tar.gz" || exit 1 ;;
   esac
-  _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" "${MIRROR_BASE_URL}/openssl/source/openssl-${openssl_ver}.tar.gz" || exit 1
+  # OpenSSL is official-only: major China mirrors do not provide upstream OpenSSL releases.
+  _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" || exit 1
   _dl "pcre2-${pcre_ver}.tar.gz" "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcre_ver}/pcre2-${pcre_ver}.tar.gz" || exit 1
   # Lua deps are now handled by check_download.sh; these _dl calls are a fallback only.
 fi

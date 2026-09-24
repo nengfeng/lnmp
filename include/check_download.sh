@@ -5,7 +5,9 @@
 #
 # Mirror support is limited to components confirmed available:
 #   - Node.js, MariaDB, OpenResty, binutils
-# All other components use official sources directly.
+# OpenSSL is intentionally official-only: major China mirrors do not provide
+# upstream OpenSSL releases here, so trying them would only waste requests.
+# All other components use official sources directly unless listed above.
 
 # php_ver_ge_84 / openssl_ver_ge_32 / can_use_openssl_argon2 live in
 # include/common.sh (sourced before this file), so the argon2 decision in
@@ -25,20 +27,41 @@ compute_md5() {
   md5sum "$file" 2>/dev/null | awk '{print $1}'
 }
 
+# Download a checksum file, using the configured GitHub accelerator if the
+# official GitHub checksum URL is blocked or unreachable.
+_download_checksum_file() {
+  local checksum_url=$1
+  local checksum_file=$2
+  local fallback_url=""
+
+  if wget -q "$checksum_url" -O "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]; then
+    return 0
+  fi
+
+  if [[ "$checksum_url" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+    fallback_url="${GITHUB_ACCELERATOR_URL%/}/${checksum_url}"
+    echo "${CWARNING}Official checksum unavailable, trying accelerator: ${fallback_url}${CEND}"
+    wget -q "$fallback_url" -O "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]
+  else
+    return 1
+  fi
+}
+
 # 验证 SHA256 校验码
 # 参数: 文件名 校验码URL
 verify_sha256() {
   local file_name=$1
   local checksum_url=$2
+  local checksum_file="${file_name}.sha256"
   
   [ "${VERIFY_CHECKSUM}" != "yes" ] && return 0
   [ -z "$checksum_url" ] && return 0
   
   echo "Verifying SHA256 checksum for ${file_name}..."
   
-  if wget -q "$checksum_url" -O "${file_name}.sha256" 2>/dev/null; then
+  if _download_checksum_file "$checksum_url" "$checksum_file"; then
     # 校验和文件可能是 "sha256" 或 "sha256  filename" 格式，只取第一个字段
-    local expected=$(awk '{print $1}' "${file_name}.sha256" | tr -d '[:space:]')
+    local expected=$(awk '{print $1}' "$checksum_file" | tr -d '[:space:]')
     local actual=$(compute_sha256 "$file_name")
     
     if [[ "$expected" == "$actual" ]]; then
@@ -240,10 +263,14 @@ download_openssl() {
   echo "Download openSSL..."
   local file_name="openssl-${openssl_ver}.tar.gz"
   local official_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/${file_name}"
-  local china_url="${MIRROR_BASE_URL}/openssl/source/${file_name}"
-  src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
+  # Official-only: do not consult China mirrors for OpenSSL. The release archive
+  # and checksum both come from OpenSSL/GitHub, matching upstream expectations.
+  src_url="${official_url}"
+  src_url_fallback=""
   Download_src
-  # OpenSSL GitHub releases 提供 SHA256 校验
+  src_url_fallback=""
+  # OpenSSL GitHub releases 提供 SHA256 校验。若官方 GitHub 在境内无法访问，
+  # 先让 Download_src 走 GITHUB_ACCELERATOR_URL 兜底，校验码也走同一兜底。
   local checksum_url="https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/${file_name}.sha256"
   verify_sha256 "$file_name" "$checksum_url" || die_hard "Checksum verification failed for ${file_name}"
 }

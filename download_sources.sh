@@ -75,6 +75,7 @@ if [ -f "${SCRIPT_DIR}/options.conf" ]; then
   . "${SCRIPT_DIR}/options.conf"
 fi
 MIRROR_BASE_URL="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}"
+GITHUB_ACCELERATOR_URL="${GITHUB_ACCELERATOR_URL:-}"
 
 # 日志函数
 log() {
@@ -313,11 +314,12 @@ download_checksum() {
   local checksum_url=$1
   local checksum_type=$2
   local filename=$3
-  
+  local accelerator_url=""
+
   local checksum_file="${filename}.${checksum_type}"
-  
+
   log INFO "Downloading checksum: ${checksum_url}"
-  
+
   if wget -q "${checksum_url}" -O "${checksum_file}" 2>/dev/null; then
     # 检查文件是否为空
     if [ -s "${checksum_file}" ]; then
@@ -328,7 +330,17 @@ download_checksum() {
       rm -f "${checksum_file}"
     fi
   fi
-  
+
+  if [[ "${checksum_url}" == "https://github.com/"* ]] && [[ -n "${GITHUB_ACCELERATOR_URL:-}" ]]; then
+    accelerator_url="${GITHUB_ACCELERATOR_URL%/}/${checksum_url}"
+    log WARN "Official checksum unavailable, trying accelerator: ${accelerator_url}"
+    if wget -q "${accelerator_url}" -O "${checksum_file}" 2>/dev/null && [ -s "${checksum_file}" ]; then
+      echo "${checksum_file}"
+      return 0
+    fi
+    rm -f "${checksum_file}"
+  fi
+
   return 1
 }
 
@@ -462,6 +474,15 @@ verify_checksum() {
 # ============================================
 # 下载文件
 # ============================================
+# Quick HEAD-like probe for mirror lag / missing files. wget exit 8 is an HTTP
+# error response (including 404). Without this, mirrors that do not yet have a
+# new release can consume many retries before fallback starts.
+url_available() {
+  local url=$1
+  wget -q --spider --timeout=15 --tries=1 "$url" 2>/dev/null
+  return $?
+}
+
 download_file() {
   local url=$1
   local filename=$2
@@ -469,7 +490,42 @@ download_file() {
   local checksum_type=$4
   
   pushd "${SRC_DIR}" > /dev/null
-  
+
+  # Fail fast before downloading when the source is missing/unreachable.
+  # Probe failures that are not clearly HTTP errors (network, DNS, TLS) still
+  # fall through to wget, which has its own retry behaviour.
+  local probe_rc=0
+  if command -v wget >/dev/null 2>&1; then
+    url_available "$url" || probe_rc=$?
+  fi
+  if [ ${probe_rc} -ge 4 ] && [ ${probe_rc} -lt 8 ]; then
+    log WARN "Source not found (wget exit ${probe_rc}): ${url}"
+    popd > /dev/null
+    return 1
+  fi
+  if [ ${probe_rc} -eq 8 ]; then
+    log WARN "Source returned HTTP error (wget exit 8): ${url}"
+    popd > /dev/null
+    return 1
+  fi
+
+  # GitHub can be reachable but painfully slow. Do a quick sample and prefer
+  # the accelerator when the official source is lagging behind.
+  if [[ "${url}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
+    local _gh_primary_speed _gh_accel_url _gh_accel_speed _gh_min_kbps
+    _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
+    _gh_min_speed=$(( _gh_min_kbps * 1024 ))
+    _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
+    _gh_primary_speed=$(_url_speed_curl "${url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}")
+    if [ -n "${_gh_primary_speed}" ] && [ "${_gh_primary_speed}" -lt "${_gh_min_speed}" ]; then
+      _gh_accel_speed=$(_url_speed_curl "${_gh_accel_url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}")
+      if [ -n "${_gh_accel_speed}" ] && [ "${_gh_accel_speed}" -ge "${_gh_min_speed}" ]; then
+        log WARN "Official GitHub looks slow (${_gh_primary_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed} B/s)"
+        url="${_gh_accel_url}"
+      fi
+    fi
+  fi
+
   # 检查文件是否已存在
   if [ -f "${filename}" ]; then
     local filesize=$(stat -c%s "${filename}" 2>/dev/null || echo "0")
@@ -543,6 +599,12 @@ download_file() {
   local part_file="${filename}.part"
   wget --progress=bar:force -c "${url}" -O "${part_file}" 2>&1 | tee -a "${LOG_FILE}"
   local wget_rc=${PIPESTATUS[0]}
+  if [ ${wget_rc} -eq 8 ]; then
+    log WARN "Download source returned HTTP error; skipping retries: ${url}"
+    [ -f "${part_file}" ] && [ ! -s "${part_file}" ] && rm -f "${part_file}"
+    popd > /dev/null
+    return 1
+  fi
   if [ ${wget_rc} -eq 0 ] && [ -s "${part_file}" ]; then
     mv -f "${part_file}" "${filename}"
     if [ -f "${filename}" ]; then
@@ -552,14 +614,33 @@ download_file() {
 
         # 下载并验证校验码
         if [[ -n "$checksum_url" ]] && [ -n "$checksum_type" ] && [[ "$VERIFY_CHECKSUM" == "yes" ]]; then
+          local checksum_ok=0
           if download_checksum "$checksum_url" "$checksum_type" "$filename"; then
-            if ! verify_checksum "$filename" "${filename}.${checksum_type}" "$checksum_type" "$filename"; then
+            if verify_checksum "$filename" "${filename}.${checksum_type}" "$checksum_type" "$filename"; then
+              checksum_ok=1
+            else
               log ERROR "Checksum verification failed, removing corrupted file"
               rm -f "$filename" "${filename}.${checksum_type}"
               popd > /dev/null
               return 1
             fi
-          else
+          fi
+
+          if [ "$checksum_ok" -eq 0 ] && [[ "${url}" == "https://github.com/"* ]] && [[ -n "${GITHUB_ACCELERATOR_URL}" ]]; then
+            local accelerator_checksum="${GITHUB_ACCELERATOR_URL%/}/${checksum_url}"
+            log WARN "Official checksum unavailable, trying accelerator: ${accelerator_checksum}"
+            if download_checksum "$accelerator_checksum" "$checksum_type" "$filename"; then
+              if ! verify_checksum "$filename" "${filename}.${checksum_type}" "$checksum_type" "$filename"; then
+                log ERROR "Checksum verification failed, removing corrupted file"
+                rm -f "$filename" "${filename}.${checksum_type}"
+                popd > /dev/null
+                return 1
+              fi
+              checksum_ok=1
+            fi
+          fi
+
+          if [ "$checksum_ok" -eq 0 ]; then
             log ERROR "Could not download checksum file, treating as verification failure"
             rm -f "$filename"
             popd > /dev/null
@@ -598,12 +679,12 @@ download_component() {
     
     # 新格式: 组件名|官方源|国内镜像|文件名|校验码URL|校验码类型|备用源|重命名目录
     local name=$(echo "$line" | cut -d'|' -f1)
-    local official_url=$(echo "$line" | cut -d'|' -f2 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
-    local china_url=$(echo "$line" | cut -d'|' -f3 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
+    local official_url=$(echo "$line" | cut -d'|' -f2 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g" | sed "s|\${GITHUB_ACCELERATOR_URL}|${GITHUB_ACCELERATOR_URL}|g")
+    local china_url=$(echo "$line" | cut -d'|' -f3 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g" | sed "s|\${GITHUB_ACCELERATOR_URL}|${GITHUB_ACCELERATOR_URL}|g")
     local filename_template=$(echo "$line" | cut -d'|' -f4)
-    local checksum_url_template=$(echo "$line" | cut -d'|' -f5 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
+    local checksum_url_template=$(echo "$line" | cut -d'|' -f5 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g" | sed "s|\${GITHUB_ACCELERATOR_URL}|${GITHUB_ACCELERATOR_URL}|g")
     local checksum_type=$(echo "$line" | cut -d'|' -f6)
-    local fallback_url_template=$(echo "$line" | cut -d'|' -f7)
+    local fallback_url_template=$(echo "$line" | cut -d'|' -f7 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g" | sed "s|\${GITHUB_ACCELERATOR_URL}|${GITHUB_ACCELERATOR_URL}|g")
     local rename_dir_template=$(echo "$line" | cut -d'|' -f8)
     
     # 替换架构变量
@@ -731,8 +812,8 @@ list_components() {
     [[ ! "$line" =~ \| ]] && continue
     
     local name=$(echo "$line" | cut -d'|' -f1)
-    local official_url=$(echo "$line" | cut -d'|' -f2 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
-    local china_url=$(echo "$line" | cut -d'|' -f3 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g")
+    local official_url=$(echo "$line" | cut -d'|' -f2 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g" | sed "s|\${GITHUB_ACCELERATOR_URL}|${GITHUB_ACCELERATOR_URL}|g")
+    local china_url=$(echo "$line" | cut -d'|' -f3 | sed "s|\${MIRROR_BASE_URL}|${MIRROR_BASE_URL}|g" | sed "s|\${GITHUB_ACCELERATOR_URL}|${GITHUB_ACCELERATOR_URL}|g")
     local checksum_type=$(echo "$line" | cut -d'|' -f6)
     
     # 替换架构变量
@@ -741,7 +822,7 @@ list_components() {
     local ver=$(get_version "$name")
     
     local mirror_status=""
-    if [[ "$official_url" == "$china_url" ]]; then
+    if [[ -z "$china_url" || "$official_url" == "$china_url" ]]; then
       mirror_status="official only"
     else
       mirror_status="official + china"

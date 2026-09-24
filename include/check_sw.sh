@@ -207,7 +207,7 @@ installDepsDebian() {
   # Ubuntu 26.04, and Debian is moving the same way), while libxml2-dev keeps
   # its name everywhere and Depends on the matching runtime package, so it
   # alone pulls in the right library on every supported release.
-  local pkgCommon="debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl libcurl4-openssl-dev e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev bison re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev locales patch vim zip unzip tmux htop bc dc expect libexpat1-dev libonig-dev libtirpc-dev rsync git lsof lrzsz rsyslog cron logrotate chrony libsqlite3-dev psmisc wget sysv-rc apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
+  local pkgCommon="debian-keyring debian-archive-keyring build-essential gcc g++ make cmake autoconf automake libjpeg-dev libpng-dev libgd-dev libxml2-dev zlib1g zlib1g-dev libc6 libc6-dev libglib2.0-0 libglib2.0-dev bzip2 libzip-dev libbz2-1.0 libaio1 libaio-dev numactl libreadline-dev curl libcurl4-openssl-dev e2fsprogs libkrb5-3 libkrb5-dev libltdl-dev openssl net-tools libssl-dev libtool libevent-dev bison re2c libsasl2-dev libxslt1-dev libicu-dev libpsl-dev locales patch vim zip unzip tmux htop bc dc expect libexpat1-dev libonig-dev libtirpc-dev rsync git lsof lrzsz rsyslog cron logrotate chrony libsqlite3-dev psmisc wget apt-transport-https ca-certificates gnupg ufw libmaxminddb-dev procps"
 
   # Per-release additions for the supported Debian releases (12/13), which is
   # all this needs a branch for: check_os.sh refuses anything else before this
@@ -283,9 +283,6 @@ installDepsUbuntu() {
   #     rename predates the supported set: it landed in 22.04)
   #   libidn12-dev does not exist anywhere: the libidn dev package is the
   #     unversioned libidn-dev (libidn12 is the runtime name)
-  #   sysv-rc: does not exist in ANY Ubuntu release (verified against the
-  #     archive); update-rc.d ships in init-system-helpers, which is
-  #     priority: required and therefore always present. Do not re-add it.
   #   software-properties-common: dropped from the common list -- nothing in
   #     this repo calls add-apt-repository, and Debian 13 already removed the
   #     package, so keeping it here is pure drift risk

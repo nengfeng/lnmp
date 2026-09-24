@@ -35,6 +35,68 @@ _archive_integrity_ok() {
   esac
 }
 
+# Probe whether a URL is actually present before a large download.
+# Mirrors may lag behind upstream releases (for example a new OpenSSL version
+# may not exist yet on a China mirror). wget with -c treats 404 as a resumable
+# download failure and would otherwise retry an unavailable file many times.
+# Exit code 8 from wget means "server error responses", including HTTP 404.
+# Non-zero is not always definitive: callers should treat >=8 as an HTTP error
+# and leave smaller wget failures to the normal retry path.
+_url_availability_wget() {
+  local url="$1"
+  wget -q --spider --timeout=15 --tries=1 "$url" 2>/dev/null
+  return $?
+}
+
+# Build a GitHub accelerator URL. Empty output means this URL has no accelerator.
+github_accelerator_url() {
+  local url="$1"
+  local accelerator="${GITHUB_ACCELERATOR_URL:-}"
+  if [ -z "${accelerator}" ] || [[ "${url}" != "https://github.com/"* ]]; then
+    return
+  fi
+  printf '%s\n' "${accelerator%/}/${url}"
+}
+
+# Probe a URL's transfer speed with a short ranged curl sample.
+# Prints bytes/sec on success; non-zero exit if curl is unavailable or the
+# probe does not finish in time. Range requests keep the sample bounded even
+# when GitHub is slow but reachable.
+_url_speed_curl() {
+  local url="$1"
+  local sample_bytes="${2:-${GITHUB_SPEED_SAMPLE_BYTES:-2097152}}"
+  local max_time="${3:-${GITHUB_SPEED_TEST_SECONDS:-10}}"
+  local range_end=$((sample_bytes - 1))
+
+  command -v curl >/dev/null 2>&1 || return 1
+
+  local raw
+  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null)
+  [ -n "${raw}" ] || return 1
+
+  printf '%d\n' "${raw%.*}"
+}
+
+# Resolve the configured GitHub speed threshold in bytes/sec.
+github_speed_min_bytes() {
+  local min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
+  printf '%d\n' "$((min_kbps * 1024))"
+}
+
+# Append accelerator fallbacks for every GitHub URL in the array named by $1.
+github_accelerator_urls() {
+  local -n _urls=$1
+  local _acc
+  for _acc in $(for _u in "${_urls[@]}"; do github_accelerator_url "${_u}"; done); do
+    local _found="no"
+    local _u
+    for _u in "${_urls[@]}"; do
+      [ "${_u}" = "${_acc}" ] && _found="yes" && break
+    done
+    [ "${_found}" = "no" ] && _urls+=( "${_acc}" )
+  done
+}
+
 Download_src() {
   # Usage: Download_src [output_filename]
   # If output_filename is provided, download to that name; otherwise use URL basename
@@ -57,12 +119,39 @@ Download_src() {
     return 0
   fi
 
-  # Candidate sources, in order: the primary src_url plus any fallbacks.
+    # Candidate sources, in order: the primary src_url plus any fallbacks.
   local urls=( "${src_url}" )
   if [ -n "${src_url_fallback:-}" ]; then
-    local _fb=()
+    local _fb
     read -ra _fb <<< "${src_url_fallback}"
     urls+=( "${_fb[@]}" )
+  fi
+
+  # GitHub Releases/archives are common in this installer. In mainland China
+  # the official GitHub URL may be slow or blocked, so add a configurable
+  # accelerator as a final fallback instead of burning the install on GitHub.
+  github_accelerator_urls urls
+
+  # GitHub URLs can be reachable but painfully slow. If so, do a quick sample
+  # and prefer the accelerator instead of waiting on the full download.
+  if [[ "${urls[0]}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
+    local primary_speed accel_url min_speed
+    min_speed=$(github_speed_min_bytes)
+    accel_url=$(github_accelerator_url "${urls[0]}")
+    if [ -n "${accel_url}" ]; then
+      primary_speed=$(_url_speed_curl "${urls[0]}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}")
+      if [ -n "${primary_speed}" ] && [ "${primary_speed}" -lt "${min_speed}" ]; then
+        echo "${CMSG}GitHub primary looks slow (${primary_speed} B/s < ${min_speed} B/s); preferring accelerator${CEND}"
+        local reordered=()
+        reordered+=( "${accel_url}" )
+        local _u
+        for _u in "${urls[@]}"; do
+          [ "${_u}" = "${accel_url}" ] && continue
+          reordered+=( "${_u}" )
+        done
+        urls=( "${reordered[@]}" )
+      fi
+    fi
   fi
 
   # Multiple sources: fewer retries each so we fail over quickly. A single
@@ -77,11 +166,29 @@ Download_src() {
   local i
   for i in "${!urls[@]}"; do
     local url="${urls[i]}"
+    local unavailable_exit=""
     last_url="${url}"
     if [ "${i}" -eq 0 ]; then
       echo "${CMSG}Downloading ${file_name}...${CEND}"
     else
       echo "${CMSG}Primary source unavailable - trying fallback: ${url}${CEND}"
+    fi
+
+    # Fail over immediately for missing resources. Probe with HEAD-like wget
+    # spider; on failure, preserve wget's exit code so unavailable/404 sources
+    # do not burn the normal retry budget.
+    if command -v wget >/dev/null 2>&1; then
+      _url_availability_wget "${url}"
+      unavailable_exit=$?
+    fi
+
+    if [ -n "${unavailable_exit}" ] && [ "${unavailable_exit}" -ge 8 ]; then
+      # HTTP error responses such as 404 mean retrying the same URL is useless;
+      # fall over immediately. Keep transient network/DNS/TLS probe failures on
+      # the normal wget retry path below.
+      echo "${CWARNING}Download source unavailable (wget exit ${unavailable_exit}): ${url}${CEND}"
+      rm -f "${file_name}"
+      continue
     fi
 
     local attempt=1
@@ -98,6 +205,13 @@ Download_src() {
         -O "${file_name}" \
         "${url}" 2>&1 | tee -a "${current_dir}/download.log"
       local wget_exit_code=${PIPESTATUS[0]}
+      if [ ${wget_exit_code} -eq 8 ]; then
+        echo "${CWARNING}Download source returned HTTP error (wget exit 8), skipping retries: ${url}${CEND}"
+        if [ -f "${file_name}" ] && [ ! -s "${file_name}" ]; then
+          rm -f "${file_name}"
+        fi
+        break
+      fi
       if [ ${wget_exit_code} -eq 0 ] && [ -f "${file_name}" ] && [ -s "${file_name}" ]; then
         # A mirror returning 200 OK + an HTML error page yields a non-empty
         # file that is not a valid archive; probe it before trusting the size.

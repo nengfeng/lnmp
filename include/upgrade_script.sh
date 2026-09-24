@@ -4,7 +4,15 @@
 
 Upgrade_Script() {
   pushd ${current_dir} > /dev/null
-  latest_md5=$(curl --connect-timeout 3 -m 5 -fsS "https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt" 2>/dev/null | awk -v f="lnmp.tar.gz" '$2==f {print $1}')
+  local md5_primary="https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt"
+  local md5_fallback=""
+  local md5_tmp
+  md5_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${md5_primary}" 2>/dev/null)
+  if [ -z "${md5_tmp}" ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+    md5_fallback="${GITHUB_ACCELERATOR_URL%/}/${md5_primary}"
+    md5_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${md5_fallback}" 2>/dev/null || true)
+  fi
+  latest_md5=$(printf '%s\n' "${md5_tmp}" | awk -v f="lnmp.tar.gz" '$2==f {print $1}')
   [ ! -e README.md ] && ois_flag=n
   if [ -z "${latest_md5}" ] || [ "${script_md5}" != "${latest_md5}" ]; then
     UPGRADE_TMP_DIR=$(mktemp -d /tmp/lnmp_upgrade.XXXXXX)
@@ -14,6 +22,9 @@ Upgrade_Script() {
     # new tree is verified good (a failed download previously deleted
     # options.conf via the EXIT trap and still reported success)
     wget -qc "https://github.com/nengfeng/lnmp/archive/main.tar.gz" -O "${UPGRADE_TMP_DIR}/lnmp.tar.gz"
+    if [ ! -s "${UPGRADE_TMP_DIR}/lnmp.tar.gz" ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+      wget -qc "${GITHUB_ACCELERATOR_URL%/}/https://github.com/nengfeng/lnmp/archive/main.tar.gz" -O "${UPGRADE_TMP_DIR}/lnmp.tar.gz"
+    fi
     if [ ! -s "${UPGRADE_TMP_DIR}/lnmp.tar.gz" ] || ! tar xzf "${UPGRADE_TMP_DIR}/lnmp.tar.gz" -C "${UPGRADE_TMP_DIR}/"; then
       echo "${CFAILURE}LNMP upgrade failed: could not download or extract the package. Your files were not modified.${CEND}"
       popd > /dev/null

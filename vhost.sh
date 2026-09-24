@@ -430,6 +430,9 @@ What Are You Doing?
       local acme_url="https://github.com/acmesh-official/acme.sh/archive/master.tar.gz"
       if [ ! -e acme.sh-master.tar.gz ]; then
         wget --tries=6 -c -O acme.sh-master.tar.gz "${acme_url}"
+        if [ ! -s acme.sh-master.tar.gz ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+          wget --tries=6 -c -O acme.sh-master.tar.gz "${GITHUB_ACCELERATOR_URL%/}/${acme_url}"
+        fi
       fi
       tar xzf acme.sh-master.tar.gz
       pushd acme.sh-master > /dev/null

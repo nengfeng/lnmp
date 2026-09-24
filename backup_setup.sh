@@ -394,13 +394,22 @@ if [ -n "$(echo ${desc_bk} | grep -w 6)" ]; then
     QSHELL_TMP_DIR=$(mktemp -d /tmp/lnmp_qshell.XXXXXX)
     # single quotes + quoted paths: expand at fire time, survive a space in TMPDIR (SC2064/SC2046)
     trap 'rm -rf "${QSHELL_TMP_DIR}"' EXIT
+    qshell_primary=""
+    qshell_acc=""
+    qshell_file=""
     if [[ "${1}" == y ]]; then
-      wget -qc "https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-arm64.tar.gz" -O "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-arm64.tar.gz"
-      tar xzf "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-arm64.tar.gz" -C /usr/local/bin/
+      qshell_primary="https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-arm64.tar.gz"
+      qshell_file="${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-arm64.tar.gz"
     else
-      wget -qc "https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-${M_ARCH}.tar.gz" -O "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-${M_ARCH}.tar.gz"
-      tar xzf "${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-${M_ARCH}.tar.gz" -C /usr/local/bin/
+      qshell_primary="https://github.com/qiniu/qshell/releases/download/v2.15.0/qshell-v2.15.0-linux-${M_ARCH}.tar.gz"
+      qshell_file="${QSHELL_TMP_DIR}/qshell-v2.15.0-linux-${M_ARCH}.tar.gz"
     fi
+    wget -qc "${qshell_primary}" -O "${qshell_file}"
+    if [ ! -s "${qshell_file}" ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+      qshell_acc="${GITHUB_ACCELERATOR_URL%/}/${qshell_primary}"
+      wget -qc "${qshell_acc}" -O "${qshell_file}"
+    fi
+    tar xzf "${qshell_file}" -C /usr/local/bin/
     chmod +x /usr/local/bin/qshell
     rm -rf $QSHELL_TMP_DIR
     trap - EXIT
@@ -556,10 +565,17 @@ fi
 
 if [ -n "$(echo ${desc_bk} | grep -w 8)" ]; then
   if [ ! -e "/usr/local/bin/dbxcli" ]; then
+    dbxcli_primary=""
+    dbxcli_acc=""
     if [[ "${1}" == y ]]; then
-      wget -qc https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-arm -O /usr/local/bin/dbxcli
+      dbxcli_primary="https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-arm"
     else
-      wget -qc https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-${M_ARCH} -O /usr/local/bin/dbxcli
+      dbxcli_primary="https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-${M_ARCH}"
+    fi
+    wget -qc "${dbxcli_primary}" -O /usr/local/bin/dbxcli
+    if [ ! -s /usr/local/bin/dbxcli ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
+      dbxcli_acc="${GITHUB_ACCELERATOR_URL%/}/${dbxcli_primary}"
+      wget -qc "${dbxcli_acc}" -O /usr/local/bin/dbxcli
     fi
     chmod +x /usr/local/bin/dbxcli
   fi
