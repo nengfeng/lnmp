@@ -113,6 +113,38 @@ Choose_ENV() {
   NGX_FLAG=php
 }
 
+# Returns 0 when the active web engine supports OpenResty-only directives.
+web_engine_supports_ssl_conf_command() {
+  [ -n "${web_install_dir}" ] || return 1
+  [ -n "${openresty_install_dir}" ] || return 1
+  [ -e "${openresty_install_dir}/nginx/sbin/nginx" ] && [ -e "${web_install_dir}/sbin/nginx" ] &&
+    [ "$(readlink -f "${web_install_dir}/sbin/nginx")" = "$(readlink -f "${openresty_install_dir}/nginx/sbin/nginx")" ]
+}
+
+# Returns 0 when the installed nginx binary understands the standalone
+# `http2 on;` directive (nginx 1.25.1+ / OpenResty with a recent core).
+nginx_supports_http2_on() {
+  local ver
+  [ -n "${web_install_dir}" ] && [ -x "${web_install_dir}/sbin/nginx" ] || return 1
+  ver=$(${web_install_dir}/sbin/nginx -v 2>&1 | sed -n 's/.*nginx version: nginx\///p')
+  [[ -n "$ver" ]] || return 1
+  local major minor
+  major=${ver%%.*}
+  minor=${ver#*.}; minor=${minor%%.*}
+  [[ "${major}" =~ ^[0-9]+$ && "${minor}" =~ ^[0-9]+$ ]] || return 1
+  (( major > 1 )) && return 0
+  (( major == 1 && minor >= 25 ))
+}
+
+# Remove the artifacts created while adding a vhost, leaving the running server
+# in the state it had before this attempt.
+cleanup_vhost_artifacts() {
+  local rewrite_conf="${web_install_dir}/conf/rewrite/${rewrite}.conf"
+  rm -f "${web_install_dir}/conf/vhost/${domain}.conf" \
+        "${rewrite_conf}" \
+        "${PATH_SSL}/${domain}.crt" "${PATH_SSL}/${domain}.key" "${PATH_SSL}/${domain}.csr" 2>/dev/null
+}
+
 Create_SSL() {
   if [[ "${Domain_Mode}" == 2 ]]; then
     printf "
@@ -476,30 +508,39 @@ What Are You Doing?
     while :; do echo
       echo "Please input the directory for the domain:${domain} :"
       read -e -p "(Default directory: ${wwwroot_dir}/${domain}): " vhostdir
-      if [[ -n "${vhostdir}" && -z "$(echo ${vhostdir} | grep '^/')" ]]; then
-        echo "${CWARNING}input error! Press Enter to continue...${CEND}"
-      elif [[ -n "${vhostdir}" && "${vhostdir}" == *".."* ]]; then
-        echo "${CWARNING}input error! Path traversal not allowed. Press Enter to continue...${CEND}"
+      # Resolve the candidate path before using it: the recursive chmod/chown
+      # below would otherwise reach outside ${wwwroot_dir} if the user typed a
+      # system path such as /etc or /usr/local/nginx/conf.
+      local wwwroot_real vhostdir_candidate
+      wwwroot_real=$(realpath -m "${wwwroot_dir%/}" 2>/dev/null)
+      if [ -z "${vhostdir}" ]; then
+        vhostdir_candidate="${wwwroot_dir}/${domain}"
       else
-        if [ -z "${vhostdir}" ]; then
-          vhostdir="${wwwroot_dir}/${domain}"
-          echo "Virtual Host Directory=${CMSG}${vhostdir}${CEND}"
-        fi
-        echo
-        echo "Create Virtual Host directory......"
-        mkdir -p "${vhostdir}"
-        echo "Set secure permissions for Virtual Host directory......"
-        # Set secure permissions: 750 for directories, 640 for files
-        chmod 750 ${vhostdir}
-        chown ${run_user}:${run_group} ${vhostdir}
-        
-        # Ensure proper permissions for subdirectories and files
-        if [ -d "${vhostdir}" ]; then
-          find ${vhostdir} -type d -exec chmod 750 {} \; 2>/dev/null
-          find ${vhostdir} -type f -exec chmod 640 {} \; 2>/dev/null
-        fi
-        break
+        vhostdir_candidate="$(realpath -m "${vhostdir}" 2>/dev/null)"
       fi
+      case "${vhostdir_candidate}" in
+        "${wwwroot_real}"/*)
+          vhostdir="${vhostdir_candidate}"
+          echo "Virtual Host Directory=${CMSG}${vhostdir}${CEND}"
+          echo
+          echo "Create Virtual Host directory......"
+          mkdir -p "${vhostdir}"
+          echo "Set secure permissions for Virtual Host directory......"
+          # Set secure permissions: 750 for directories, 640 for files
+          chmod 750 "${vhostdir}"
+          chown "${run_user}:${run_group}" "${vhostdir}"
+          
+          # Ensure proper permissions for subdirectories and files
+          if [ -d "${vhostdir}" ]; then
+            find "${vhostdir}" -type d -exec chmod 750 {} \; 2>/dev/null
+            find "${vhostdir}" -type f -exec chmod 640 {} \; 2>/dev/null
+          fi
+          break
+          ;;
+        *)
+          echo "${CWARNING}input error! The virtual host directory must be under ${wwwroot_dir}. Press Enter to continue...${CEND}"
+          ;;
+      esac
     done
   fi
 
@@ -561,9 +602,40 @@ What Are You Doing?
     fi
     
     if [ -n "$(ifconfig | grep inet6)" ]; then
-      Nginx_conf=$(printf "%b" "listen 80;\n  listen [::]:80;\n  listen 443 ssl;\n  listen [::]:443 ssl;\n  http2 on;\n  ssl_certificate ${PATH_SSL}/${domain}.crt;\n  ssl_certificate_key ${PATH_SSL}/${domain}.key;\n  ssl_protocols TLSv1.2 TLSv1.3;\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;\n  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;\n  ssl_conf_command Options PrioritizeChaCha;\n  ssl_prefer_server_ciphers on;\n  ssl_session_timeout 10m;\n  ssl_session_cache shared:SSL:10m;\n  ssl_buffer_size 2k;\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";\n  ${ssl_stapling_conf}\n")
+      # http2 on; is only understood by nginx 1.25.1+; older builds fall back
+      # to the listen-based directive. ssl_conf_command is OpenResty-only.
+      local http2_conf=""
+      if nginx_supports_http2_on; then
+        http2_conf="  http2 on;\n"
+      else
+        # Re-express the listener lines with http2 for pre-1.25.1 builds.
+        : # handled below by swapping the listen lines in Nginx_conf
+      fi
+      local ssl_conf_command_block=""
+      if web_engine_supports_ssl_conf_command; then
+        ssl_conf_command_block="  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;\n  ssl_conf_command Options PrioritizeChaCha;\n"
+      fi
+      if [ -n "$http2_conf" ]; then
+        Nginx_conf=$(printf "%b" "listen 80;\n  listen [::]:80;\n  listen 443 ssl;\n  listen [::]:443 ssl;\n${http2_conf}ssl_certificate ${PATH_SSL}/${domain}.crt;\n  ssl_certificate_key ${PATH_SSL}/${domain}.key;\n  ssl_protocols TLSv1.2 TLSv1.3;\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;\n${ssl_conf_command_block}  ssl_prefer_server_ciphers on;\n  ssl_session_timeout 10m;\n  ssl_session_cache shared:SSL:10m;\n  ssl_buffer_size 2k;\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";\n  ${ssl_stapling_conf}\n")
+      else
+        # Pre-1.25.1: attach http2 to the 443 listen lines instead of a
+        # standalone directive.
+        Nginx_conf=$(printf "%b" "listen 80;\n  listen [::]:80;\n  listen 443 ssl http2;\n  listen [::]:443 ssl http2;\nssl_certificate ${PATH_SSL}/${domain}.crt;\n  ssl_certificate_key ${PATH_SSL}/${domain}.key;\n  ssl_protocols TLSv1.2 TLSv1.3;\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;\n${ssl_conf_command_block}  ssl_prefer_server_ciphers on;\n  ssl_session_timeout 10m;\n  ssl_session_cache shared:SSL:10m;\n  ssl_buffer_size 2k;\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";\n  ${ssl_stapling_conf}\n")
+      fi
     else
-      Nginx_conf=$(printf "%b" "listen 80;\n  listen 443 ssl;\n  http2 on;\n  ssl_certificate ${PATH_SSL}/${domain}.crt;\n  ssl_certificate_key ${PATH_SSL}/${domain}.key;\n  ssl_protocols TLSv1.2 TLSv1.3;\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;\n  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;\n  ssl_conf_command Options PrioritizeChaCha;\n  ssl_prefer_server_ciphers on;\n  ssl_session_timeout 10m;\n  ssl_session_cache shared:SSL:10m;\n  ssl_buffer_size 2k;\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";\n  ${ssl_stapling_conf}\n")
+      local http2_conf2=""
+      if nginx_supports_http2_on; then
+        http2_conf2="  http2 on;\n"
+      fi
+      local ssl_conf_command_block2=""
+      if web_engine_supports_ssl_conf_command; then
+        ssl_conf_command_block2="  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;\n  ssl_conf_command Options PrioritizeChaCha;\n"
+      fi
+      if [ -n "$http2_conf2" ]; then
+        Nginx_conf=$(printf "%b" "listen 80;\n  listen 443 ssl;\n${http2_conf2}ssl_certificate ${PATH_SSL}/${domain}.crt;\n  ssl_certificate_key ${PATH_SSL}/${domain}.key;\n  ssl_protocols TLSv1.2 TLSv1.3;\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;\n${ssl_conf_command_block2}  ssl_prefer_server_ciphers on;\n  ssl_session_timeout 10m;\n  ssl_session_cache shared:SSL:10m;\n  ssl_buffer_size 2k;\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";\n  ${ssl_stapling_conf}\n")
+      else
+        Nginx_conf=$(printf "%b" "listen 80;\n  listen 443 ssl http2;\nssl_certificate ${PATH_SSL}/${domain}.crt;\n  ssl_certificate_key ${PATH_SSL}/${domain}.key;\n  ssl_protocols TLSv1.2 TLSv1.3;\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;\n${ssl_conf_command_block2}  ssl_prefer_server_ciphers on;\n  ssl_session_timeout 10m;\n  ssl_session_cache shared:SSL:10m;\n  ssl_buffer_size 2k;\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";\n  ${ssl_stapling_conf}\n")
+      fi
     fi
     [[ "${https_flag}" == y ]] && sed -i "s@^  listen 80;@&\n  return 301 https://\$host\$request_uri;@" ${web_install_dir}/conf/vhost/${domain}.conf
   fi
@@ -714,8 +786,10 @@ EOF
       sed -i "s@^  server_name.*;@&\n  ssl_session_cache shared:SSL:10m;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  server_name.*;@&\n  ssl_session_timeout 10m;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  server_name.*;@&\n  ssl_prefer_server_ciphers on;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_conf_command Options PrioritizeChaCha;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;@" ${web_install_dir}/conf/vhost/${domain}.conf
+      if web_engine_supports_ssl_conf_command; then
+        sed -i "s@^  server_name.*;@&\n  ssl_conf_command Options PrioritizeChaCha;@" ${web_install_dir}/conf/vhost/${domain}.conf
+        sed -i "s@^  server_name.*;@&\n  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;@" ${web_install_dir}/conf/vhost/${domain}.conf
+      fi
       sed -i "s@^  server_name.*;@&\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  server_name.*;@&\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;@" ${web_install_dir}/conf/vhost/${domain}.conf
       sed -i "s@^  server_name.*;@&\n  ssl_protocols TLSv1.2 TLSv1.3;@" ${web_install_dir}/conf/vhost/${domain}.conf
@@ -732,8 +806,8 @@ EOF
     echo "Reload Nginx......"
     ${web_install_dir}/sbin/nginx -s reload
   else
-    rm -f ${web_install_dir}/conf/vhost/${domain}.conf
     echo "Create virtualhost ... [${CFAILURE}FAILED${CEND}]"
+    cleanup_vhost_artifacts
     exit 1
   fi
 
@@ -811,7 +885,7 @@ EOF
     echo "Reload Nginx......"
     ${web_install_dir}/sbin/nginx -s reload
   else
-    rm -f ${web_install_dir}/conf/vhost/${domain}.conf
+    cleanup_vhost_artifacts
     echo "Create virtualhost ... [${CFAILURE}FAILED${CEND}]"
     exit 1
   fi
