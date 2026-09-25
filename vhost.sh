@@ -282,11 +282,41 @@ If you enter '.', the field will be left blank.
       fi
       auth_file="$(< /dev/urandom tr -dc A-Za-z0-9 | head -c8)".html
       auth_str=$(< /dev/urandom tr -dc A-Za-z0-9 | head -c16); echo "${auth_str}" > "${vhostdir}/${auth_file}"
+      _verify_failed=n
       for D in ${domain} ${moredomainame}
       do
         curl_str=$(curl --connect-timeout 30 -4 -s $D/${auth_file} 2>&1)
-        [ "${curl_str}" != "${auth_str}" ] && { echo; echo "${CFAILURE}Let's Encrypt Verify error! DNS problem: NXDOMAIN looking up A for ${D}${CEND}"; }
+        if [ "${curl_str}" != "${auth_str}" ]; then
+          _verify_failed=y
+          echo
+          echo "${CFAILURE}Let's Encrypt pre-flight check failed for ${D}${CEND}"
+          echo "${CWARNING}  likely: the record does not exist, DNS not propagated yet, or this machine cannot reach its own public IP (NAT hairpin)${CEND}"
+        fi
       done
+      if [ "${_verify_failed}" == y ]; then
+        # The pre-flight is a heuristic from THIS machine's point of view and
+        # false-positives on NAT hairpin / propagation delay, where issuance
+        # from Let's Encrypt's side still succeeds - so it prompts instead of
+        # hard-blocking. quiet mode (automation) continues and gets the
+        # authoritative failure + cleanup from the --issue/install steps.
+        echo "${CWARNING}Issuance will very likely fail if the domain is unreachable from the internet.${CEND}"
+        if [ "${quiet_flag}" != 'y' ]; then
+          while :; do echo
+            read -e -p "Continue with certificate issuance anyway? [y/N]: " _issue_anyway
+            _issue_anyway=${_issue_anyway:-N}
+            [[ "${_issue_anyway}" =~ ^[yYnN]$ ]] && break
+            echo "${CWARNING}input error! Please only input 'y' or 'n'${CEND}"
+          done
+          if [[ "${_issue_anyway}" =~ ^[nN]$ ]]; then
+            rm -f ${vhostdir}/${auth_file}
+            [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f "${web_install_dir}/conf/vhost/${domain}.conf"
+            echo "${CFAILURE}Issuance aborted. Point the DNS record at this server and re-run vhost.sh.${CEND}"
+            exit 1
+          fi
+        else
+          echo "${CWARNING}quiet mode: attempting issuance anyway${CEND}"
+        fi
+      fi
       rm -f ${vhostdir}/${auth_file}
       [[ "${moredomainame_flag}" == y ]] && moredomainame_D="$(for D in ${moredomainame}; do echo -d ${D}; done)"
       "${HOME}/.acme.sh/acme.sh" --force --issue -k ${CERT_KEYLENGTH} -w ${vhostdir} -d ${domain} ${moredomainame_D}
