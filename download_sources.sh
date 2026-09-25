@@ -501,6 +501,19 @@ _url_speed_curl() {
   printf '%d\n' "${raw%.*}"
 }
 
+# Probe archive integrity after a successful download. A mirror or accelerator
+# can return 200 with an HTML error page that is non-empty; the size check
+# alone is not enough.
+_archive_integrity_ok() {
+  local file_name="$1"
+  case "${file_name}" in
+    *.tar.gz|*.tgz) command -v gzip  >/dev/null 2>&1 && gzip -t "${file_name}" 2>/dev/null ;;
+    *.tar.xz)       command -v xz    >/dev/null 2>&1 && xz -t "${file_name}" 2>/dev/null ;;
+    *.tar.bz2)      command -v bzip2 >/dev/null 2>&1 && bzip2 -t "${file_name}" 2>/dev/null ;;
+    *) return 0 ;;
+  esac
+}
+
 download_file() {
   local url=$1
   local filename=$2
@@ -626,6 +639,16 @@ download_file() {
         log INFO "Downloaded: ${filename} (${filesize} bytes)"
 
         # 下载并验证校验码
+        # Reject downloads that are not valid archives even when the server
+        # returned 200. Without this, HTML error pages from mirrors/accelerators
+        # can be accepted as long as the byte size looks plausible.
+        if ! _archive_integrity_ok "${filename}"; then
+          log WARN "Downloaded file failed integrity probe (server may have returned an error page): ${filename}"
+          rm -f "${filename}"
+          popd > /dev/null
+          return 1
+        fi
+
         if [[ -n "$checksum_url" ]] && [ -n "$checksum_type" ] && [[ "$VERIFY_CHECKSUM" == "yes" ]]; then
           local checksum_ok=0
           if download_checksum "$checksum_url" "$checksum_type" "$filename"; then

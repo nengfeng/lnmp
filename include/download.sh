@@ -35,6 +35,37 @@ _archive_integrity_ok() {
   esac
 }
 
+# Align a GitHub-sourced archive's top-level dir with the expected build dir.
+# GitHub auto-tag archives unpack to <repo>-<tag>, not the release dir, so a
+# fallback-sourced archive must be re-packed before the build step will find it.
+align_archive_top_dir() {
+  local file_name="$1"
+  local expected_dir="${2:-}"
+
+  [ -n "${expected_dir}" ] || return 0
+  command -v tar >/dev/null 2>&1 || return 0
+  tar -tzf "${file_name}" >/dev/null 2>&1 || return 0
+
+  local probe_dir
+  probe_dir=$(tar -tzf "${file_name}" 2>/dev/null | head -1 | cut -d'/' -f1)
+  [ -n "${probe_dir}" ] || return 0
+  [ "${probe_dir}" = "${expected_dir}" ] && return 0
+
+  local work=".repack_${file_name}_$$"
+  rm -rf "${work}"
+  mkdir -p "${work}"
+  if tar -xzf "${file_name}" -C "${work}" 2>/dev/null \
+     && mv "${work}/${probe_dir}" "${work}/${expected_dir}" 2>/dev/null \
+     && tar -czf "${work}/${file_name}" -C "${work}" "${expected_dir}" 2>/dev/null; then
+    mv -f "${work}/${file_name}" "${file_name}"
+    rm -rf "${work}"
+    echo "${CMSG}Repacked ${file_name} to expected top-level dir '${expected_dir}'...${CEND}"
+    return 0
+  fi
+  rm -rf "${work}"
+  return 1
+}
+
 # Probe whether a URL is actually present before a large download.
 # Mirrors may lag behind upstream releases (for example a new OpenSSL version
 # may not exist yet on a China mirror). wget with -c treats 404 as a resumable
@@ -219,26 +250,7 @@ Download_src() {
           echo "${CWARNING}Downloaded ${file_name} failed integrity probe (mirror returned HTML?), discarding...${CEND}"
           rm -f "${file_name}"
         else
-          # Align the archive's top-level dir with what the build step expects.
-          # GitHub auto-tag archives unpack to <repo>-<tag> (e.g.
-          # freetype-VER-2-14-3), not the release dir (freetype-2.14.3), so a
-          # fallback-sourced archive must be re-packed before it will build.
-          if [ -n "${src_expected_dir:-}" ] && tar -tzf "${file_name}" >/dev/null 2>&1; then
-            local probe_dir
-            probe_dir=$(tar -tzf "${file_name}" 2>/dev/null | head -1 | cut -d'/' -f1)
-            if [ -n "${probe_dir}" ] && [ "${probe_dir}" != "${src_expected_dir}" ]; then
-              echo "${CMSG}Repacking ${file_name} to expected top-level dir '${src_expected_dir}'...${CEND}"
-              local work=".repack_${file_name}_$$"
-              rm -rf "${work}"
-              mkdir -p "${work}"
-              if tar -xzf "${file_name}" -C "${work}" 2>/dev/null \
-                 && mv "${work}/${probe_dir}" "${work}/${src_expected_dir}" 2>/dev/null \
-                 && tar -czf "${work}/${file_name}" -C "${work}" "${src_expected_dir}" 2>/dev/null; then
-                mv -f "${work}/${file_name}" "${file_name}"
-              fi
-              rm -rf "${work}"
-            fi
-          fi
+          align_archive_top_dir "${file_name}" "${src_expected_dir:-}"
           echo "${CSUCCESS}Successfully downloaded ${file_name} (source: ${url})${CEND}"
           return 0
         fi
