@@ -152,12 +152,14 @@ load_versions() {
   fi
   
   while IFS='=' read -r key value; do
-    # 跳过注释和空行
-    [[ "$key" =~ ^#.*$ ]] && continue
-    [[ -z "$key" ]] && continue
-    # 去除前后空格
+    # Trim FIRST, then skip: on a CRLF working copy every raw key carries a
+    # trailing  (and comment/blank lines carry spaces), which would reach
+    # the assignment below as VERSIONS[<garbage>] - 'bad array subscript',
+    # a fatal error even without set -e.
     key=$(echo "$key" | tr -d '[:space:]')
     value=$(echo "$value" | tr -d '[:space:]')
+    [[ -z "$key" ]] && continue
+    [[ "$key" =~ ^# ]] && continue
     VERSIONS[$key]=$value
   done < "${VERSIONS_FILE}"
 

@@ -556,6 +556,12 @@ grep -Fq "$_dbi" "$work/rb4.log" && grep -Fq "$_dbd" "$work/rb4.log" && ok "fail
 rm -rf "$_dbi" "$_dbd" "${_dbi}_old_"* "${_dbd}_old_"*
 unset -f wait_for_db_ready pidof
 
+# [ -x ] is unreliable on Windows checkouts (MSYS exec-bit emulation):
+# the fixtures below chmod +x and the function under test probes [ -x ].
+# Skip the section where that probe cannot be trusted - CI on Linux
+# (the authoritative gate) still runs it.
+_xp="$work/xprobe"; mkdir -p "$_xp"; : > "$_xp/f"; chmod +x "$_xp/f"
+if [ -x "$_xp/f" ]; then
 echo "== detect_backup_engine (include/check_dir.sh) =="
 # The bug this function exists for: on a PostgreSQL-only host db_install_dir
 # is EMPTY (check_dir.sh only ever assigns it from a MySQL/MariaDB tree), so
@@ -611,6 +617,8 @@ got=$(detect_backup_engine "" "$_eng/noexec"); _rc=$?
 [ "$got" = "none" ] && [ $_rc -ne 0 ] && ok "non-executable pg binaries do not count" || ko "got [$got] rc=$_rc"
 
 rm -rf "$_eng"
+
+fi
 
 echo "== Upgrade_DB on a PostgreSQL-only host (include/upgrade_db.sh) =="
 # The reporting bug: db_install_dir is empty on such a host, so the generic

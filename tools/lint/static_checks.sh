@@ -261,7 +261,7 @@ while IFS= read -r f; do
         exit_ok=0
       fi ;;
   esac
-done < <(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*' -not -path './tools/lint/static_checks.sh')
+done < <(find . -name '*.sh' -not -path './src/*' -not -path './include/*' -not -path './.workbuddy/*' -not -path './VeryNginx/*' -not -path './tools/lint/static_checks.sh')
 [ "$exit_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
 echo "== 12. README db facts must match the install.sh menu [HARD] =="

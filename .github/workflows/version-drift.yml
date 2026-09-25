@@ -79,4 +79,8 @@ jobs:
           gh pr create \
             --base main --head "$branch" \
             --title "chore(versions): upstream version bump $(date +%Y-%m-%d)" \
-            --body-file body.md
+            --body-file body.md \
+          || {
+            echo "::error::PR creation rejected - most likely the repo setting 'Allow GitHub Actions to create and approve pull requests' is disabled: Settings -> Actions -> General -> Workflow permissions. The bump branch is pushed and safe; enable the setting or merge it manually."
+            exit 1
+          }

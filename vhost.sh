@@ -998,6 +998,10 @@ Del_NGX_Vhost() {
                   break
                 fi
               done
+              # Show the resolved absolute path: the y/n prompt below must
+              # never be answerable without seeing exactly what rm -rf
+              # will receive.
+              echo "Directory to be deleted (canonical path): ${dir_real}"
               if [[ "${Del_Vhost_wwwroot_flag}" == y ]]; then
                 if [ "${quiet_flag}" != 'y' ]; then
                   echo "Press Ctrl+c to cancel or Press any key to continue..."
