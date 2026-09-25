@@ -957,7 +957,14 @@ Del_NGX_Vhost() {
             echo "${CWARNING}Your ${domain} is invalid! ${CEND}"
           else
             if [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ]; then
-              Directory=$(grep '^  root' "${web_install_dir}/conf/vhost/${domain}.conf" | head -1 | sed 's/^[[:space:]]*root[[:space:]]*//;s/;$//')
+              # Accept any indentation (stock confs use two spaces, but
+              # hand-edited ones do not), quoted paths and trailing
+              # comments: cut at the first ';' so 'root /x; # c' yields /x.
+              Directory=$(grep -E '^[[:space:]]*root[[:space:]]' "${web_install_dir}/conf/vhost/${domain}.conf"                           | head -1                           | sed -E 's/^[[:space:]]*root[[:space:]]+//; s/;.*$//; s/^[[:space:]]*"//; s/"[[:space:]]*$//; s/[[:space:]]+$//')
+              if [ -z "${Directory}" ]; then
+                echo "${CFAILURE}Could not determine the vhost root from ${domain}.conf (no 'root' directive found) - nothing was deleted; remove the directory manually if needed.${CEND}"
+                continue
+              fi
               # Canonicalize and validate: the vhost root must be a directory
               # STRICTLY deeper than ${wwwroot_dir}; deleting ${wwwroot_dir}
               # itself (or anything escaping it, e.g. via ..) is refused.
