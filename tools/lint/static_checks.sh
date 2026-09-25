@@ -7,6 +7,17 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 FILES=$(find . -name '*.sh' -not -path './src/*')
 FAIL=0
+echo "== 0. shell script line endings [HARD] =="
+crlf_bad=0
+while IFS= read -r _f; do
+  [ -n "$_f" ] || continue
+  if grep -qU $'\r' "$_f" 2>/dev/null; then
+    echo "  $_f contains carriage return bytes"
+    crlf_bad=1
+  fi
+done < <(find . -name '*.sh' -not -path './src/*' -not -path './VeryNginx/*' -print)
+[ "$crlf_bad" -eq 0 ] && echo "  OK"
+[ "$crlf_bad" -eq 1 ] && FAIL=1
 
 echo "== 1. bash syntax (bash -n) [HARD] =="
 for f in $FILES; do

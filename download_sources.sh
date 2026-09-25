@@ -153,7 +153,7 @@ load_versions() {
   
   while IFS='=' read -r key value; do
     # Trim FIRST, then skip: on a CRLF working copy every raw key carries a
-    # trailing  (and comment/blank lines carry spaces), which would reach
+    # trailing carriage return (and comment/blank lines carry spaces), which would reach
     # the assignment below as VERSIONS[<garbage>] - 'bad array subscript',
     # a fatal error even without set -e.
     key=$(echo "$key" | tr -d '[:space:]')
