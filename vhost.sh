@@ -835,12 +835,16 @@ EOF
   ssl_prefer_server_ciphers on;\n
   ssl_session_cache shared:SSL:10m;\n
   ssl_session_timeout 10m;\n
-  ssl_buffer_size 2k;\n
-  ssl_stapling on;\n
+  ssl_buffer_size 2k;"
+      local _ssl_stapling_block=""
+      if [ -s "${PATH_SSL}/${domain}.crt" ] && openssl x509 -in "${PATH_SSL}/${domain}.crt" -noout -text 2>/dev/null | grep -q "OCSP - URI:"; then
+        _ssl_stapling_block="  ssl_stapling on;\n
   ssl_stapling_verify on;\n
   ssl_trusted_certificate ${PATH_SSL}/${domain}.crt;\n
   resolver 8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 valid=300s;\n
   resolver_timeout 5s;"
+      fi
+      _ssl_block="${_ssl_block}${_ssl_stapling_block}"
       if web_engine_supports_ssl_conf_command; then
         _ssl_block="${_ssl_block}\n  ssl_conf_command Options PrioritizeChaCha;\n  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;"
       fi
