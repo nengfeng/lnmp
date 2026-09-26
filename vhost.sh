@@ -405,15 +405,15 @@ If you enter '.', the field will be left blank.
       fi
       break
     done
-    # Verify cert and key match
-    cert_modulus=$(openssl x509 -noout -modulus -in "${CUSTOM_CERT_PATH}" 2>/dev/null | md5sum)
-    key_modulus=$(openssl rsa -noout -modulus -in "${CUSTOM_KEY_PATH}" 2>/dev/null | md5sum)
-    if [ "${cert_modulus}" != "${key_modulus}" ]; then
-      # Try ECC key
-      if ! openssl ec -in "${CUSTOM_KEY_PATH}" -check -noout 2>/dev/null; then
-        echo "${CFAILURE}Error: Certificate and key do not match!${CEND}"
-        exit 1
-      fi
+    # Verify cert and key match by comparing their public keys: works for
+    # RSA, EC and Ed25519 alike (the old modulus comparison only ever
+    # covered RSA, and an RSA cert paired with a valid EC key slipped
+    # through the ECC fallback - nginx -t caught it after the fact).
+    cert_pub=$(openssl x509 -in "${CUSTOM_CERT_PATH}" -noout -pubkey 2>/dev/null)
+    key_pub=$(openssl pkey -in "${CUSTOM_KEY_PATH}" -pubout 2>/dev/null)
+    if [ -z "${cert_pub}" ] || [ -z "${key_pub}" ] || [ "${cert_pub}" != "${key_pub}" ]; then
+      echo "${CFAILURE}Error: Certificate and key do not match!${CEND}"
+      exit 1
     fi
     # Copy to SSL directory
     mkdir -p ${PATH_SSL}
@@ -507,7 +507,10 @@ What Are You Doing?
       read -ra _mphptags_a <<< "${_mphptags}"
       mphp_ver=${_mphptags_a[$((php_option - 1))]}
     fi
-    [ ! -e "/dev/shm/php${mphp_ver}-cgi.sock" ] && unset mphp_ver
+    if [ ! -e "/dev/shm/php${mphp_ver}-cgi.sock" ]; then
+      [ "${mphp_flag}" == "y" ] && echo "${CWARNING}PHP${mphp_ver} socket not found - falling back to the main PHP for this vhost.${CEND}"
+      unset mphp_ver
+    fi
   fi
 
   NGX_CONF=$(printf "%b" "location ~ [^/]\.php(/|$) {\n    #fastcgi_pass remote_php_ip:9000;\n    fastcgi_pass unix:/dev/shm/php${mphp_ver}-cgi.sock;\n    fastcgi_index index.php;\n    include fastcgi.conf;\n  }\n")
@@ -1028,7 +1031,7 @@ Add_Vhost() {
 
 Del_NGX_Vhost() {
   if [ -e "${web_install_dir}/sbin/nginx" ]; then
-    [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | sed "s@.conf@@g")
+    [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@.conf@@g")
     if [ -n "${Domain_List}" ]; then
       echo
       echo "Virtualhost list:"
@@ -1125,7 +1128,7 @@ List_Vhost() {
     echo "${CWARNING}Web server not found! ${CEND}"
     return
   fi
-  [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | sed "s@.conf@@g")
+  [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@.conf@@g")
   if [ -n "${Domain_List}" ]; then
     echo
     echo "Virtualhost list:"
