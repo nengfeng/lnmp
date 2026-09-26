@@ -309,7 +309,7 @@ If you enter '.', the field will be left blank.
           done
           if [[ "${_issue_anyway}" =~ ^[nN]$ ]]; then
             rm -f ${vhostdir}/${auth_file}
-            [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f "${web_install_dir}/conf/vhost/${domain}.conf"
+            cleanup_vhost_artifacts
             "${web_install_dir}/sbin/nginx" -s reload >/dev/null 2>&1
             echo "${CFAILURE}Issuance aborted. Point the DNS record at this server and re-run vhost.sh.${CEND}"
             exit 1
@@ -331,30 +331,30 @@ If you enter '.', the field will be left blank.
       Nginx_cmd="${web_install_dir}/sbin/nginx -s reload"
       Command="${Nginx_cmd}"
     if [ -s "${HOME}/.acme.sh/${domain}/fullchain.cer" ] && [[ "${CERT_KEYLENGTH}" =~ ^2048$|^3072$|^4096$|^8192$ ]]; then
-      if ! "${HOME}/.acme.sh/acme.sh" --force --install-cert -d ${{domain}} --fullchain-file ${{PATH_SSL}}/${{domain}}.crt --key-file ${{PATH_SSL}}/${{domain}}.key --reloadcmd "${{Command}}" > /dev/null; then
-        if [ ! -s "${{PATH_SSL}}/${{domain}}.crt" ]; then
-          echo "${{CFAILURE}}install-cert failed for ${{domain}}${{CEND}}"
-          [ -e "${{web_install_dir}}/conf/vhost/${{domain}}.conf" ] && rm -f "${{web_install_dir}}/conf/vhost/${{domain}}.conf"
-          "${{web_install_dir}}/sbin/nginx" -s reload >/dev/null 2>&1
-          echo "${{CFAILURE}}The temporary HTTP vhost was removed - nothing left half-installed.${{CEND}}"
+      if ! "${HOME}/.acme.sh/acme.sh" --force --install-cert -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null; then
+        if [ ! -s "${PATH_SSL}/${domain}.crt" ]; then
+          echo "${CFAILURE}install-cert failed for ${domain}${CEND}"
+          cleanup_vhost_artifacts
+          "${web_install_dir}/sbin/nginx" -s reload >/dev/null 2>&1
+          echo "${CFAILURE}The temporary HTTP vhost was removed - nothing left half-installed.${CEND}"
           exit 1
         fi
-        echo "${{CWARNING}}install-cert reported failure after installing the certificate (reload step?) - continuing; the final vhost reload applies it.${{CEND}}"
+        echo "${CWARNING}install-cert reported failure after installing the certificate (reload step?) - continuing; the final vhost reload applies it.${CEND}"
       fi
     elif [ -s "${HOME}/.acme.sh/${domain}_ecc/fullchain.cer" ] && [[ "${CERT_KEYLENGTH}" =~ ^ec-256$|^ec-384$|^ec-521$ ]]; then
-      if ! "${HOME}/.acme.sh/acme.sh" --force --install-cert --ecc -d ${{domain}} --fullchain-file ${{PATH_SSL}}/${{domain}}.crt --key-file ${{PATH_SSL}}/${{domain}}.key --reloadcmd "${{Command}}" > /dev/null; then
-        if [ ! -s "${{PATH_SSL}}/${{domain}}.crt" ]; then
-          echo "${{CFAILURE}}install-cert failed for ${{domain}}${{CEND}}"
-          [ -e "${{web_install_dir}}/conf/vhost/${{domain}}.conf" ] && rm -f "${{web_install_dir}}/conf/vhost/${{domain}}.conf"
-          "${{web_install_dir}}/sbin/nginx" -s reload >/dev/null 2>&1
-          echo "${{CFAILURE}}The temporary HTTP vhost was removed - nothing left half-installed.${{CEND}}"
+      if ! "${HOME}/.acme.sh/acme.sh" --force --install-cert --ecc -d ${domain} --fullchain-file ${PATH_SSL}/${domain}.crt --key-file ${PATH_SSL}/${domain}.key --reloadcmd "${Command}" > /dev/null; then
+        if [ ! -s "${PATH_SSL}/${domain}.crt" ]; then
+          echo "${CFAILURE}install-cert failed for ${domain}${CEND}"
+          cleanup_vhost_artifacts
+          "${web_install_dir}/sbin/nginx" -s reload >/dev/null 2>&1
+          echo "${CFAILURE}The temporary HTTP vhost was removed - nothing left half-installed.${CEND}"
           exit 1
         fi
-        echo "${{CWARNING}}install-cert reported failure after installing the certificate (reload step?) - continuing; the final vhost reload applies it.${{CEND}}"
+        echo "${CWARNING}install-cert reported failure after installing the certificate (reload step?) - continuing; the final vhost reload applies it.${CEND}"
       fi
     else
       echo "${CFAILURE}Error: Create Let's Encrypt SSL Certificate failed! ${CEND}"
-      [ -e "${web_install_dir}/conf/vhost/${domain}.conf" ] && rm -f ${web_install_dir}/conf/vhost/${domain}.conf
+      cleanup_vhost_artifacts
       "${web_install_dir}/sbin/nginx" -s reload >/dev/null 2>&1
       exit 1
     fi
