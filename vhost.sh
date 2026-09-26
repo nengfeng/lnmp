@@ -875,7 +875,7 @@ EOF
     fi
   fi
 
-  [[ "${https_flag}" == y ]] && sed -i "s@^  root.*;@&\n  if (\$ssl_protocol = \"\") { return 301 https://\$host\$request_uri; }@" ${web_install_dir}/conf/vhost/${domain}.conf
+  [[ "${https_flag}" == y ]] && sed -i "s@^  root.*;@&\n  if (\$ssl_protocol = \"\") { set \$redirect_to_https 1; }\n  if (\$request_uri ~ ^/.well-known/acme-challenge) { set \$redirect_to_https 0; }\n  if (\$redirect_to_https = 1) { return 301 https://\$host\$request_uri; }@" ${web_install_dir}/conf/vhost/${domain}.conf
   [[ "${https_flag}" == y ]] && ! grep -q "ssl_protocol" "${web_install_dir}/conf/vhost/${domain}.conf" 2>/dev/null && {
     echo "${CFAILURE}https redirect insertion missed - the vhost template drifted; failing instead of silently skipping the redirect.${CEND}"
     cleanup_vhost_artifacts
@@ -949,7 +949,7 @@ server {
 EOF
 
 
-  [[ "${https_flag}" == y ]] && sed -i "s@^  root.*;@&\n  if (\$ssl_protocol = \"\") { return 301 https://\$host\$request_uri; }@" ${web_install_dir}/conf/vhost/${domain}.conf
+  [[ "${https_flag}" == y ]] && sed -i "s@^  root.*;@&\n  if (\$ssl_protocol = \"\") { set \$redirect_to_https 1; }\n  if (\$request_uri ~ ^/.well-known/acme-challenge) { set \$redirect_to_https 0; }\n  if (\$redirect_to_https = 1) { return 301 https://\$host\$request_uri; }@" ${web_install_dir}/conf/vhost/${domain}.conf
   [[ "${https_flag}" == y ]] && ! grep -q "ssl_protocol" "${web_install_dir}/conf/vhost/${domain}.conf" 2>/dev/null && {
     echo "${CFAILURE}https redirect insertion missed - the vhost template drifted; failing instead of silently skipping the redirect.${CEND}"
     cleanup_vhost_artifacts
@@ -1053,7 +1053,7 @@ Add_Vhost() {
 
 Del_NGX_Vhost() {
   if [ -e "${web_install_dir}/sbin/nginx" ]; then
-    [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@.conf@@g")
+    [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@\.conf$@@")
     if [ -n "${Domain_List}" ]; then
       echo
       echo "Virtualhost list:"
@@ -1072,19 +1072,28 @@ Del_NGX_Vhost() {
                 echo "${CFAILURE}Could not determine the vhost root from ${domain}.conf (no 'root' directive found) - nothing was deleted; remove the directory manually if needed.${CEND}"
                 continue
               fi
+              # Proxy vhosts (root /dev/null) have no real docroot, so there
+              # is nothing to validate or delete on disk - skip the wwwroot
+              # containment check below (which would otherwise reject
+              # /dev/null forever and make proxy vhosts undeletable).
+              local is_proxy_vhost=n
+              [[ "${Directory}" == "/dev/null" ]] && is_proxy_vhost=y
               # Canonicalize and validate: the vhost root must be a directory
               # STRICTLY deeper than ${wwwroot_dir}; deleting ${wwwroot_dir}
               # itself (or anything escaping it, e.g. via ..) is refused.
-              local dir_real wwwroot_real
-              dir_real=$(realpath -m "${Directory}" 2>/dev/null)
-              wwwroot_real=$(realpath -m "${wwwroot_dir%/}" 2>/dev/null)
-              local dir_ok=n
-              case "${dir_real}" in
-                "${wwwroot_real}"/*) [ "${dir_real}" != "${wwwroot_real}" ] && dir_ok=y ;;
-              esac
-              if [[ "${dir_ok}" != y ]] || [ ! -d "${dir_real}" ]; then
-                echo "${CFAILURE}Invalid directory path detected. Only existing directories under ${wwwroot_dir} can be deleted.${CEND}"
-                continue
+              local dir_real=""
+              if [[ "${is_proxy_vhost}" != y ]]; then
+                local wwwroot_real
+                dir_real=$(realpath -m "${Directory}" 2>/dev/null)
+                wwwroot_real=$(realpath -m "${wwwroot_dir%/}" 2>/dev/null)
+                local dir_ok=n
+                case "${dir_real}" in
+                  "${wwwroot_real}"/*) [ "${dir_real}" != "${wwwroot_real}" ] && dir_ok=y ;;
+                esac
+                if [[ "${dir_ok}" != y ]] || [ ! -d "${dir_real}" ]; then
+                  echo "${CFAILURE}Invalid directory path detected. Only existing directories under ${wwwroot_dir} can be deleted.${CEND}"
+                  continue
+                fi
               fi
               /bin/mv "${web_install_dir}/conf/vhost/${domain}.conf" "${web_install_dir}/conf/vhost/${domain}.conf.bak"
               if ${web_install_dir}/sbin/nginx -t; then
@@ -1109,24 +1118,26 @@ Del_NGX_Vhost() {
                 echo "${CFAILURE}Nginx config test failed! Virtualhost not deleted.${CEND}"
                 break
               fi
-              while :; do echo
-                read -e -p "Do you want to delete Virtul Host directory? [y/n]: " Del_Vhost_wwwroot_flag
-                if [[ ! ${Del_Vhost_wwwroot_flag} =~ ^[y,n]$ ]]; then
-                  echo "${CWARNING}input error! Please only input 'y' or 'n'${CEND}"
-                else
-                  break
+              if [[ "${is_proxy_vhost}" != y ]]; then
+                while :; do echo
+                  read -e -p "Do you want to delete Virtul Host directory? [y/n]: " Del_Vhost_wwwroot_flag
+                  if [[ ! ${Del_Vhost_wwwroot_flag} =~ ^[y,n]$ ]]; then
+                    echo "${CWARNING}input error! Please only input 'y' or 'n'${CEND}"
+                  else
+                    break
+                  fi
+                done
+                # Show the resolved absolute path: the y/n prompt below must
+                # never be answerable without seeing exactly what rm -rf
+                # will receive.
+                echo "Directory to be deleted (canonical path): ${dir_real}"
+                if [[ "${Del_Vhost_wwwroot_flag}" == y ]]; then
+                  if [ "${quiet_flag}" != 'y' ]; then
+                    echo "Press Ctrl+c to cancel or Press any key to continue..."
+                    char=$(get_char)
+                  fi
+                  rm -rf -- "${dir_real}"
                 fi
-              done
-              # Show the resolved absolute path: the y/n prompt below must
-              # never be answerable without seeing exactly what rm -rf
-              # will receive.
-              echo "Directory to be deleted (canonical path): ${dir_real}"
-              if [[ "${Del_Vhost_wwwroot_flag}" == y ]]; then
-                if [ "${quiet_flag}" != 'y' ]; then
-                  echo "Press Ctrl+c to cancel or Press any key to continue..."
-                  char=$(get_char)
-                fi
-                rm -rf -- "${dir_real}"
               fi
               echo
               [ -d "${HOME}/.acme.sh/${domain}" ] && "${HOME}/.acme.sh/acme.sh" --force --remove -d ${domain} > /dev/null 2>&1
@@ -1150,7 +1161,7 @@ List_Vhost() {
     echo "${CWARNING}Web server not found! ${CEND}"
     return
   fi
-  [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@.conf@@g")
+  [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@\.conf$@@")
   if [ -n "${Domain_List}" ]; then
     echo
     echo "Virtualhost list:"
