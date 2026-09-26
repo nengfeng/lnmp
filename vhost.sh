@@ -818,41 +818,54 @@ EOF
   [[ "${rewrite}" == pathinfo ]] && sed -i '/pathinfo.conf;$/d' ${web_install_dir}/conf/vhost/${domain}.conf
   if [[ "${rewrite}" == 'magento2' && -e "config/${rewrite}.conf" ]]; then
     /bin/cp config/${rewrite}.conf ${web_install_dir}/conf/vhost/${domain}.conf
-    sed -i "s@/dev/shm/php-cgi.sock@/dev/shm/php${mphp_ver}-cgi.sock@g" ${web_install_dir}/conf/vhost/${domain}.conf
-    sed -i "s@^  set \$MAGE_ROOT.*;@  set \$MAGE_ROOT ${vhostdir};@" ${web_install_dir}/conf/vhost/${domain}.conf
-    sed -i "s@^  server_name.*;@  server_name ${domain}${moredomainame};@" ${web_install_dir}/conf/vhost/${domain}.conf
-    sed -i "s@^  server_name.*;@&\n  ${Nginx_log}@" ${web_install_dir}/conf/vhost/${domain}.conf
-    if [[ "${anti_hotlinking_flag}" == y ]]; then
-      sed -i "s@^  root.*;@&\n  }@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  root.*;@&\n    }@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  root.*;@&\n      return 403;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  root.*;@&\n      return 403;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  root.*;@&\n    if (\$invalid_referer) {@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  root.*;@&\n    valid_referers none blocked ${domain_allow_all};@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  root.*;@&\n  location ~ .*\.(wma|wmv|asf|mp3|mmf|zip|rar|jpg|gif|png|swf|flv|mp4)\$ {@" ${web_install_dir}/conf/vhost/${domain}.conf
-    fi
-
-    [[ "${redirect_flag}" == y ]] && sed -i "s@^  root.*;@&\n  if (\$host != ${domain}) {  return 301 \$scheme://${domain}\$request_uri;  }@" ${web_install_dir}/conf/vhost/${domain}.conf
-
+    local _mconf=${web_install_dir}/conf/vhost/${domain}.conf
+    # Marker substitution instead of positional sed patches: the template
+    # carries __MARKER__ tokens and every one MUST be consumed - a leftover
+    # marker means the template drifted, and we fail loudly instead of
+    # writing a subtly wrong vhost. (The old positional chain also built a
+    # duplicate "return 403" for hotlinking, which nginx rejects.)
+    local _ssl_block=""
     if [[ "${nginx_ssl_flag}" == y ]]; then
-      sed -i "s@^  listen 80;@&\n  listen 443 ssl;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  add_header Strict-Transport.*@&\n  ssl_stapling on;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  ssl_stapling on;@&\n  ssl_stapling_verify on;\n  ssl_trusted_certificate ${PATH_SSL}/${domain}.crt;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  ssl_stapling_verify on;@&\n  resolver 8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 valid=300s;\n  resolver_timeout 5s;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_buffer_size 2k;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_session_cache shared:SSL:10m;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_session_timeout 10m;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_prefer_server_ciphers on;@" ${web_install_dir}/conf/vhost/${domain}.conf
+      _ssl_block="  listen 443 ssl;\n
+  ssl_certificate ${PATH_SSL}/${domain}.crt;\n
+  ssl_certificate_key ${PATH_SSL}/${domain}.key;\n
+  ssl_protocols TLSv1.2 TLSv1.3;\n
+  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;\n
+  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;\n
+  ssl_prefer_server_ciphers on;\n
+  ssl_session_cache shared:SSL:10m;\n
+  ssl_session_timeout 10m;\n
+  ssl_buffer_size 2k;\n
+  ssl_stapling on;\n
+  ssl_stapling_verify on;\n
+  ssl_trusted_certificate ${PATH_SSL}/${domain}.crt;\n
+  resolver 8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 valid=300s;\n
+  resolver_timeout 5s;"
       if web_engine_supports_ssl_conf_command; then
-        sed -i "s@^  server_name.*;@&\n  ssl_conf_command Options PrioritizeChaCha;@" ${web_install_dir}/conf/vhost/${domain}.conf
-        sed -i "s@^  server_name.*;@&\n  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;@" ${web_install_dir}/conf/vhost/${domain}.conf
+        _ssl_block="${_ssl_block}\n  ssl_conf_command Options PrioritizeChaCha;\n  ssl_conf_command Ciphersuites TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256;"
       fi
-      sed -i "s@^  server_name.*;@&\n  ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_ecdh_curve X25519:prime256v1:secp384r1:secp521r1;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_protocols TLSv1.2 TLSv1.3;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_certificate_key ${PATH_SSL}/${domain}.key;@" ${web_install_dir}/conf/vhost/${domain}.conf
-      sed -i "s@^  server_name.*;@&\n  ssl_certificate ${PATH_SSL}/${domain}.crt;@" ${web_install_dir}/conf/vhost/${domain}.conf
+      _ssl_block="${_ssl_block}\n  add_header Strict-Transport-Security \"max-age=15768000; includeSubDomains; preload\";"
+    fi
+    local _redirect_block=""
+    [[ "${redirect_flag}" == y ]] && _redirect_block="  if (\$host != ${domain}) {  return 301 \$scheme://${domain}\$request_uri;  }"
+    local _hotlink_block=""
+    if [[ "${anti_hotlinking_flag}" == y ]]; then
+      _hotlink_block="  location ~ .*\.(wma|wmv|asf|mp3|mmf|zip|rar|jpg|gif|png|swf|flv|mp4)\$ {\n
+    valid_referers none blocked ${domain_allow_all};\n
+    if (\$invalid_referer) {\n
+      return 403;\n
+    }\n
+  }"
+    fi
+    sed -i "s@__MAGE_ROOT__@${vhostdir}@; s@__DOMAIN_NAME__@${domain}${moredomainame}@; s@unix:__PHP_SOCK__@unix:/dev/shm/php${mphp_ver}-cgi.sock@g" ${_mconf}
+    sed -i "s@^  __ACCESS_LOG__\$@\\"${Nginx_log}\\"@" ${_mconf}
+    sed -i "s@^  __SSL_CONF__\$@${_ssl_block}@" ${_mconf}
+    sed -i "s@^  __REDIRECT_CONF__\$@${_redirect_block}@" ${_mconf}
+    sed -i "s@^  __HOTLINK_BLOCK__\$@${_hotlink_block}@" ${_mconf}
+    if grep -qE "__[A-Z_]+__" ${_mconf}; then
+      echo "${CFAILURE}magento2 template markers left unreplaced - the template drifted; failing instead of writing a subtly broken vhost.${CEND}"
+      cleanup_vhost_artifacts
+      exit 1
     fi
   fi
 
