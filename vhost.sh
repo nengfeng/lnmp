@@ -1053,7 +1053,7 @@ Add_Vhost() {
 
 Del_NGX_Vhost() {
   if [ -e "${web_install_dir}/sbin/nginx" ]; then
-    [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@\.conf$@@")
+    [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(for _vhost_conf in "${web_install_dir}"/conf/vhost/*.conf; do [ -e "${_vhost_conf}" ] && basename "${_vhost_conf}" .conf; done)
     if [ -n "${Domain_List}" ]; then
       echo
       echo "Virtualhost list:"
@@ -1161,7 +1161,7 @@ List_Vhost() {
     echo "${CWARNING}Web server not found! ${CEND}"
     return
   fi
-  [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(ls ${web_install_dir}/conf/vhost | grep -v "[.]bak$" | sed "s@\.conf$@@")
+  [ -d "${web_install_dir}/conf/vhost" ] && Domain_List=$(for _vhost_conf in "${web_install_dir}"/conf/vhost/*.conf; do [ -e "${_vhost_conf}" ] && basename "${_vhost_conf}" .conf; done)
   if [ -n "${Domain_List}" ]; then
     echo
     echo "Virtualhost list:"
