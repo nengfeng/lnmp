@@ -696,6 +696,12 @@ What Are You Doing?
       fi
     fi
     [[ "${https_flag}" == y ]] && sed -i "s@^  listen 80;@&\n  return 301 https://\$host\$request_uri;@" ${web_install_dir}/conf/vhost/${domain}.conf
+    [[ "${https_flag}" == y ]] && ! grep -q "return 301 https://" "${web_install_dir}/conf/vhost/${domain}.conf" 2>/dev/null && {
+      echo "${CFAILURE}https redirect insertion missed - the temporary vhost template drifted; failing instead of silently skipping the redirect.${CEND}"
+      rm -f "${web_install_dir}/conf/vhost/${domain}.conf"
+      "${web_install_dir}/sbin/nginx" -s reload >/dev/null 2>&1
+      exit 1
+    }
   fi
 }
 
@@ -874,6 +880,12 @@ EOF
   fi
 
   [[ "${https_flag}" == y ]] && sed -i "s@^  root.*;@&\n  if (\$ssl_protocol = \"\") { return 301 https://\$host\$request_uri; }@" ${web_install_dir}/conf/vhost/${domain}.conf
+  [[ "${https_flag}" == y ]] && ! grep -q "ssl_protocol" "${web_install_dir}/conf/vhost/${domain}.conf" 2>/dev/null && {
+    echo "${CFAILURE}https redirect insertion missed - the vhost template drifted; failing instead of silently skipping the redirect.${CEND}"
+    cleanup_vhost_artifacts
+    "${web_install_dir}/sbin/nginx" -s reload >/dev/null 2>&1
+    exit 1
+  }
 
   echo
   ${web_install_dir}/sbin/nginx -t
@@ -942,6 +954,12 @@ EOF
 
 
   [[ "${https_flag}" == y ]] && sed -i "s@^  root.*;@&\n  if (\$ssl_protocol = \"\") { return 301 https://\$host\$request_uri; }@" ${web_install_dir}/conf/vhost/${domain}.conf
+  [[ "${https_flag}" == y ]] && ! grep -q "ssl_protocol" "${web_install_dir}/conf/vhost/${domain}.conf" 2>/dev/null && {
+    echo "${CFAILURE}https redirect insertion missed - the vhost template drifted; failing instead of silently skipping the redirect.${CEND}"
+    cleanup_vhost_artifacts
+    "${web_install_dir}/sbin/nginx" -s reload >/dev/null 2>&1
+    exit 1
+  }
 
   echo
   ${web_install_dir}/sbin/nginx -t
