@@ -1006,11 +1006,40 @@ Add_Vhost() {
   access_by_lua_file ${verynginx_dir}/on_access.lua;
   log_by_lua_file ${verynginx_dir}/on_log.lua;
 
+  set \$vn_proxy_scheme \"http\";
+  set \$vn_proxy_host \$host;
+  set \$vn_proxy_port \"80\";
+  set \$vn_proxy_sni '';
+  set \$vn_in_exec '';
+  set \$vn_static_root '';
+  set \$vn_static_expires 'epoch';
+
+  location @vn_proxy {
+      proxy_http_version 1.1;
+      proxy_set_header Host \$vn_proxy_host;
+      proxy_set_header X-Request-Id \$request_id;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+      proxy_set_header Upgrade \$http_upgrade;
+      proxy_set_header Connection \$connection_upgrade;
+      proxy_ssl_name \$vn_proxy_sni;
+      proxy_ssl_server_name on;
+      proxy_ssl_verify on;
+      proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+      proxy_ssl_verify_depth 2;
+      proxy_hide_header Server;
+      proxy_hide_header X-Powered-By;
+      proxy_connect_timeout 3s;
+      proxy_read_timeout 60s;
+      proxy_send_timeout 60s;
+      proxy_pass http://vn_dynamic_upstream;
+  }
+
   location /verynginx/static/ {
       alias ${verynginx_dir}/dashboard/;
-      access_by_lua_block { }
-      log_by_lua_block { }
       expires epoch;
+      add_header X-Content-Type-Options \"nosniff\" always;
+      add_header X-Frame-Options \"SAMEORIGIN\" always;
   }
   location /verynginx/ {
   }"
