@@ -139,10 +139,18 @@ nginx_supports_http2_on() {
 # Remove the artifacts created while adding a vhost, leaving the running server
 # in the state it had before this attempt.
 cleanup_vhost_artifacts() {
-  local rewrite_conf="${web_install_dir}/conf/rewrite/${rewrite}.conf"
   rm -f "${web_install_dir}/conf/vhost/${domain}.conf" \
-        "${rewrite_conf}" \
         "${PATH_SSL}/${domain}.crt" "${PATH_SSL}/${domain}.key" "${PATH_SSL}/${domain}.csr" 2>/dev/null
+  # The rewrite file is a SHARED template (conf/rewrite/wordpress.conf is
+  # included by every site created with that template): deleting it because
+  # one add failed would break every other site's next nginx reload. Only
+  # remove it when no remaining vhost conf still includes it. Runs AFTER
+  # the vhost conf removal above so the failed conf cannot match itself.
+  local rewrite_conf="${web_install_dir}/conf/rewrite/${rewrite:-__none__}.conf"
+  if [ -f "${rewrite_conf}" ] \
+     && ! grep -rq "rewrite/${rewrite:-__none__}.conf" "${web_install_dir}/conf/vhost/" 2>/dev/null; then
+    rm -f "${rewrite_conf}"
+  fi
 }
 
 Create_SSL() {
@@ -1038,7 +1046,12 @@ Del_NGX_Vhost() {
                 local rewrite_conf
                 rewrite_conf=$(grep -oP 'include\s+\K[^;]*rewrite/[^;]+' "${web_install_dir}/conf/vhost/${domain}.conf.bak" 2>/dev/null || true)
                 rm -f "${web_install_dir}/conf/vhost/${domain}.conf.bak"
-                [ -n "${rewrite_conf}" ] && [ -e "${rewrite_conf}" ] && rm -f "${rewrite_conf}"
+                # Shared template guard: only delete the rewrite file when
+                # no remaining vhost conf still includes it.
+                if [ -n "${rewrite_conf}" ] && [ -e "${rewrite_conf}" ] \
+                   && ! grep -rq "rewrite/$(basename "${rewrite_conf}")" "${web_install_dir}/conf/vhost/" 2>/dev/null; then
+                  rm -f "${rewrite_conf}"
+                fi
                 [ -e "${web_install_dir}/conf/rewrite/${domain}.conf" ] && rm -f "${web_install_dir}/conf/rewrite/${domain}.conf"
                 [ -e "${web_install_dir}/conf/ssl/${domain}.crt" ] && rm -f "${web_install_dir}/conf/ssl/${domain}".{crt,key,csr}
                 ${web_install_dir}/sbin/nginx -s reload
