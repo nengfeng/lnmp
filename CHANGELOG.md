@@ -12,34 +12,50 @@ fixes, they are grouped by area rather than listed one by one.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Corrected the 1.7.6 release notes.** They described `sysv-rc` as an install
+  blocker — "does not exist in any supported distribution" — which is false:
+  the package is shipped by Debian 12 and 13 (`3.06-4`, `3.14-4`, arch `all`)
+  and only ever appeared in `installDepsDebian`'s list, so it installed fine.
+  The genuine blocker in that release was the OpenSSL mirror 404 with no
+  official-source fallback. The GitHub Release body and the `[1.7.6]`
+  CHANGELOG entry have both been corrected; two other claims were checked at
+  the same standard and withdrawn (`_url_speed_curl` did not exist in v1.7.5
+  at all, so nothing could call it undefined).
+
+### Added
+
+- **Static check #13**: `sysv-rc` must stay out of BOTH dependency lists, and
+  each function's `pkgCommon` must stay where the guard reads it. v1.7.6
+  removed the package but took its guard with it, and the guard that existed
+  was watching the wrong variable — it asserted absence from the Ubuntu list
+  while the entry sat in `installDepsDebian`'s, so it could never have fired.
+  The check also fails itself when either function's `pkgCommon` is renamed or
+  dropped, which is the only way it could otherwise go quietly inert (verified
+  against four mutations: package reintroduced in either list, and `pkgCommon`
+  renamed in either function).
+
 ## [1.7.6] - 2026-09-30
 
-Two waves of work merged since v1.7.5. The headline is that **v1.7.5 could
-fail during install** on a supported host — a dependency that does not exist in
-any of the four supported distributions, an OpenSSL mirror URL that always
-404s, and an undefined shell function on the download-probe path. Those are
-fixed first below; virtual-host management accounts for 44% of the diff.
+Two waves of work merged since v1.7.5. The headline is that **v1.7.5 could not
+complete an install on a host using a China mirror**: the OpenSSL tarball was
+requested from a mirror that does not carry upstream OpenSSL releases (that URL
+404s), and `_dl` cleared `src_url_fallback`, so the 404 had nowhere to go but
+`die_hard` and the `|| exit 1` that followed. Virtual-host management accounts
+for 44% of the diff.
 
 ### Fixed
 
-*Install and download blockers, merged 2026-09-24/25:*
+*Install and download, merged 2026-09-24/25:*
 
-- **`sysv-rc` does not exist in any supported distribution**, yet it was in
-  `include/check_sw.sh`'s `pkgCommon`, which `apt-get install` is given
-  verbatim — one unresolvable package aborts the whole dependency install.
-  It was never needed: `update-rc.d` ships in `init-system-helpers`, which is
-  `priority: required` and therefore present on Debian 12/13 and Ubuntu
-  24.04/26.04 alike. Removed.
-- **OpenSSL could only ever fail.** The `_dl` call passed a
-  `MIRROR_BASE_URL` path for `openssl-${openssl_ver}.tar.gz`, but the major
-  China mirrors do not carry upstream OpenSSL releases, and that call is
-  `|| exit 1` — so on a China mirror the install died at the OpenSSL download.
-  It is now official-source-only.
-- **`_url_speed_curl` was called but never defined.**
-  `download_sources.sh`'s GitHub speed probe invoked it, so the probe could
-  only ever fail — which silently disabled the speed-based accelerator
-  selection that probe exists to drive. Defined, and the probe threshold was
-  realigned with the value `options.conf` documents.
+- **The OpenSSL download could only fail behind a China mirror.** The `_dl`
+  call passed `${MIRROR_BASE_URL}/openssl/source/openssl-${openssl_ver}.tar.gz`,
+  but the major China mirrors do not carry upstream OpenSSL releases — the URL
+  returns HTTP 404 — and `_dl` set `src_url_fallback=""`, so there was no
+  official-source retry before `die_hard` took the `|| exit 1` with it. OpenSSL
+  is now official-source-only, and `_dl` records the official URL as a fallback
+  so a mirror failure retries upstream instead of aborting the run.
 - **The GitHub fallback path did not work from behind the GFW.** Five call
   sites fetched `raw.githubusercontent.com` / `github.com` bare, with no
   accelerator behind them: `install.sh --md5sum`'s md5 + sha256 lookups,
@@ -57,6 +73,13 @@ fixed first below; virtual-host management accounts for 44% of the diff.
   invisible to `make`. `align_archive_top_dir()` repacks it before unpacking.
 - **A mirror 404 was not treated as a failure**, so a 404 could be recorded as
   a completed download.
+- **A redundant dependency was dropped**: `sysv-rc` is gone from
+  `installDepsDebian`'s `pkgCommon`. It installed fine — the package exists in
+  Debian 12 and 13 (`3.06-4`, `3.14-4`, arch `all`) and only ever appeared in
+  the Debian list, which is the only one that ran it — so this is a cleanup,
+  not a fix: `update-rc.d` already comes from `init-system-helpers`
+  (`priority: required`). See the Changed entry for the guard that was
+  supposed to be watching it.
 
 *Virtual host management, 14 commits merged 2026-09-26 (+325/-114, 44% of
 this release's diff):*
@@ -193,13 +216,15 @@ this release's diff):*
 
 ### Changed
 
-- **The `sysv-rc` static guard was removed along with the package.** The guard
-  asserted the package was absent from `ubuntu_pkgs`, but the offending entry
-  lived in `pkgCommon` — the shared list — so the guard never fired on the bug
-  it was written for. The package is now gone from the tree, which left the
-  guard with nothing to assert, so it was dropped too. Nothing now prevents
-  `sysv-rc` being re-added to `pkgCommon`; re-adding it re-breaks the
-  dependency install on all four supported distributions.
+- **The `sysv-rc` static guard was removed along with the package, and it had
+  been checking the wrong list.** The guard asserted the package was absent
+  from `ubuntu_pkgs`; the entry it was written to police actually lived in
+  `installDepsDebian`'s `pkgCommon`, so the guard could not have fired on it.
+  The package is now gone from the tree, which left the guard with nothing to
+  assert, so it was dropped rather than re-pointed. Nothing currently prevents
+  `sysv-rc` being re-added — harmless while it stays in the Debian list, but a
+  guard that watches the wrong variable is the actual defect here and is
+  tracked separately.
 - **shellcheck `warning` level is now a CI gate**, not advisory (28 findings →
   0). `info` level (252 findings) remains advisory so it can be burned down
   without blocking releases. The gate runs at `-S warning`.
@@ -213,9 +238,10 @@ this release's diff):*
 - **Four GitHub-accelerator knobs in `options.conf`**:
   `GITHUB_ACCELERATOR_URL` (the fallback itself), plus
   `GITHUB_SPEED_MIN_KBPS`, `GITHUB_SPEED_TEST_SECONDS` and
-  `GITHUB_SPEED_SAMPLE_BYTES` governing the speed probe that decides whether
-  the accelerator is worth switching to. None of the four is documented in the
-  README's mirror section yet.
+  `GITHUB_SPEED_SAMPLE_BYTES` governing a new speed probe
+  (`_url_speed_curl` in `download_sources.sh`, introduced together with its
+  two call sites) that decides whether the accelerator is worth switching to.
+  None of the four is documented in the README's mirror section yet.
 - **Static check #12**: README's database documentation (component list,
   `db_option` mapping, example-command comments) must match the `install.sh`
   menu. Verified against four mutations of the historical bugs.
