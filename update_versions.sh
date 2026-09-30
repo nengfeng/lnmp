@@ -34,6 +34,26 @@ gh_tags() {
     sort -V | tail -1
 }
 
+# Helper: fetch GitHub tags atom feed and return EVERY numeric tag it lists,
+# stable and pre-release alike, one per line.
+#
+# The lua group needs both views of one repo: LNMP ships rc builds of
+# lua-nginx-module and lua-resty-core as production, so "latest" has to mean
+# "newest tag, rc included". Deriving the two views from two separate requests
+# for the same URL meant a single rate-limited or flaky response could drop
+# the rc half — the atom feeds are unauthenticated (60 req/h per IP) and this
+# script makes a dozen of them, so that was not hypothetical. The stable and rc
+# views then disagreed, the check silently degraded to stable-only, and the
+# report read "0.10.32rc5 (最新: 0.10.31)" while still counting as up to date.
+# One fetch, two views, always consistent.
+# Usage: gh_tags_all <owner/repo>
+gh_tags_all() {
+  curl -sL --connect-timeout 10 --max-time 20 \
+    "https://github.com/${1}/tags.atom" 2>/dev/null | \
+    grep "<title>" | grep -vE "(alpha|beta|dev)" | \
+    grep -oP "<title>v?\K[0-9][0-9.]*[a-z0-9]*"
+}
+
 # Helper: fetch GitHub releases atom feed and extract latest version
 # Usage: gh_release_latest <owner/repo>
 # Outputs: newest stable release tag (without v prefix, rc/alpha/beta excluded)
@@ -520,29 +540,20 @@ _check_nginx_lua_group() {
     total=$((total + 4))
 
     # Fetch latest versions
-    local latest_lua_ngx
-    latest_lua_ngx=$(gh_tags "openresty/lua-nginx-module" "^[0-9]+\.[0-9]+\.[0-9]+$")
-    # Also check rc tags for lua-nginx-module (compatibility map may reference rc versions)
-    local latest_lua_ngx_rc
-    latest_lua_ngx_rc=$(curl -sL --connect-timeout 10 --max-time 20 \
-        "https://github.com/openresty/lua-nginx-module/tags.atom" 2>/dev/null | \
-        grep "<title>" | grep -vE "(alpha|beta|dev)" | \
-        grep -oP "<title>v?\K[0-9][0-9.]*[a-z0-9]*" | \
-        grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | \
-        sort -V | tail -1)
+    # One request per repo, two views off the same response (see gh_tags_all).
+    local ngx_tags core_tags
+    ngx_tags=$(gh_tags_all "openresty/lua-nginx-module")
+    core_tags=$(gh_tags_all "openresty/lua-resty-core")
+
+    local latest_lua_ngx latest_lua_ngx_rc
+    latest_lua_ngx=$(printf '%s\n' "${ngx_tags}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+    latest_lua_ngx_rc=$(printf '%s\n' "${ngx_tags}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | sort -V | tail -1)
     if [ -n "$latest_lua_ngx_rc" ] && ver_lt_rc "$latest_lua_ngx" "$latest_lua_ngx_rc"; then
         latest_lua_ngx="$latest_lua_ngx_rc"
     fi
-    local latest_core
-    latest_core=$(gh_tags "openresty/lua-resty-core" "^[0-9]+\.[0-9]+\.[0-9]+$")
-    # Also check rc tags for lua-resty-core (compatibility map may reference rc versions)
-    local latest_core_rc
-    latest_core_rc=$(curl -sL --connect-timeout 10 --max-time 20 \
-        "https://github.com/openresty/lua-resty-core/tags.atom" 2>/dev/null | \
-        grep "<title>" | grep -vE "(alpha|beta|dev)" | \
-        grep -oP "<title>v?\K[0-9][0-9.]*[a-z0-9]*" | \
-        grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | \
-        sort -V | tail -1)
+    local latest_core latest_core_rc
+    latest_core=$(printf '%s\n' "${core_tags}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+    latest_core_rc=$(printf '%s\n' "${core_tags}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$' | sort -V | tail -1)
     if [ -n "$latest_core_rc" ] && ver_lt_rc "$latest_core" "$latest_core_rc"; then
         latest_core="$latest_core_rc"
     fi
@@ -573,6 +584,12 @@ _check_nginx_lua_group() {
             results="${results}🆕 lua-nginx-module: ${cur_ngx} → ${latest_lua_ngx} (缺少兼容的 lua-resty-core 版本映射，请手动确认)\n"
             major_available=$((major_available + 1))
         fi
+    elif [[ "$cur_ngx" == *rc* ]] && [[ "$latest_lua_ngx" != *rc* ]]; then
+        # We run an rc build as production, and the feed handed us no rc tag at
+        # all. "Not behind the stable line" is not evidence of being current, so
+        # do not report it as up to date and do not name the stable line "最新".
+        results="${results}⚠️  lua-nginx-module: 已装 ${cur_ngx}（rc 版本），但上游 rc 标签未能获取，无法确认是否为最新（稳定版最新为 ${latest_lua_ngx}）\n"
+        check_failed=$((check_failed + 1))
     else
         results="${results}✅ lua-nginx-module: ${cur_ngx} (最新: ${latest_lua_ngx})\n"
         up_to_date=$((up_to_date + 1))
@@ -621,6 +638,10 @@ _check_nginx_lua_group() {
                 minor_updated=$((minor_updated + 1))
             fi
         fi
+    elif [[ "$cur_core" == *rc* ]] && [[ "$latest_core" != *rc* ]]; then
+        # Same rc-channel caveat as lua-nginx-module above.
+        results="${results}⚠️  lua-resty-core: 已装 ${cur_core}（rc 版本），但上游 rc 标签未能获取，无法确认是否为最新（稳定版最新为 ${latest_core}）\n"
+        check_failed=$((check_failed + 1))
     else
         results="${results}✅ lua-resty-core: ${cur_core} (最新: ${latest_core})\n"
         up_to_date=$((up_to_date + 1))
