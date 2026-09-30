@@ -316,5 +316,46 @@ while IFS= read -r line; do
 done < <(grep -E -- '--db_option [0-9]+.*#' README.md)
 [ "$db_doc_ok" -eq 1 ] && echo "  OK" || FAIL=1
 
+echo "== 13. unnecessary/absent packages stay out of BOTH dep lists [HARD] =="
+# Check #5 already polices a short list of package names, but it scoped
+# 'sysv-rc' to the Ubuntu list only — while the entry it was meant to police
+# actually lived in installDepsDebian's pkgCommon. The guard watched a variable
+# the package was never in, so it could not have fired. That is the defect
+# worth closing, not the package: a name-scoped guard has to be checked against
+# every list that can carry the name, or re-adding the package walks straight
+# past it.
+#
+# Scope note, so this is not mistaken for check #5's "does not exist upstream":
+#   sysv-rc - IS shipped by Debian 12/13 (3.06-4, 3.14-4, arch all) and by no
+#             Ubuntu release. It is banned from BOTH lists because it is
+#             unnecessary everywhere: update-rc.d comes from
+#             init-system-helpers (priority: required), which every supported
+#             release carries. Re-adding it buys nothing and re-couples the
+#             Debian list to a package name that only some families ship.
+dep_lists=$(sed -n '/^installDepsDebian/,/^}/p;/^installDepsUbuntu/,/^}/p' include/check_sw.sh \
+  | grep -E '^[[:space:]]*(local )?(pkgCommon|pkgExtra)=')
+unnec_ok=1
+if grep -qw -- 'sysv-rc' <<< "$dep_lists"; then
+  echo "  include/check_sw.sh: 'sysv-rc' is unnecessary (init-system-helpers provides update-rc.d) but is back in a dep list:"
+  grep -nw -- 'sysv-rc' <<< "$dep_lists" | sed 's/^/      /'
+  unnec_ok=0
+fi
+# Each function's pkgCommon must be seen INDIVIDUALLY. A single combined grep
+# keeps passing while one family's list has been renamed or dropped, and a
+# per-function count over pkgCommon+pkgExtra is not enough either — pkgExtra
+# also lives in both bodies, so the count stays non-zero and the guard goes on
+# reporting OK while no longer reading the list that matters. That is the same
+# blind spot this check exists to close.
+deb_common=$(sed -n '/^installDepsDebian/,/^}/p' include/check_sw.sh \
+  | grep -cE '^[[:space:]]*(local )?pkgCommon=')
+ubu_common=$(sed -n '/^installDepsUbuntu/,/^}/p' include/check_sw.sh \
+  | grep -cE '^[[:space:]]*(local )?pkgCommon=')
+if [ "$deb_common" -eq 0 ] || [ "$ubu_common" -eq 0 ]; then
+  echo "  a dependency function's pkgCommon is no longer where this guard looks - it is not being watched:"
+  echo "      installDepsDebian pkgCommon: ${deb_common}, installDepsUbuntu pkgCommon: ${ubu_common}"
+  unnec_ok=0
+fi
+[ "$unnec_ok" -eq 1 ] && echo "  OK" || FAIL=1
+
 echo ""
 [ "$FAIL" -eq 0 ] && { echo "STATIC CHECKS: PASS"; exit 0; } || { echo "STATIC CHECKS: FAIL"; exit 1; }
