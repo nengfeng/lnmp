@@ -12,9 +12,91 @@ fixes, they are grouped by area rather than listed one by one.
 
 ## [Unreleased]
 
-Work merged after v1.7.5 and not yet cut into a release.
+## [1.7.6] - 2026-09-30
+
+Two waves of work merged since v1.7.5. The headline is that **v1.7.5 could
+fail during install** on a supported host — a dependency that does not exist in
+any of the four supported distributions, an OpenSSL mirror URL that always
+404s, and an undefined shell function on the download-probe path. Those are
+fixed first below; virtual-host management accounts for 44% of the diff.
 
 ### Fixed
+
+*Install and download blockers, merged 2026-09-24/25:*
+
+- **`sysv-rc` does not exist in any supported distribution**, yet it was in
+  `include/check_sw.sh`'s `pkgCommon`, which `apt-get install` is given
+  verbatim — one unresolvable package aborts the whole dependency install.
+  It was never needed: `update-rc.d` ships in `init-system-helpers`, which is
+  `priority: required` and therefore present on Debian 12/13 and Ubuntu
+  24.04/26.04 alike. Removed.
+- **OpenSSL could only ever fail.** The `_dl` call passed a
+  `MIRROR_BASE_URL` path for `openssl-${openssl_ver}.tar.gz`, but the major
+  China mirrors do not carry upstream OpenSSL releases, and that call is
+  `|| exit 1` — so on a China mirror the install died at the OpenSSL download.
+  It is now official-source-only.
+- **`_url_speed_curl` was called but never defined.**
+  `download_sources.sh`'s GitHub speed probe invoked it, so the probe could
+  only ever fail — which silently disabled the speed-based accelerator
+  selection that probe exists to drive. Defined, and the probe threshold was
+  realigned with the value `options.conf` documents.
+- **The GitHub fallback path did not work from behind the GFW.** Five call
+  sites fetched `raw.githubusercontent.com` / `github.com` bare, with no
+  accelerator behind them: `install.sh --md5sum`'s md5 + sha256 lookups,
+  `include/upgrade_script.sh`'s checksum fetch and tarball download, and
+  `backup_setup.sh`'s qshell and dbxcli downloads. All five now go through
+  `GITHUB_ACCELERATOR_URL` — official source first, accelerator only after it
+  fails, so nothing changes for a host that can already reach GitHub.
+- **Fallback downloads skipped integrity verification.** A package obtained
+  from a mirror or the accelerator was unpacked and built without being
+  checked, so the fallback was also the weakest link. Fallback downloads are
+  verified like any other.
+- **Archives fetched from GitHub unpacked into the wrong directory.** A
+  GitHub auto-tag archive expands to `<repo>-<tag>`, not the release
+  directory the build step expects, so a fallback-sourced source tree was
+  invisible to `make`. `align_archive_top_dir()` repacks it before unpacking.
+- **A mirror 404 was not treated as a failure**, so a 404 could be recorded as
+  a completed download.
+
+*Virtual host management, 14 commits merged 2026-09-26 (+325/-114, 44% of
+this release's diff):*
+
+- **Let's Encrypt had four consecutive defects on the failure path.** The
+  pre-flight check only warned and let the run continue; the post-failure
+  cleanup covered some intermediate steps but not all, so a failed issuance
+  left partial state behind; and the install-cert guards were broken at
+  runtime. All three are fixed — a failed pre-flight now stops the run instead
+  of warning past it.
+- **A failed or deleted vhost could take down unrelated sites.** The shared
+  rewrite templates under `conf/rewrite/` were removed along with the vhost,
+  so every other site referencing that template started returning 500. They
+  are no longer deleted on failure or on delete.
+- **`ssl_stapling` was enabled unconditionally**, including for certificates
+  with no OCSP responder of their own, where it slows the handshake and can
+  fail it. It is now gated on the certificate's own responder.
+- **A stale `https-redirect` block broke SSL vhost creation** — it referenced
+  state that no longer existed at that point in the generated config. Dropped.
+- **`acme-challenge` was caught by the HTTPS redirect**, so certificate
+  renewal was blocked by the site's own 301. Exempted.
+- **VeryNginx's injection was incomplete for proxied vhosts** — the
+  `$vn_proxy_*` variables and the `@vn_proxy` location were missing, so a
+  reverse-proxied site under WAF could not route. Both are now emitted.
+- **Proxied vhost configs carried duplicate redirect and anti-hotlinking
+  blocks.** Removed.
+- **The magento2 rewrite branch used positional `sed` insertions** that broke
+  when anything above them shifted. It now anchors on template markers.
+- `https_flag` redirect insertions are now verified to have landed instead of
+  being assumed to have.
+- Domain extraction accepts arbitrary indentation, quotes and trailing
+  comments; `Del_NGX_Vhost` reports the canonical path; proxied vhost deletion
+  and its domain list were fixed.
+- **CRLF line endings silently broke version loading.** A `download_sources.sh`
+  or `vhost.sh` carrying CRLF made `load_versions` parse to empty values, so
+  version numbers resolved to nothing. Line endings are normalised to LF, a
+  static guard rejects a regression, and `.gitattributes` now pins
+  `*.sh text eol=lf` so the editor cannot reintroduce it.
+
+*Install, upgrade and backup correctness, merged earlier in this cycle:*
 
 - **README documented the wrong database options in three places** — the
   component list was missing MySQL 9.7 and MariaDB 12.3, the `db_option`
@@ -111,6 +193,13 @@ Work merged after v1.7.5 and not yet cut into a release.
 
 ### Changed
 
+- **The `sysv-rc` static guard was removed along with the package.** The guard
+  asserted the package was absent from `ubuntu_pkgs`, but the offending entry
+  lived in `pkgCommon` — the shared list — so the guard never fired on the bug
+  it was written for. The package is now gone from the tree, which left the
+  guard with nothing to assert, so it was dropped too. Nothing now prevents
+  `sysv-rc` being re-added to `pkgCommon`; re-adding it re-breaks the
+  dependency install on all four supported distributions.
 - **shellcheck `warning` level is now a CI gate**, not advisory (28 findings →
   0). `info` level (252 findings) remains advisory so it can be burned down
   without blocking releases. The gate runs at `-S warning`.
@@ -121,6 +210,12 @@ Work merged after v1.7.5 and not yet cut into a release.
 
 ### Added
 
+- **Four GitHub-accelerator knobs in `options.conf`**:
+  `GITHUB_ACCELERATOR_URL` (the fallback itself), plus
+  `GITHUB_SPEED_MIN_KBPS`, `GITHUB_SPEED_TEST_SECONDS` and
+  `GITHUB_SPEED_SAMPLE_BYTES` governing the speed probe that decides whether
+  the accelerator is worth switching to. None of the four is documented in the
+  README's mirror section yet.
 - **Static check #12**: README's database documentation (component list,
   `db_option` mapping, example-command comments) must match the `install.sh`
   menu. Verified against four mutations of the historical bugs.
@@ -293,7 +388,8 @@ board, and several paths reported success regardless of outcome.
 
 - Default memory allocator switched from tcmalloc to jemalloc.
 
-[Unreleased]: https://github.com/nengfeng/lnmp/compare/v1.7.5...HEAD
+[Unreleased]: https://github.com/nengfeng/lnmp/compare/v1.7.6...HEAD
+[1.7.6]: https://github.com/nengfeng/lnmp/compare/v1.7.5...v1.7.6
 [1.7.5]: https://github.com/nengfeng/lnmp/compare/v1.7.4...v1.7.5
 [1.7.4]: https://github.com/nengfeng/lnmp/compare/v1.7.3...v1.7.4
 [1.7.3]: https://github.com/nengfeng/lnmp/compare/v1.7.2...v1.7.3
