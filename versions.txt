@@ -69,7 +69,7 @@ pecl_memcached_ver=3.4.0
 pecl_memcache_ver=8.2
 
 # MongoDB
-pecl_mongodb_ver=2.5.2
+pecl_mongodb_ver=2.5.3
 
 # phpMyadmin
 phpmyadmin_ver=5.2.3
