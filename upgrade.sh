@@ -162,7 +162,7 @@ Show_Help() {
 # Description: Displays an interactive menu for selecting components to upgrade
 Menu() {
   while :; do
-    printf "
+    printf "%b" "
 What Are You Doing?
 \t${CMSG} 1${CEND}. Upgrade Nginx/Tengine/OpenResty
 \t${CMSG} 2${CEND}. Upgrade MySQL/MariaDB

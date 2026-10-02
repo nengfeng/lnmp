@@ -236,7 +236,7 @@ check_functional() {
 
   # SSL certificate check (if exists)
   if [ -d "${web_install_dir}/conf/ssl" ]; then
-    for cert in ${web_install_dir}/conf/ssl/*.crt; do
+    for cert in "${web_install_dir}"/conf/ssl/*.crt; do
       [ -f "${cert}" ] || continue
       domain=$(basename "${cert}" .crt)
       expiry=$(openssl x509 -in "${cert}" -noout -enddate 2>/dev/null | cut -d= -f2)

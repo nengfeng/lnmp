@@ -453,7 +453,7 @@ Input_Add_proxy() {
 Input_Add_domain() {
   if [ "${sslquiet_flag}" != 'y' ]; then
     while :;do
-      printf "
+      printf "%b" "
 What Are You Doing?
 \t${CMSG}1${CEND}. Use HTTP Only
 \t${CMSG}2${CEND}. Generate a self-signed SSL Certificate
@@ -471,7 +471,7 @@ What Are You Doing?
   fi
 
   #Multiple_PHP
-  if [ "$(ls /dev/shm/php*-cgi.sock 2> /dev/null | wc -l)" -ge 2 ]; then
+  if [ "$(find /dev/shm -maxdepth 1 -name 'php*-cgi.sock' 2>/dev/null | wc -l)" -ge 2 ]; then
     if [ "${mphp_flag}" != 'y' ]; then
       PHP_detail_ver=$(${php_install_dir}/bin/php-config --version)
       PHP_main_ver=${PHP_detail_ver%.*}

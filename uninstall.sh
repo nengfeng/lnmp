@@ -504,7 +504,7 @@ Print_Nodejs() {
 
 Menu() {
 while :; do
-  printf "
+  printf "%b" "
 What Are You Doing?
 \t${CMSG} 0${CEND}. Uninstall All
 \t${CMSG} 1${CEND}. Uninstall Nginx/Tengine/OpenResty

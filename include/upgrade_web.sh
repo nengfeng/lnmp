@@ -259,6 +259,10 @@ Upgrade_Nginx() {
     export LUAJIT_LIB=/usr/local/lib
     export LUAJIT_INC=/usr/local/include/luajit-2.1
     ./configure ${nginx_configure_args}
+    # SC2119 is a false positive: compile_check's contract is
+    # "[extra_make_args]" and it reads $1 only. Forwarding "$@" would split
+    # the one argument callers pass ("build core") into two make targets.
+    # shellcheck disable=SC2119
     compile_check
     if [ -f "objs/nginx" ]; then
       echo "Config test with new binary......"
@@ -450,6 +454,8 @@ Upgrade_Tengine() {
     fi
 
     ./configure ${tengine_configure_args} || { fail_msg "Tengine upgrade (configure)"; }
+    # See the nginx call above: compile_check reads $1 by design.
+    # shellcheck disable=SC2119
     compile_check
     if [ -f "objs/nginx" ]; then
       echo "Config test with new binary......"
@@ -568,11 +574,13 @@ Upgrade_OpenResty() {
 
     pushd openresty-${NEW_openresty_ver}
     make clean || true
-    local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
+    local nginx_bundle_dir=$(find bundle -maxdepth 1 -type d -name 'nginx-*' 2>/dev/null | head -1)
     [ -n "$nginx_bundle_dir" ] && sed -i 's@CFLAGS="$CFLAGS -g"@#CFLAGS="$CFLAGS -g"@' "${nginx_bundle_dir}/auto/cc/gcc"
     ./configure --prefix=${openresty_install_dir} --user=${run_user} --group=${run_user} --with-http_stub_status_module --with-http_v2_module --with-http_v3_module --with-http_ssl_module --with-stream --with-stream_ssl_preread_module --with-stream_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-openssl=../openssl-${openssl_ver} --with-pcre=../pcre2-${pcre_ver} --with-pcre-jit --add-module=../ngx_brotli --with-ld-opt="${allocator_ldflag--ljemalloc} -Wl,-u,pcre_version" ${nginx_modules_options} || { fail_msg "OpenResty upgrade (configure)"; }
+    # See the nginx call above: compile_check reads $1 by design.
+    # shellcheck disable=SC2119
     compile_check
-    local nginx_build_dir=$(ls -d build/nginx-* 2>/dev/null | head -1)
+    local nginx_build_dir=$(find build -maxdepth 1 -type d -name 'nginx-*' 2>/dev/null | head -1)
     if [ -n "$nginx_build_dir" ] && [ -f "${nginx_build_dir}/objs/nginx" ]; then
       echo "Config test with new binary......"
       if ! ${nginx_build_dir}/objs/nginx -t; then

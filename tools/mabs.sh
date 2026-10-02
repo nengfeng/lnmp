@@ -113,11 +113,11 @@ BEGINDATETIME=$(date "+%F %T")
 
 [ ! -f $CONFIG_FILE ] && printf "%b" "\033[31mERROR: config \"$CONFIG_FILE\" not exists, please check! \033[0m\n" && exit 1
 
-IP_count=$(egrep -v '^#|^$' $IPLIST|wc -l)
+IP_count=$(grep -cEv '^#|^$' $IPLIST)
 IP_init=1
 while [[ $IP_init -le $IP_count ]]
 do
-  egrep -v '^#|^$' $IPLIST | sed -n "$IP_init,$(expr $IP_init + 50)p" > $IPLIST.tmp
+  grep -Ev '^#|^$' $IPLIST | sed -n "$IP_init,$((IP_init + 50))p" > $IPLIST.tmp
 
   IPSEQ=0
 

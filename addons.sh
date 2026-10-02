@@ -106,7 +106,7 @@ ACTION_FUN() {
 
 Menu() {
   while :;do
-    printf "
+    printf "%b" "
 What Are You Doing?
 \t${CMSG}1${CEND}. Install/Uninstall PHP Composer
 \t${CMSG}2${CEND}. Install/Uninstall fail2ban

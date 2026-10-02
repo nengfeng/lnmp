@@ -80,7 +80,7 @@ Upgrade_DB() {
       break
     else
       echo
-      read -e -p "Please input the root password of database: " NEW_dbrootpwd || { echo "${CFAILURE}No interactive terminal available (stdin closed), aborting.${CEND}" && exit 1; }
+      read -er -p "Please input the root password of database: " NEW_dbrootpwd || { echo "${CFAILURE}No interactive terminal available (stdin closed), aborting.${CEND}" && exit 1; }
       # Same restriction as input_password / --dbrootpwd: these characters
       # cannot survive the sed-based options.conf rewrite below
       case "${NEW_dbrootpwd}" in
@@ -142,11 +142,11 @@ Upgrade_DB() {
         DB_URL=${DOWN_ADDR}/MySQL-$(echo ${NEW_db_ver} | awk -F. '{print $1"."$2}')/${DB_filename}.tar.xz
       fi
       local db_archive_file=""
-      for _f in ${DB_filename}.tar.?z; do
+      for _f in "${DB_filename}".tar.?z; do
         [ -s "$_f" ] && db_archive_file="$_f" && break
       done
       [ -z "${db_archive_file}" ] && { wget -c "${DB_URL}" > /dev/null 2>&1 || rm -f "${DB_filename}.tar.gz" "${DB_filename}.tar.xz" 2>/dev/null; }
-      for _f in ${DB_filename}.tar.?z; do
+      for _f in "${DB_filename}".tar.?z; do
         [ -s "$_f" ] && db_archive_file="$_f" && break
       done
       if [ -n "${db_archive_file}" ]; then
@@ -162,14 +162,14 @@ Upgrade_DB() {
   done
 
   local db_archive_file=""
-  for _f in ${DB_filename}.tar.?z; do
+  for _f in "${DB_filename}".tar.?z; do
     [ -s "$_f" ] && db_archive_file="$_f" && break
   done
   if [ -z "${db_archive_file}" ]; then
     echo "Downloading ${CMSG}${DB_URL}${CEND}......"
     wget -c "${DB_URL}" > /dev/null 2>&1 || rm -f "${DB_filename}.tar.gz" "${DB_filename}.tar.xz" 2>/dev/null
   fi
-  for _f in ${DB_filename}.tar.?z; do
+  for _f in "${DB_filename}".tar.?z; do
     [ -s "$_f" ] && db_archive_file="$_f" && break
   done
 

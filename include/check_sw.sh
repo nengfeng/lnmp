@@ -109,7 +109,7 @@ apt_install_packages() {
     # per-release rename. Both counts should be large on a healthy index.
     echo "${CWARNING}--- apt index ---${CEND}"
     echo "  apt-cache pkgnames: $(apt-cache pkgnames 2> /dev/null | wc -l)"
-    echo "  Packages lists    : $(ls /var/lib/apt/lists/*Packages* 2> /dev/null | wc -l)"
+    echo "  Packages lists    : $(find /var/lib/apt/lists -maxdepth 1 -name '*Packages*' 2>/dev/null | wc -l)"
     for Package in ${suspect}; do
       echo "  ${Package}:"
       apt-cache policy "${Package}" 2>&1 | sed -n '1,4{s/^/    /;p}'

@@ -270,7 +270,7 @@ install_web_server() {
   if [[ "${server_type}" == "nginx" ]]; then
     close_gcc_debug "$(pwd)"
   elif [[ "${server_type}" == "openresty" ]]; then
-    local nginx_bundle_dir=$(ls -d bundle/nginx-* 2>/dev/null | head -1)
+    local nginx_bundle_dir=$(find bundle -maxdepth 1 -type d -name 'nginx-*' 2>/dev/null | head -1)
     [ -n "$nginx_bundle_dir" ] && close_gcc_debug "$nginx_bundle_dir"
   fi
   
