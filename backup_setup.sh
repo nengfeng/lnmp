@@ -164,7 +164,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 2)" ]; then
     read -e -p "Please enter the remote host user(Default: root) : " remote_user
     remote_user=${remote_user:-root}
     echo
-    read -e -p "Please enter the remote host password: " remote_password
+    read -er -p "Please enter the remote host password: " remote_password
     IPcode=$(echo "ibase=16;$(echo "${remote_address}" | xxd -ps -u)"|bc|tr -d '\\'|tr -d '\n')
     Portcode=$(echo "ibase=16;$(echo "${remote_port}" | xxd -ps -u)"|bc|tr -d '\\'|tr -d '\n')
     PWcode=$(echo "ibase=16;$(echo "$remote_password" | xxd -ps -u)"|bc|tr -d '\\'|tr -d '\n')
@@ -246,7 +246,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 3)" ]; then
     read -e -p "Please enter the aliyun oss Access Key ID: " KeyID
     [ -z "${KeyID}" ] && continue
     echo
-    read -e -p "Please enter the aliyun oss Access Key Secret: " KeySecret
+    read -er -p "Please enter the aliyun oss Access Key Secret: " KeySecret
     [ -z "${KeySecret}" ] && continue
     ossutil ls -e ${Host} -i ${KeyID} -k ${KeySecret} > /dev/null 2>&1
     if [ $? -eq 0 ]; then
@@ -319,7 +319,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 4)" ]; then
     read -e -p "Please enter the Qcloud COS SECRET_ID: " SECRET_ID
     [ -z "${SECRET_ID}" ] && continue
     echo
-    read -e -p "Please enter the Qcloud COS SECRET_KEY: " SECRET_KEY
+    read -er -p "Please enter the Qcloud COS SECRET_KEY: " SECRET_KEY
     [ -z "${SECRET_KEY}" ] && continue
     echo
     read -e -p "Please enter the Qcloud COS BUCKET: " COS_BUCKET
@@ -375,7 +375,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 5)" ]; then
     read -e -p "Please enter the upyun Operator: " Operator
     [ -z "${Operator}" ] && continue
     echo
-    read -e -p "Please enter the upyun Password: " Password
+    read -er -p "Please enter the upyun Password: " Password
     [ -z "${Password}" ] && continue
     echo
     upx login ${ServiceName} ${Operator} ${Password} > /dev/null 2>&1
@@ -437,7 +437,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 6)" ]; then
     read -e -p "Please enter the qiniu AccessKey: " AccessKey
     [ -z "${AccessKey}" ] && continue
     echo
-    read -e -p "Please enter the qiniu SecretKey: " SecretKey
+    read -er -p "Please enter the qiniu SecretKey: " SecretKey
     [ -z "${SecretKey}" ] && continue
     echo
     read -e -p "Please enter the qiniu bucket: " QINIU_BUCKET
@@ -527,7 +527,7 @@ if [ -n "$(echo ${desc_bk} | grep -w 7)" ]; then
     read -e -p "Please enter the AWS Access Key: " ACCESS_KEY
     [ -z "${ACCESS_KEY}" ] && continue
     echo
-    read -e -p "Please enter the AWS Secret Key: " SECRET_KEY
+    read -er -p "Please enter the AWS Secret Key: " SECRET_KEY
     [ -z "${SECRET_KEY}" ] && continue
     aws configure set aws_access_key_id ${ACCESS_KEY}
     aws configure set aws_secret_access_key ${SECRET_KEY}

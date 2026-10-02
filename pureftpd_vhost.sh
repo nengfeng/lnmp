@@ -112,7 +112,7 @@ PASSWORD() {
   while :; do
     if [ "${password_flag}" != 'y' ]; then
       echo
-      read -e -p "Please input the password: " Password
+      read -er -p "Please input the password: " Password
     fi
     [ -n "$(echo ${Password} | grep '[+|&]')" ] && { echo "${CWARNING}input error,not contain a plus sign (+) and &${CEND}"; continue; }
     if (( ${#Password} >= 5 )); then
@@ -220,7 +220,7 @@ ShowUser() {
 
 Menu() {
   while :; do
-    printf "
+    printf "%b" "
 What Are You Doing?
 \t${CMSG}1${CEND}. UserAdd
 \t${CMSG}2${CEND}. UserMod

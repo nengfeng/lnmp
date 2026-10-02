@@ -309,7 +309,11 @@ input_password() {
   fi
 
   while :; do
-    read -e -p "${prompt} (default: ${default}): " value
+    # -r is mandatory here, not cosmetic: without it read treats a backslash
+    # as an escape, so a password typed as p@ss\word is silently stored as
+    # p@ssword. The user's idea of the password and the real one then differ
+    # with nothing on screen to say so.
+    read -er -p "${prompt} (default: ${default}): " value
     value=${value:-${default}}
     # Reject dangerous characters (+, |, &) — use case instead of [[ =~ ]]
     # because bash parses bare '&' inside [[ ]] as a logical operator,
