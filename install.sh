@@ -534,6 +534,10 @@ if [[ ${nginx_option} =~ ^[1-3]$ ]]; then
   [ ! -d "${wwwlogs_dir}" ] && mkdir -p "${wwwlogs_dir}"
 fi
 # Create www user before setting permissions (nginx/php-fpm runs as www)
+# SC2119 is a false positive: create_run_user takes optional $1/$2 that
+# default to ${run_user}/${run_group}; this call site means "use the
+# configured values", not "forward the script's arguments".
+# shellcheck disable=SC2119
 [[ ${nginx_option} =~ ^[1-3]$ ]] && create_run_user
 # Set improved permissions for /data to enhance security
 setup_web_directory_permissions

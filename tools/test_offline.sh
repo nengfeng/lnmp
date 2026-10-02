@@ -291,6 +291,11 @@ gpg --batch --yes --output "$pgp_dir/src/artifact.tar.gz.asc" --detach-sign "$pg
 gpg --armor --export "offline@test.invalid" > "$pgp_dir/keys/test.asc" 2>/dev/null   && [ -s "$pgp_dir/keys/test.asc" ] && ok "public key exported for the keys/ fixture" || ko "could not export the public key"
 
 pgp_run() {  # pgp_run <gnupghome> <keydir> -> rc of verify_checksum (asc)
+  # SC2030/SC2031 below: re-exporting GNUPGHOME inside the subshell is the
+  # point of this helper - every PGP case needs its own keyring, and the
+  # caller's GNUPGHOME must come back untouched. shellcheck reads the
+  # subshell as an accidental write; it is deliberate isolation.
+  # shellcheck disable=SC2030,SC2031
   (
     set +e
     export GNUPGHOME="$1"
@@ -308,10 +313,15 @@ pgp_run() {  # pgp_run <gnupghome> <keydir> -> rc of verify_checksum (asc)
   )
 }
 
+# pgp_run re-exports GNUPGHOME inside a subshell (see the function above);
+# reading $GNUPGHOME at the call sites below is therefore intentional, not a
+# lost write. SC2031 is a false positive at all three.
+# shellcheck disable=SC2031
 pgp_run "$GNUPGHOME" "$pgp_dir/keys"; pgp_rc=$?; [ "$pgp_rc" -eq 0 ]   && ok "good signature verifies (rc 0)" || ko "good signature rejected (rc=$pgp_rc)"
 
 printf 'tampered
 ' >> "$pgp_dir/src/artifact.tar.gz"
+# shellcheck disable=SC2031
 pgp_run "$GNUPGHOME" "$pgp_dir/keys"; pgp_rc=$?; [ "$pgp_rc" -ne 0 ]   && ok "tampered file is rejected (BAD signature)" || ko "tampered file PASSED verification"
 # restore the pristine artifact for the remaining cases
 printf 'payload-line
@@ -319,10 +329,14 @@ printf 'payload-line
 
 pgp_dir_empty="$work/pgp-empty-keys"
 mkdir -p "$pgp_dir_empty"
+# shellcheck disable=SC2031
 pgp_run "$GNUPGHOME" "$pgp_dir_empty"; pgp_rc=$?; [ "$pgp_rc" -ne 0 ]   && ok "missing keys/ directory fails verification" || ko "missing keys/ directory PASSED verification"
 
 pgp_run "$work/pgp/no-such-home" "$pgp_dir/keys"; pgp_rc=$?; [ "$pgp_rc" -ne 0 ]   && ok "signer key not in keyring fails verification (gpg exit 2)" || ko "unverifiable signature PASSED"
 
+# Same reasoning as pgp_run above: a throwaway keyring for the
+# "gpg is missing" case, isolated on purpose.
+# shellcheck disable=SC2031
 (
   set +e
   export GNUPGHOME="$GNUPGHOME"

@@ -7,8 +7,36 @@
 #   error   - fails the gate (syntax / obvious defects)
 #   warning - fails the gate; the 28 historical findings were fixed, not
 #             silenced, and the ratchet was tightened to keep it there
-#   info    - reported, advisory only (SC2162 read without -r, SC2015 a &&
-#             b || c, ... 252 findings across 86 files - style, not signal)
+#   info    - reported, advisory only; measured at 304 findings across 86
+#             files. Triage as of 2026-09-30. Every finding that was either a
+#             real defect or a verified false positive is now resolved, so
+#             what remains is 100% deliberate idiom:
+#
+#               SC2015 154  a && b || c - the codebase's set-or-fail habit
+#               SC2162  84  read without -r; every CREDENTIAL read now uses
+#                            -r (see input_password), the rest read menu
+#                            choices / domains / versions where a backslash
+#                            cannot appear
+#               SC1091  34  dynamic `. ./include/*.sh` cannot be followed
+#               SC2317  11  functions invoked indirectly look unreachable
+#               SC2016  11  single quotes around $ are intentional
+#               SC1003  10  ${x:1:2} string slicing
+#
+#             Resolved 2026-09-30 (were 38 findings):
+#               real defect, fixed
+#                 SC2012   6  `ls` used to parse directory names
+#                 SC2059   5  variables inside a printf format string
+#                 SC2196   2  deprecated egrep
+#                 SC2231   5  unquoted glob in a for-loop head
+#               verified false positive, silenced at the site with a reason
+#                 SC2028   1  init_Ubuntu.sh must leave PS1 backslashes literal
+#                 SC2030   1  test_offline.sh pgp_run isolates each PGP case
+#                 SC2031   5  in a subshell on purpose
+#                 SC2119   4  compile_check / create_run_user read $1 by design
+#
+#             These are NOT blanket-disabled: a new real instance of any of
+#             them still fails the warning gate, and the site-level disables
+#             each carry the reasoning inline.
 #
 # Subtle behavioral bugs (swallowed pipeline exits, CWD leaks, unguarded
 # extractions) are caught by tools/lint/static_checks.sh and

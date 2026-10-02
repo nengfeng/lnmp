@@ -22,6 +22,11 @@ EOF
 sed -i 's@^"syntax on@syntax on@' /etc/vim/vimrc
 
 # PS1
+# SC2028 is a false positive here: the backslashes must stay LITERAL in
+# ~/.bashrc so that bash expands \[ \] \e \u ... when it renders the prompt.
+# Using printf "%b" would bake real ESC bytes into .bashrc instead, which
+# works but is unreadable and inconsistent with the sibling lines below.
+# shellcheck disable=SC2028
 [ -z "$(grep ^PS1 ~/.bashrc)" ] && echo "PS1='\${debian_chroot:+(\$debian_chroot)}\\[\\e[1;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ '" >> ~/.bashrc
 
 # history
