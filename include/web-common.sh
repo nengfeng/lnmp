@@ -204,7 +204,7 @@ install_web_server() {
   if [ ! -e "/usr/local/lib/lua/5.1/resty/core.lua" ]; then
     _extract_tar "lua-resty-core-${lua_resty_core_ver}.tar.gz" || fail_msg "${server_type}"
     pushd "lua-resty-core-${lua_resty_core_ver}" > /dev/null
-    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1
+    make install LUA_LIB_DIR=/usr/local/lib/lua/5.1 || fail_msg "lua-resty-lrucache" || fail_msg "lua-resty-core"
     popd > /dev/null
     rm -rf "lua-resty-core-${lua_resty_core_ver}"
   fi
