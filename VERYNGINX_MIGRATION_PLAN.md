@@ -339,7 +339,9 @@ verynginx_check_prereqs() {
   # 当成「卸载时的清理问题」，风险表写错方向。
   if ! command -v python3 >/dev/null 2>&1; then
     echo "${CWARNING}python3 is required by VeryNginx (config patching + password hashing).${CEND}"
-    if [ "${os_type}" = debian ] || [ "${os_type}" = ubuntu ]; then
+    # os_type 由 include/check_os.sh 设置（Family=debian/ubuntu）
+    # vhost.sh / uninstall.sh / upgrade.sh / install.sh / addons.sh 均已 source
+    if [ "${Family}" = "debian" ] || [ "${Family}" = "ubuntu" ]; then
       echo "${CMSG}Installing python3 ...${CEND}"
       apt-get update -qq
       apt-get install -y python3 || { echo "${CFAILURE}Failed to install python3${CEND}"; return 1; }
@@ -592,6 +594,7 @@ _verynginx_keep_configs() {
   [ -d "${vn_dir}/configs" ] || return 0
 
   local move_configs="y"
+  # quiet_flag 由 uninstall.sh 的 --yes 参数设置（uninstall.sh:68-69）
   if [ "${quiet_flag}" != 'y' ] && [ -t 0 ]; then
     read -e -p "Move ${vn_dir}/configs to ${vn_dir}_configs_bak? (y/n): " move_configs
   fi
@@ -1072,8 +1075,14 @@ if __name__ == '__main__':
       add_header X-Frame-Options \"SAMEORIGIN\" always;
       add_header X-XSS-Protection \"1; mode=block\" always;
       add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'\" always;
+      # 显式空块：location 级 access/log_by_lua_block（即使为空）会替换 server 级的
+      # access_by_lua_file/log_by_lua_file，导致 WAF 对该路径失效。
+      # 上游 install-lnmp.sh 的 replace_server_block() 同样注入这两行。
+      access_by_lua_block { }
+      log_by_lua_block { }
   }
   location /verynginx/ {
+      # Managed by router plugin; no content handler needed
   }"
         echo "${CMSG}VeryNginx WAF enabled for this vhost${CEND}"
       else
@@ -1199,8 +1208,9 @@ fi
 # Skipped when ./VeryNginx is absent (not cloned).
 ```
 
-检查逻辑：以 `location / {` 为分界，比较「除该块以外的所有非注释行」的集合，
-注释行不参与比较（上游注释解释性很强，LNMP 副本里没有也无害）。
+检查逻辑：以 `try_files` 为分界标记（`location /` 块的唯一特征行），
+比较「分界之前的所有非注释行」的集合。这样即使 `location /verynginx/` 等
+其他 location 块出现在中间，也不会被误判为分界。
 VeryNginx 源码不存在时 SKIP 而非 FAIL（CI 容器里没有 clone，见 §8.4）。
 
 #### 5.2.11 `health_check.sh` / `backup.sh`（v2 从 §11 提前到本期）
@@ -1243,11 +1253,14 @@ VeryNginx 源码不存在时 SKIP 而非 FAIL（CI 容器里没有 clone，见 �
 1. ./addons.sh --verynginx -i
    - verynginx_check_prereqs：检查/安装 python3，检查 nginx + lua-nginx-module
    - _verynginx_remove_legacy_lua_waf：移除 `include waf.conf;` + conf/{waf,waf.conf}
+   - 定位源码目录：current_dir/VeryNginx → /opt/VeryNginx → /root/VeryNginx
    - 备份 nginx.conf 为 nginx.conf.lnmp-pre-verynginx.<ts>
-   - 交互式：按提示设置 Dashboard 管理员密码
+   - _verynginx_seed_admin_if_needed：非交互场景预置 admin 密码
+     交互式：按提示设置 Dashboard 管理员密码
      非交互式：export VN_ADMIN_PASSWORD=... （否则上游生成随机密码并打进日志）
    - 上游 install-lnmp.sh：部署到 /opt/verynginx + 注入 nginx.conf
    - _verynginx_reconcile_firewall_helper：移除非预期的 firewall-helper
+   - 验证：verynginx_is_installed && verynginx_is_enabled
 
 2. 验证
    - /usr/local/nginx/sbin/nginx -t
@@ -1346,7 +1359,7 @@ VeryNginx 的 lua 钩子在 server 级别，与 PHP 版本无关。多 PHP 版�
 | VeryNginx 卸载 | `./addons.sh --verynginx -u` | 卸载成功，`nginx -t` 通过，**无残留 systemd 单元** |
 | 重复安装 | 连续运行两次 | 第二次提示已安装，并提示用 `tools/upgrade.sh` 升级 |
 | 重复卸载 | 连续运行两次 | 第二次提示未安装 |
-| 自定义前缀 | `./addons.sh --verynginx --verynginx_prefix /data/vn2 -i` | 安装到 `/data/vn2`；**再跑一次安装应识别为「已安装」**（E4 回归） |
+| 自定义前缀 | `./addons.sh --verynginx_prefix /data/vn2 --verynginx -i` | 安装到 `/data/vn2`；**再跑一次安装应识别为「已安装」**（E4 回归） |
 | 缺 python3 | 在无 python3 的容器里 `-i` | 自动装 python3 后继续；装不上则明确报错而非让上游 die |
 | 缺 lua 模块 | 用未编译 Lua 的 nginx `-i` | 提示先跑 `./upgrade.sh --nginx` |
 
@@ -1381,7 +1394,8 @@ VeryNginx 的 lua 钩子在 server 级别，与 PHP 版本无关。多 PHP 版�
 - name: Install VeryNginx
   run: |
     # 外网可达性由 workflow 自行保证；pin 与方案基线一致
-    git clone --depth 1 https://github.com/nengfeng/VeryNginx ./VeryNginx
+    # 先无检出克隆，再 fetch 特定 commit（--depth 1 只保留最新历史，无法直接 fetch）
+    git clone --no-checkout https://github.com/nengfeng/VeryNginx ./VeryNginx
     git -C ./VeryNginx fetch --depth 1 origin 616becc8a2cbc554166cbf0e03147ba3e43aa745
     git -C ./VeryNginx checkout 616becc8a2cbc554166cbf0e03147ba3e43aa745
     VN_ADMIN_PASSWORD=ci-smoke-pwd ./addons.sh --verynginx -i
