@@ -9,8 +9,8 @@ pcre_ver=10.49
 nghttp2_ver=1.59.0
 
 # DB
-mysql97_ver=9.7.2
-mysql84_ver=8.4.11
+mysql97_ver=9.7.4
+mysql84_ver=8.4.13
 mysql80_ver=8.0.46
 
 # glibc tag baked into the MySQL binary tarball filename (the -linux-glibcX.YY
@@ -87,7 +87,7 @@ boost_ver=1.77.0
 # Others
 ngx_devel_kit_ver=0.3.4
 lua_nginx_module_ver=0.10.32rc6
-luajit2_ver=2.1-20261015
+luajit2_ver=2.1-20261021
 lua_resty_core_ver=0.1.35rc1
 lua_resty_lrucache_ver=0.15
 lua_cjson_ver=2.1.0.20
