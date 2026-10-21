@@ -243,3 +243,4 @@ echo "====================================="
 echo "Passed: ${pass}, Failed: ${fail}"
 [ "$fail" -eq 0 ] || exit 1
 echo "All tests passed."
+exit 0

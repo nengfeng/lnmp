@@ -116,3 +116,4 @@ fi
 cp "$new_pin" "$PIN_FILE"
 echo
 echo "已更新 ${PIN_FILE}"
+exit 0

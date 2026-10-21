@@ -429,19 +429,24 @@ _gh_pick_address() {
 _gh_set_primary_resolve() {
   local host="$1" ip="$2"
   [ -n "$ip" ] || return 1
-  local -a out=()
+  # The array is called "args", not "out": "out" is a plain string in the
+  # download functions of this file, and shellcheck follows the sourced
+  # files, so an array and a string sharing a name make it report "variable
+  # was used as an array but is now assigned a string" in every file that
+  # sources this one.
+  local -a args=()
   local a found="no"
   for a in "${_GH_RESOLVE_ARGS[@]}"; do
     case "$a" in
       "${host}:443:"*)
-        out+=( "${host}:443:${ip}" )
+        args+=( "${host}:443:${ip}" )
         found="yes"
         ;;
-      *) out+=( "$a" ) ;;
+      *) args+=( "$a" ) ;;
     esac
   done
-  [ "$found" = "yes" ] || out+=( --resolve "${host}:443:${ip}" )
-  _GH_RESOLVE_ARGS=( "${out[@]}" )
+  [ "$found" = "yes" ] || args+=( --resolve "${host}:443:${ip}" )
+  _GH_RESOLVE_ARGS=( "${args[@]}" )
   return 0
 }
 

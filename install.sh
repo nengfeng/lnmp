@@ -296,7 +296,11 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
     # 会被污染，而这正是脚本自身校验和清单的来源。
     md5_tmp=""
     if [ "${GH_DIRECT_ENABLED:-y}" != "n" ]; then
-      local _md5_pin_file="${TMPDIR:-/tmp}/lnmp_md5sum.$$"
+      # Not "local": this is top level, not inside a function. Bash refuses
+      # "local" outside a function — it prints an error, returns 1, and
+      # leaves the variable unset, which silently disabled the pinned
+      # download below.
+      _md5_pin_file="${TMPDIR:-/tmp}/lnmp_md5sum.$$"
       if gh_direct_download "${md5_url}" "${_md5_pin_file}" 2>/dev/null && [ -s "${_md5_pin_file}" ]; then
         md5_tmp=$(cat "${_md5_pin_file}")
       fi
@@ -322,7 +326,7 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
     sha_url="https://raw.githubusercontent.com/nengfeng/lnmp/main/sha256sum.txt"
     sha_tmp=""
     if [ "${GH_DIRECT_ENABLED:-y}" != "n" ]; then
-      local _sha_pin_file="${TMPDIR:-/tmp}/lnmp_sha256sum.$$"
+      _sha_pin_file="${TMPDIR:-/tmp}/lnmp_sha256sum.$$"
       if gh_direct_download "${sha_url}" "${_sha_pin_file}" 2>/dev/null && [ -s "${_sha_pin_file}" ]; then
         sha_tmp=$(cat "${_sha_pin_file}")
       fi
