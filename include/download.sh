@@ -97,14 +97,19 @@ _url_availability_wget() {
 # Build a GitHub accelerator URL. Empty output means this URL has no accelerator.
 github_accelerator_url() {
   local url="$1"
-  local accelerator="${GITHUB_ACCELERATOR_URL:-}"
-  if [ -z "${accelerator}" ] || [[ "${url}" != "https://github.com/"* ]]; then
-    # Returns success, not "no accelerator": the caller captures this in a
-    # command substitution, and under "set -e" a non-zero status there would
-    # terminate the install for a URL that simply has no accelerator.
+  # Returns success, not "no accelerator": the caller captures this in a
+  # command substitution, and under "set -e" a non-zero status there would
+  # terminate the install for a URL that simply has no accelerator.
+  [[ "${url}" == "https://github.com/"* ]] || return 0
+  if command -v gh_accelerator_list >/dev/null 2>&1; then
+    local first
+    first=$(gh_accelerator_list | head -1)
+    [ -n "$first" ] && printf '%s\n' "${first}/${url}"
     return 0
   fi
-  printf '%s\n' "${accelerator%/}/${url}"
+  local accelerator="${GITHUB_ACCELERATOR_URL:-}"
+  [ -n "$accelerator" ] && printf '%s\n' "${accelerator%/}/${url}"
+  return 0
 }
 
 # Probe a URL's transfer speed with a short ranged curl sample.
@@ -136,6 +141,23 @@ github_speed_min_bytes() {
 github_accelerator_urls() {
   local -n _urls=$1
   local _acc
+  local _u
+  # Every configured accelerator becomes a fallback source, not just the first
+  # one: these services come and go, and one dead accelerator would otherwise
+  # take the whole mainland fallback path down with it.
+  if command -v gh_accelerator_urls_for >/dev/null 2>&1; then
+    for _u in "${_urls[@]}"; do
+      for _acc in $(gh_accelerator_urls_for "${_u}"); do
+        local _found="no"
+        local _x
+        for _x in "${_urls[@]}"; do
+          [ "$_x" = "${_acc}" ] && _found="yes" && break
+        done
+        [ "$_found" = "no" ] && _urls+=( "${_acc}" )
+      done
+    done
+    return 0
+  fi
   for _acc in $(for _u in "${_urls[@]}"; do github_accelerator_url "${_u}"; done); do
     local _found="no"
     local _u
@@ -207,10 +229,18 @@ Download_src() {
     min_speed=$(github_speed_min_bytes)
     pinned_speed=$(gh_direct_speed_probe "${urls[0]}" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
     if [ -n "$pinned_speed" ] && [ "$pinned_speed" -lt "${min_speed}" ]; then
-      echo "${CMSG}Pinned path looks slow (${pinned_speed} B/s < ${min_speed} B/s); switching to the accelerator${CEND}"
-      local accel_url reordered=() _u
-      accel_url=$(github_accelerator_url "${urls[0]}")
+      # Every configured accelerator is measured and the fastest one is used.
+      # A single dead accelerator would otherwise take the whole fallback
+      # path down with it.
+      local accel_url=""
+      if command -v gh_fastest_accelerator >/dev/null 2>&1; then
+        accel_url=$(gh_fastest_accelerator "${urls[0]}" "${min_speed}" || true)
+      else
+        accel_url=$(github_accelerator_url "${urls[0]}")
+      fi
       if [ -n "$accel_url" ]; then
+        echo "${CMSG}Pinned path looks slow (${pinned_speed} B/s < ${min_speed} B/s); switching to the accelerator${CEND}"
+        local reordered=() _u
         reordered+=( "${accel_url}" )
         for _u in "${urls[@]}"; do
           [ "$_u" = "${accel_url}" ] && continue
@@ -286,9 +316,13 @@ Download_src() {
     last_url="${url}"
 
     # 记下这个包是从加速器来的（如果是从加速器来的话）。
-    case "$url" in
-      "${GITHUB_ACCELERATOR_URL%/}/"*) GH_TARBALL_SOURCE="accelerator" ;;
-    esac
+    if command -v gh_is_accelerator_url >/dev/null 2>&1; then
+      gh_is_accelerator_url "$url" && GH_TARBALL_SOURCE="accelerator"
+    else
+      case "$url" in
+        "${GITHUB_ACCELERATOR_URL%/}/"*) GH_TARBALL_SOURCE="accelerator" ;;
+      esac
+    fi
 
     if [ "${i}" -eq 0 ]; then
       echo "${CMSG}Downloading ${file_name}...${CEND}"

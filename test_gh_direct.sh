@@ -129,6 +129,31 @@ check "no accelerator configured returns success" "0" "$?"
 check "no accelerator configured prints nothing" "" "${out}"
 
 # --------------------------------------------------------------------------
+# The accelerator list.
+#
+# A single accelerator is a single point of failure for the mainland
+# fallback path, and these services do go away. The primary value stays a
+# single URL because many places build "${GITHUB_ACCELERATOR_URL%/}/${url}";
+# the extra ones live in their own variable.
+# --------------------------------------------------------------------------
+echo
+echo "Accelerator list:"
+GITHUB_ACCELERATOR_URL="https://a.example"
+GITHUB_ACCELERATOR_FALLBACKS="https://b.example https://c.example"
+list=$(gh_accelerator_list)
+check "three accelerators are configured" "3" "$(printf '%s\n' "$list" | wc -l | tr -d ' ')"
+check "the primary accelerator comes first" "https://a.example" "$(printf '%s\n' "$list" | head -1)"
+
+GITHUB_ACCELERATOR_FALLBACKS="https://b.example,https://a.example"
+list=$(gh_accelerator_list)
+check "a duplicate is dropped" "2" "$(printf '%s\n' "$list" | wc -l | tr -d ' ')"
+
+GITHUB_ACCELERATOR_FALLBACKS=""
+check "the accelerator URL is built correctly" \
+  "https://a.example/https://github.com/x/y" \
+  "$(github_accelerator_url 'https://github.com/x/y')"
+
+# --------------------------------------------------------------------------
 # The pinned checksum must be found regardless of the current directory.
 # --------------------------------------------------------------------------
 echo

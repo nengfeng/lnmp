@@ -481,6 +481,104 @@ gh_direct_speed_probe() {
   printf '%d\n' "$(( bytes * 1000000000 / ns ))"
 }
 
+# The accelerators to try, in order.
+#
+# GITHUB_ACCELERATOR_URL stays a single value: it is referenced by name in
+# many places (install.sh, vhost.sh, backup_setup.sh, sources.conf) and all
+# of them build "${GITHUB_ACCELERATOR_URL%/}/${url}". The extra fallbacks
+# live in their own variable, used only by the download layer.
+#
+# The reason for a list at all: these services come and go, and one dead
+# accelerator is a single point of failure for the mainland fallback path.
+# The accelerator only carries bytes — the expected checksum is pinned in the
+# repository — so a list of them costs nothing in trust terms.
+gh_accelerator_list() {
+  local all one
+  all="${GITHUB_ACCELERATOR_URL:-} ${GITHUB_ACCELERATOR_FALLBACKS:-}"
+  local -a seen=()
+  for one in ${all//,/ }; do
+    one="${one%/}"
+    [ -n "$one" ] || continue
+    local dup="no" s
+    for s in "${seen[@]}"; do
+      [ "$s" = "$one" ] && dup="yes" && break
+    done
+    [ "$dup" = "yes" ] && continue
+    seen+=("$one")
+    printf '%s\n' "$one"
+  done
+  return 0
+}
+
+# The accelerator URL for a GitHub URL, one per accelerator.
+gh_accelerator_urls_for() {
+  local url="$1" accel
+  [[ "${url}" == "https://github.com/"* ]] || return 0
+  while read -r accel; do
+    [ -n "$accel" ] && printf '%s\n' "${accel}/${url}"
+  done < <(gh_accelerator_list)
+  return 0
+}
+
+# Is this URL served by one of the accelerators?
+gh_is_accelerator_url() {
+  local url="$1" accel
+  while read -r accel; do
+    [ -n "$accel" ] || continue
+    case "$url" in
+      "${accel}/"*) return 0 ;;
+    esac
+  done < <(gh_accelerator_list)
+  return 1
+}
+
+# Measure a URL's transfer speed with a short ranged sample.
+# Prints bytes/sec; prints nothing when the probe could not run.
+gh_url_speed() {
+  local url="$1"
+  local sample_bytes="${2:-524288}"
+  local max_time="${3:-8}"
+  command -v curl >/dev/null 2>&1 || return 1
+  local raw
+  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null \
+          -r "0-$((sample_bytes - 1))" -w '%{speed_download}' \
+          "${url}" 2>/dev/null || true)
+  [ -n "$raw" ] || return 1
+  printf '%d\n' "${raw%.*}"
+}
+
+# The fastest accelerator for a URL.
+#
+# Prints "<accelerator>/<url>" for the fastest accelerator that reaches the
+# threshold. When none reaches it, the fastest one that answered at all is
+# printed — a slow accelerator still beats no accelerator.
+gh_fastest_accelerator() {
+  local url="$1"
+  local min_speed="${2:-0}"
+  command -v curl >/dev/null 2>&1 || return 1
+
+  local accel best="" best_speed=0
+  while read -r accel; do
+    [ -n "$accel" ] || continue
+    local candidate="${accel}/${url}"
+    local speed
+    speed=$(gh_url_speed "$candidate" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
+    [ -n "$speed" ] || continue
+    if [ -z "$best" ] || [ "$speed" -gt "$best_speed" ]; then
+      best="$candidate"
+      best_speed="$speed"
+    fi
+  done < <(gh_accelerator_list)
+
+  [ -n "$best" ] || return 1
+  if [ "$best_speed" -lt "$min_speed" ]; then
+    # Nothing was fast enough. Say so, and let the caller decide.
+    echo "gh_accelerator: fastest was ${best} at ${best_speed} B/s, below ${min_speed} B/s" >&2
+  fi
+  printf '%s\n' "$best"
+  return 0
+}
+
 # Download a URL through an address that is known to work.
 # Usage: gh_direct_download <url> <output-file>
 #
