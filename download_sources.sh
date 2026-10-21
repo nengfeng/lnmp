@@ -562,25 +562,6 @@ download_file() {
     return 1
   fi
 
-  # GitHub can be reachable but painfully slow. Do a quick sample and prefer
-  # the accelerator when the official source is lagging behind.
-  if [[ "${url}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
-    local _gh_primary_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
-    _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
-    _gh_min_speed=$(( _gh_min_kbps * 1024 ))
-    _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
-    _gh_primary_speed=$(_url_speed_curl "${url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_primary_speed=""
-    if [ -n "${_gh_primary_speed}" ] && [ "${_gh_primary_speed}" -lt "${_gh_min_speed}" ]; then
-      _gh_accel_speed=$(_url_speed_curl "${_gh_accel_url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_accel_speed=""
-      if [ -n "${_gh_accel_speed}" ] && [ "${_gh_accel_speed}" -ge "${_gh_min_speed}" ]; then
-        log WARN "Official GitHub looks slow (${_gh_primary_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed} B/s)"
-        url="${_gh_accel_url}"
-        # 记下这个包是加速器给的——后面校验和不能也来自加速器，
-        # 否则 SHA256 就是拿它自己跟它自己比，被篡改的包一样能过。
-        GH_TARBALL_SOURCE="accelerator"
-      fi
-    fi
-  fi
 
   # 检查文件是否已存在
   if [ -f "${filename}" ]; then
@@ -667,6 +648,29 @@ download_file() {
       rm -f "${part_file}"
       wget_rc=1
     fi
+
+  # 固定 IP 直连没成功，才去测速并考虑加速器。
+  # 顺序是关键：测速在前的话，url 一旦被换成加速器地址，上面那段
+  # 就因为不再是 github.com 而整段跳过，固定 IP 的路径根本没被尝试过。
+  # GitHub can be reachable but painfully slow. Do a quick sample and prefer
+  # the accelerator when the official source is lagging behind.
+  if [[ "${url}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
+    local _gh_primary_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
+    _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
+    _gh_min_speed=$(( _gh_min_kbps * 1024 ))
+    _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
+    _gh_primary_speed=$(_url_speed_curl "${url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_primary_speed=""
+    if [ -n "${_gh_primary_speed}" ] && [ "${_gh_primary_speed}" -lt "${_gh_min_speed}" ]; then
+      _gh_accel_speed=$(_url_speed_curl "${_gh_accel_url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_accel_speed=""
+      if [ -n "${_gh_accel_speed}" ] && [ "${_gh_accel_speed}" -ge "${_gh_min_speed}" ]; then
+        log WARN "Official GitHub looks slow (${_gh_primary_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed} B/s)"
+        url="${_gh_accel_url}"
+        # 记下这个包是加速器给的——后面校验和不能也来自加速器，
+        # 否则 SHA256 就是拿它自己跟它自己比，被篡改的包一样能过。
+        GH_TARBALL_SOURCE="accelerator"
+      fi
+    fi
+  fi
   fi
 
   if [ ! -s "${part_file}" ] && [ ${wget_rc} -ne 0 ]; then
