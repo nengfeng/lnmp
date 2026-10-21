@@ -68,9 +68,6 @@ GH_DOH_ENDPOINTS=(
 GH_PIN_HOSTS=(
   "github.com"
   "release-assets.githubusercontent.com"
-  "objects.githubusercontent.com"
-  "raw.githubusercontent.com"
-  "codeload.github.com"
 )
 
 # Addresses GitHub is known to use, tried when neither the local resolver nor
@@ -111,6 +108,17 @@ _gh_cache_init() {
   [ -n "$_GH_CACHE_DIR" ] || return 1
   return 0
 }
+
+# The cache directory is created once, when this file is sourced, and not
+# when it is first needed.
+#
+# The reason is the subshell: the callers capture things in command
+# substitutions, and a subshell that creates its own cache directory writes
+# the entry there — where the parent will never look. The parent then creates
+# a second directory, and the address that was already found is looked up
+# again from scratch. Every resolution is then paid for twice, which is
+# exactly the kind of waste that turns into seconds on a slow network.
+_gh_cache_init || true
 
 _gh_cache_get() {
   local f="${_GH_CACHE_DIR}/$1"
@@ -180,9 +188,95 @@ _gh_doh_resolve_one() {
     | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
 }
 
+# ---------------------------------------------------------------- addresses
+#
+# THE RESOLUTION HAS TO BE BOUNDED.
+#
+# A mainland network cannot reach some of GitHub's hosts at all —
+# objects.githubusercontent.com and codeload.github.com are the usual two —
+# and an unreachable host used to cost the sum of its candidates' timeouts:
+# tens of seconds each, all of it silent, which is what made the install
+# look frozen with no output at all. Three rules now apply:
+#
+#   * the candidates of one host are probed at the same time, so a single
+#     unreachable address does not delay the others;
+#   * the phases (local resolver, over-HTTPS resolver, known addresses) are
+#     tried in order and the first that works wins;
+#   * the whole thing runs under a deadline, and whatever has been found by
+#     then is used.
+#
+# Progress is printed. A download that is thinking has to say so.
+
+# How long one address may take to answer a probe.
+GH_DIRECT_PROBE_TIMEOUT="${GH_DIRECT_PROBE_TIMEOUT:-5}"
+# How long the resolution of all hosts may take in total.
+GH_DIRECT_RESOLVE_BUDGET="${GH_DIRECT_RESOLVE_BUDGET:-20}"
+# How many candidates are tried per host.
+GH_DIRECT_MAX_CANDIDATES="${GH_DIRECT_MAX_CANDIDATES:-8}"
+
+# The measured speed of the accelerator gh_fastest_accelerator picked.
+_GH_FASTEST_ACCEL_SPEED=0
+
+# The deadline of the current resolution, as a unix timestamp. 0 = no limit.
+_GH_RESOLVE_DEADLINE=0
+
+_gh_deadline_hit() {
+  [ "$_GH_RESOLVE_DEADLINE" -gt 0 ] || return 1
+  [ "$(date +%s)" -ge "$_GH_RESOLVE_DEADLINE" ]
+}
+
+# The local resolver's answer for a host.
+#
+# This is tried first: it is instant and, where the name is not poisoned,
+# it is the address that works. The answer is verified against the
+# certificate afterwards, so a poisoned answer is rejected rather than
+# trusted.
+_gh_candidates_local() {
+  local host="$1" ip
+  while read -r ip; do
+    [ -n "$ip" ] && _gh_addr_usable "$ip" && printf '%s\n' "$ip"
+  done < <(_gh_system_dns "$host")
+  return 0
+}
+
+# The over-HTTPS resolvers' answers.
+#
+# The resolvers are asked in parallel. Asked one after another they cost the
+# sum of their timeouts, and one unreachable endpoint then delays every
+# download by its full timeout — 30 seconds before the first candidate
+# exists, on the network that needs this path most.
+_gh_candidates_doh() {
+  local host="$1" ip
+  local tmp
+  tmp=$(mktemp -d 2>/dev/null) || return 0
+  local pids=() i=0
+  for endpoint in "${GH_DOH_ENDPOINTS[@]}"; do
+    _gh_doh_resolve_one "$endpoint" "$host" > "${tmp}/${i}.ip" 2>/dev/null &
+    pids+=($!)
+    i=$((i + 1))
+  done
+  for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null; done
+  for f in "${tmp}"/*.ip; do
+    [ -f "$f" ] || continue
+    ip=$(cat "$f" 2>/dev/null || true)
+    [ -n "$ip" ] && _gh_addr_usable "$ip" && printf '%s\n' "$ip"
+  done
+  rm -rf "$tmp"
+  return 0
+}
+
+# The addresses GitHub is known to use.
+_gh_candidates_known() {
+  local ip
+  for ip in "${GH_KNOWN_ADDRS[@]}"; do
+    printf '%s\n' "$ip"
+  done
+  return 0
+}
+
 # Candidate addresses for a host, most likely first.
-# Prints one address per line: the local resolver's answer, then the
-# over-HTTPS resolvers' answers, then the known addresses.
+# Prints one address per line: the cached one, the local resolver's answer,
+# the over-HTTPS resolvers' answers, then the known addresses.
 _gh_candidate_list() {
   local host="$1"
   local ip
@@ -191,38 +285,10 @@ _gh_candidate_list() {
   cached=$(_gh_cache_get "pin_${host}")
   [ -n "$cached" ] && printf '%s\n' "$cached"
 
-  # The local resolver first: it is instant and, where the name is not
-  # poisoned, it is the address that works.
-  while read -r ip; do
-    [ -n "$ip" ] && _gh_addr_usable "$ip" && printf '%s\n' "$ip"
-  done < <(_gh_system_dns "$host")
-
-  # The over-HTTPS resolvers are asked in parallel. Asked one after another
-  # they cost the sum of their timeouts, and one unreachable endpoint then
-  # delays every download by its full timeout — 30 seconds before the first
-  # candidate exists, on the network that needs this path most.
-  local tmp
-  tmp=$(mktemp -d 2>/dev/null) || tmp=""
-  local pids=() i=0
-  if [ -n "$tmp" ]; then
-    for endpoint in "${GH_DOH_ENDPOINTS[@]}"; do
-      _gh_doh_resolve_one "$endpoint" "$host" > "${tmp}/${i}.ip" 2>/dev/null &
-      pids+=($!)
-      i=$((i + 1))
-    done
-    for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null; done
-    for f in "${tmp}"/*.ip; do
-      [ -f "$f" ] || continue
-      ip=$(cat "$f" 2>/dev/null || true)
-      [ -n "$ip" ] && _gh_addr_usable "$ip" && printf '%s\n' "$ip"
-    done
-    rm -rf "$tmp"
-  fi
-
-  # The addresses GitHub is known to use.
-  for ip in "${GH_KNOWN_ADDRS[@]}"; do
-    printf '%s\n' "$ip"
-  done
+  _gh_candidates_local "$host"
+  _gh_candidates_doh "$host"
+  _gh_candidates_known "$host"
+  return 0
 }
 
 # Does this address really serve this host?
@@ -231,16 +297,71 @@ _gh_candidate_list() {
 _gh_probe_address() {
   local host="$1" ip="$2"
   command -v curl >/dev/null 2>&1 || return 1
-  curl --connect-timeout 4 -m 8 -s -o /dev/null \
+  curl --connect-timeout 3 -m "${GH_DIRECT_PROBE_TIMEOUT}" -s -o /dev/null \
        --resolve "${host}:443:${ip}" "https://${host}/" >/dev/null 2>&1
+}
+
+# Probe several candidates for a host at the same time and take the first
+# one that works.
+#
+# Usage: _gh_probe_any <host> <candidate>...
+# On success _GH_PICKED_IP holds the address.
+#
+# The candidates are probed concurrently on purpose. Probed one after
+# another, a single unreachable address costs its full timeout before the
+# next one is even tried — and the address that works is often the second.
+_gh_probe_any() {
+  local host="$1"; shift
+  local -a cands=("$@")
+  [ ${#cands[@]} -gt 0 ] || return 1
+
+  local work
+  work=$(mktemp -d 2>/dev/null) || return 1
+
+  local i pids=()
+  for i in "${!cands[@]}"; do
+    ( _gh_probe_address "$host" "${cands[$i]}" \
+        && printf '%s' "${cands[$i]}" > "${work}/ok.${i}" 2>/dev/null ) &
+    pids+=($!)
+  done
+
+  local limit="${GH_DIRECT_PROBE_TIMEOUT}"
+  if _gh_deadline_hit; then
+    limit=1
+  fi
+  local deadline=$(( SECONDS + limit ))
+  local found=""
+  while [ $SECONDS -lt $deadline ]; do
+    local f
+    for f in "${work}"/ok.*; do
+      if [ -f "$f" ]; then
+        found=$(cat "$f" 2>/dev/null || true)
+        break
+      fi
+    done
+    [ -n "$found" ] && break
+    sleep 0.2
+  done
+
+  # Stop the probes that are still running.
+  local pid
+  for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null; done
+  for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null; done
+
+  rm -rf "$work"
+  [ -n "$found" ] || return 1
+  _GH_PICKED_IP="$found"
+  return 0
 }
 
 # Find an address that works for a host.
 # On success _GH_PICKED_IP holds the address. Returns non-zero when no
 # candidate could be reached.
+#
+# The phases are tried in order, and each phase is a parallel probe, so the
+# common case — the local resolver's answer works — costs one connection.
 _gh_pick_address() {
   local host="$1"
-  local cand
   _GH_PICKED_IP=""
 
   _gh_cache_init || true
@@ -252,35 +373,116 @@ _gh_pick_address() {
     return 0
   fi
 
-  while read -r cand; do
-    [ -n "$cand" ] || continue
-    _gh_addr_usable "$cand" || continue
-    if _gh_probe_address "$host" "$cand"; then
-      _GH_PICKED_IP="$cand"
-      _gh_cache_set "pin_${host}" "$cand" || true
+  local -a cands=()
+  local c
+  while read -r c; do
+    [ -n "$c" ] || continue
+    cands+=("$c")
+  done < <(_gh_candidates_local "$host")
+
+  if [ ${#cands[@]} -gt 0 ]; then
+    if _gh_probe_any "$host" "${cands[@]:0:${GH_DIRECT_MAX_CANDIDATES}}"; then
+      _gh_cache_set "pin_${host}" "$_GH_PICKED_IP" || true
+      echo "gh_direct: ${host} -> ${_GH_PICKED_IP} (local resolver)" >&2
       return 0
     fi
-  done < <(_gh_candidate_list "$host")
+  fi
 
+  _gh_deadline_hit && return 1
+
+  cands=()
+  while read -r c; do
+    [ -n "$c" ] || continue
+    cands+=("$c")
+  done < <(_gh_candidates_doh "$host")
+
+  if [ ${#cands[@]} -gt 0 ]; then
+    if _gh_probe_any "$host" "${cands[@]:0:${GH_DIRECT_MAX_CANDIDATES}}"; then
+      _gh_cache_set "pin_${host}" "$_GH_PICKED_IP" || true
+      echo "gh_direct: ${host} -> ${_GH_PICKED_IP} (over-HTTPS resolver)" >&2
+      return 0
+    fi
+  fi
+
+  _gh_deadline_hit && return 1
+
+  cands=()
+  while read -r c; do
+    [ -n "$c" ] || continue
+    cands+=("$c")
+  done < <(_gh_candidates_known "$host")
+
+  if [ ${#cands[@]} -gt 0 ]; then
+    if _gh_probe_any "$host" "${cands[@]:0:${GH_DIRECT_MAX_CANDIDATES}}"; then
+      _gh_cache_set "pin_${host}" "$_GH_PICKED_IP" || true
+      echo "gh_direct: ${host} -> ${_GH_PICKED_IP} (known address)" >&2
+      return 0
+    fi
+  fi
+
+  echo "gh_direct: no address for ${host} could be reached" >&2
   return 1
+}
+
+# Point the host the URL names at a different address, leaving the other
+# hosts as they are.
+_gh_set_primary_resolve() {
+  local host="$1" ip="$2"
+  [ -n "$ip" ] || return 1
+  local -a out=()
+  local a found="no"
+  for a in "${_GH_RESOLVE_ARGS[@]}"; do
+    case "$a" in
+      "${host}:443:"*)
+        out+=( "${host}:443:${ip}" )
+        found="yes"
+        ;;
+      *) out+=( "$a" ) ;;
+    esac
+  done
+  [ "$found" = "yes" ] || out+=( --resolve "${host}:443:${ip}" )
+  _GH_RESOLVE_ARGS=( "${out[@]}" )
+  return 0
 }
 
 # The --resolve arguments for the current download.
 # Fills the global array _GH_RESOLVE_ARGS.
 # $1: host to pin to $2; $2: that address (empty: pick one).
+#
+# Only the hosts that can actually be involved are resolved: the one the URL
+# names, and the one that carries the bytes after the redirect. The rest are
+# pinned on demand, when a redirect points at them. Resolving a host the
+# transfer never uses costs a connection — and on a mainland network, where
+# some of them are unreachable, it costs seconds of silence.
 gh_resolve_args() {
   local primary_host="${1:-}" primary_ip="${2:-}"
   _GH_RESOLVE_ARGS=()
-  local host ip
-  for host in "${GH_PIN_HOSTS[@]}"; do
-    if [ "$host" = "$primary_host" ] && [ -n "$primary_ip" ]; then
+  _gh_cache_init || true
+
+  local -a hosts=()
+  [ -n "$primary_host" ] && hosts+=( "$primary_host" )
+  local h
+  for h in "${GH_PIN_HOSTS[@]}"; do
+    [ "$h" = "$primary_host" ] && continue
+    hosts+=( "$h" )
+  done
+
+  # Everything below runs under one deadline.
+  _GH_RESOLVE_DEADLINE=$(( $(date +%s) + GH_DIRECT_RESOLVE_BUDGET ))
+
+  local h ip
+  for h in "${hosts[@]}"; do
+    if [ "$h" = "$primary_host" ] && [ -n "$primary_ip" ]; then
       ip="$primary_ip"
     else
-      _gh_pick_address "$host" || continue
+      _gh_pick_address "$h" || continue
       ip="$_GH_PICKED_IP"
     fi
-    _GH_RESOLVE_ARGS+=( --resolve "${host}:443:${ip}" )
+    _GH_RESOLVE_ARGS+=( --resolve "${h}:443:${ip}" )
   done
+
+  _GH_RESOLVE_DEADLINE=0
+  return 0
 }
 
 # Pin a host that is not in GH_PIN_HOSTS but appeared in a redirect.
@@ -317,7 +519,7 @@ _gh_url_host() {
 _gh_effective_and_size() {
   local url="$1"
   local raw
-  raw=$(curl --connect-timeout 10 -m 60 -sS -L -r 0-0 -D - -o /dev/null \
+  raw=$(curl --connect-timeout 10 -m 30 -sS -L -r 0-0 -D - -o /dev/null \
           -w 'GH_EFFECTIVE:%{url_effective}' \
           "${_GH_RESOLVE_ARGS[@]}" "$url" 2>/dev/null || true)
   [ -n "$raw" ] || return 1
@@ -432,6 +634,7 @@ gh_direct_speed_probe() {
   local max_time="${3:-10}"
   command -v curl >/dev/null 2>&1 || return 1
 
+  echo "gh_direct: measuring the pinned path..." >&2
   gh_resolve_args "" ""
   [ ${#_GH_RESOLVE_ARGS[@]} -gt 0 ] || return 1
 
@@ -549,13 +752,18 @@ gh_url_speed() {
 
 # The fastest accelerator for a URL.
 #
-# Prints "<accelerator>/<url>" for the fastest accelerator that reaches the
-# threshold. When none reaches it, the fastest one that answered at all is
-# printed — a slow accelerator still beats no accelerator.
+# Prints "<accelerator>/<url>" for the fastest accelerator, and leaves its
+# measured speed in _GH_FASTEST_ACCEL_SPEED so that the caller can compare
+# it with what it already measured and decide whether switching is worth it.
+#
+# Switching to an accelerator that is slower than the path being replaced
+# would make things worse, so the speed is reported rather than assumed.
 gh_fastest_accelerator() {
   local url="$1"
   local min_speed="${2:-0}"
   command -v curl >/dev/null 2>&1 || return 1
+
+  _GH_FASTEST_ACCEL_SPEED=0
 
   local accel best="" best_speed=0
   while read -r accel; do
@@ -571,6 +779,7 @@ gh_fastest_accelerator() {
   done < <(gh_accelerator_list)
 
   [ -n "$best" ] || return 1
+  _GH_FASTEST_ACCEL_SPEED="$best_speed"
   if [ "$best_speed" -lt "$min_speed" ]; then
     # Nothing was fast enough. Say so, and let the caller decide.
     echo "gh_accelerator: fastest was ${best} at ${best_speed} B/s, below ${min_speed} B/s" >&2
@@ -610,6 +819,16 @@ gh_direct_download() {
 
   _gh_cache_init || true
 
+  # The other hosts are resolved ONCE, here. Resolving them inside the loop
+  # below meant that every candidate paid for the resolution of hosts it was
+  # never going to use: on a mainland network, where some of GitHub's hosts
+  # are unreachable, that is several minutes of silence per download.
+  gh_resolve_args "$host" ""
+  if [ ${#_GH_RESOLVE_ARGS[@]} -eq 0 ]; then
+    echo "gh_direct: no address could be pinned for ${host}" >&2
+    return 1
+  fi
+
   local cand tried=0 rc
   local -a seen=()
   while read -r cand; do
@@ -623,10 +842,10 @@ gh_direct_download() {
     seen+=("$cand")
 
     tried=$((tried + 1))
-    [ $tried -gt 12 ] && break
+    [ $tried -gt 4 ] && break
 
-    gh_resolve_args "$host" "$cand"
-    [ ${#_GH_RESOLVE_ARGS[@]} -gt 0 ] || continue
+    # Only the host the URL names is rotated; the rest stay as resolved.
+    _gh_set_primary_resolve "$host" "$cand"
 
     # Parallel chunks first: a single stream to GitHub's CDN is rate limited
     # to roughly 20 KB/s from a mainland network, while several range
@@ -639,7 +858,7 @@ gh_direct_download() {
 
     # Single stream, with resume.
     local effective
-    effective=$(curl --connect-timeout 10 -m 60 -sSIL "${_GH_RESOLVE_ARGS[@]}" \
+    effective=$(curl --connect-timeout 10 -m 30 -sSIL "${_GH_RESOLVE_ARGS[@]}" \
                   -o /dev/null -w '%{url_effective}' "$url" 2>/dev/null || true)
     [ -n "$effective" ] || effective="$url"
 

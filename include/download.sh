@@ -233,13 +233,17 @@ Download_src() {
       # A single dead accelerator would otherwise take the whole fallback
       # path down with it.
       local accel_url=""
+      local accel_speed=0
       if command -v gh_fastest_accelerator >/dev/null 2>&1; then
         accel_url=$(gh_fastest_accelerator "${urls[0]}" "${min_speed}" || true)
+        accel_speed="${_GH_FASTEST_ACCEL_SPEED:-0}"
       else
         accel_url=$(github_accelerator_url "${urls[0]}")
       fi
-      if [ -n "$accel_url" ]; then
-        echo "${CMSG}Pinned path looks slow (${pinned_speed} B/s < ${min_speed} B/s); switching to the accelerator${CEND}"
+      # Only switch when the accelerator is actually faster. Switching to a
+      # slower one would make the download worse, not better.
+      if [ -n "$accel_url" ] && [ "$accel_speed" -ge "$pinned_speed" ]; then
+        echo "${CMSG}Pinned path looks slow (${pinned_speed} B/s < ${min_speed} B/s); switching to the accelerator (${accel_speed} B/s)${CEND}"
         local reordered=() _u
         reordered+=( "${accel_url}" )
         for _u in "${urls[@]}"; do
