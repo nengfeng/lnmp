@@ -235,8 +235,15 @@ Download_src() {
       local accel_url=""
       local accel_speed=0
       if command -v gh_fastest_accelerator >/dev/null 2>&1; then
-        accel_url=$(gh_fastest_accelerator "${urls[0]}" "${min_speed}" || true)
-        accel_speed="${_GH_FASTEST_ACCEL_SPEED:-0}"
+        # The speed comes back with the URL: the caller captures this in a
+        # subshell, and a variable set in a subshell does not survive it.
+        local info
+        info=$(gh_fastest_accelerator "${urls[0]}" "${min_speed}" || true)
+        accel_url="${info%% *}"
+        accel_speed="${info##* }"
+        case "$accel_speed" in
+          ''|*[!0-9]*) accel_speed=0 ;;
+        esac
       else
         accel_url=$(github_accelerator_url "${urls[0]}")
       fi

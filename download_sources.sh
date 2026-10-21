@@ -659,8 +659,15 @@ download_file() {
     if [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && [ -n "$_gh_pinned_speed" ] && [ "$_gh_pinned_speed" -lt "$_gh_min_speed" ]; then
       # 每个加速器都测一遍，用最快的那个。加速器会下线，只配一个就是单点故障。
       if command -v gh_fastest_accelerator >/dev/null 2>&1; then
-        _gh_accel_url=$(gh_fastest_accelerator "${url}" "${_gh_min_speed}" || true)
-        _gh_accel_speed="${_GH_FASTEST_ACCEL_SPEED:-0}"
+        # 速度随 URL 一起返回：调用方是命令替换（子 shell），子 shell 里设的
+        # 变量带不出来——父进程读到 0，就会以为加速器比直连还慢而拒绝切换。
+        local _gh_accel_info
+        _gh_accel_info=$(gh_fastest_accelerator "${url}" "${_gh_min_speed}" || true)
+        _gh_accel_url="${_gh_accel_info%% *}"
+        _gh_accel_speed="${_gh_accel_info##* }"
+        case "$_gh_accel_speed" in
+          ''|*[!0-9]*) _gh_accel_speed=0 ;;
+        esac
       else
         _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
         _gh_accel_speed=$(gh_url_speed "${_gh_accel_url}" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)

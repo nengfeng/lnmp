@@ -750,6 +750,74 @@ gh_url_speed() {
   printf '%d\n' "${raw%.*}"
 }
 
+# The total size of a URL, from the Content-Range of a one-byte range
+# request. Prints nothing when the server does not serve ranges.
+_gh_url_size() {
+  local url="$1"
+  local headers size
+  # A short timeout: this runs for every accelerator, and an accelerator
+  # that is unreachable from here must not delay the decision by its full
+  # budget.
+  headers=$(curl --connect-timeout 4 -m 6 -s -D - -o /dev/null -r 0-0 \
+              "$url" 2>/dev/null | tr -d '\r' || true)
+  size=$(printf '%s' "$headers" | grep -ai '^content-range:' | tail -1 | grep -oE '[0-9]+$' || true)
+  [ -n "$size" ] || return 1
+  printf '%s\n' "$size"
+}
+
+# Measure a URL's transfer speed with several range requests at once.
+#
+# The same method as the pinned path uses, so that the two are comparable:
+# the gate that decides between them has to compare like with like.
+gh_url_speed_parallel() {
+  local url="$1"
+  local sample_bytes="${2:-524288}"
+  local max_time="${3:-8}"
+  local streams="${4:-8}"
+  command -v curl >/dev/null 2>&1 || return 1
+
+  local size
+  size=$(_gh_url_size "$url") || return 1
+  [ "$size" -gt "$sample_bytes" ] || sample_bytes="$size"
+
+  local n="$streams"
+  [ "$n" -lt 1 ] && n=1
+  [ "$n" -gt 16 ] && n=16
+
+  local work
+  work=$(mktemp -d 2>/dev/null) || return 1
+
+  local chunk=$(( sample_bytes / n ))
+  [ "$chunk" -lt 1 ] && chunk=1
+  local i start end pids=()
+  local t0 t1
+  t0=$(date +%s%N)
+  for i in $(seq 0 $((n - 1))); do
+    start=$(( i * chunk ))
+    end=$(( start + chunk - 1 ))
+    [ $end -ge $size ] && end=$(( size - 1 ))
+    [ $start -ge $size ] && continue
+    curl --connect-timeout 5 -m "${max_time}" -s -f -r "${start}-${end}" \
+         -o "${work}/p.${i}" "$url" >/dev/null 2>&1 &
+    pids+=($!)
+  done
+  for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null; done
+  t1=$(date +%s%N)
+
+  local bytes=0 f sz
+  for f in "${work}"/*; do
+    [ -f "$f" ] || continue
+    sz=$(stat -c%s "$f" 2>/dev/null || echo 0)
+    bytes=$(( bytes + sz ))
+  done
+  rm -rf "$work"
+
+  [ "$bytes" -gt 0 ] || return 1
+  local ns=$(( t1 - t0 ))
+  [ "$ns" -gt 0 ] || ns=1
+  printf '%d\n' "$(( bytes * 1000000000 / ns ))"
+}
+
 # The fastest accelerator for a URL.
 #
 # Prints "<accelerator>/<url>" for the fastest accelerator, and leaves its
@@ -758,6 +826,14 @@ gh_url_speed() {
 #
 # Switching to an accelerator that is slower than the path being replaced
 # would make things worse, so the speed is reported rather than assumed.
+# Prints "<accelerator>/<url> <speed>".
+#
+# The speed is part of the output on purpose. The caller captures this in a
+# command substitution — a subshell — and a variable set inside a subshell is
+# lost when it exits. A global carrying the speed therefore read back as
+# zero in the parent, and the gate concluded that the accelerator was
+# slower than the path it was replacing, when it was in fact three times
+# faster. The number travels with the URL instead.
 gh_fastest_accelerator() {
   local url="$1"
   local min_speed="${2:-0}"
@@ -765,18 +841,51 @@ gh_fastest_accelerator() {
 
   _GH_FASTEST_ACCEL_SPEED=0
 
-  local accel best="" best_speed=0
+  # Every accelerator is measured at the same time. Probed one after another
+  # they cost the sum of their timeouts, and an accelerator that is
+  # unreachable from here (which is most of them, from most places) delays
+  # the decision by its full timeout.
+  local work
+  work=$(mktemp -d 2>/dev/null) || return 1
+
+  local accel i=0 pids=()
   while read -r accel; do
     [ -n "$accel" ] || continue
     local candidate="${accel}/${url}"
-    local speed
-    speed=$(gh_url_speed "$candidate" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
-    [ -n "$speed" ] || continue
-    if [ -z "$best" ] || [ "$speed" -gt "$best_speed" ]; then
-      best="$candidate"
-      best_speed="$speed"
-    fi
+    (
+      local speed
+      speed=$(gh_url_speed_parallel "$candidate" \
+                "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" \
+                "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" \
+                "${GH_DIRECT_PARALLEL}" || true)
+      if [ -z "$speed" ]; then
+        speed=$(gh_url_speed "$candidate" \
+                  "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" \
+                  "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
+      fi
+      [ -n "$speed" ] && printf '%s %s' "$candidate" "$speed" > "${work}/s.${i}" 2>/dev/null
+    ) &
+    pids+=($!)
+    i=$((i + 1))
   done < <(gh_accelerator_list)
+
+  local pid
+  for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null; done
+
+  local best="" best_speed=0 f u s
+  for f in "${work}"/s.*; do
+    [ -f "$f" ] || continue
+    u=""
+    s=""
+    read -r u s < "$f" 2>/dev/null || true
+    [ -n "$u" ] || continue
+    [ -n "$s" ] || continue
+    if [ -z "$best" ] || [ "$s" -gt "$best_speed" ]; then
+      best="$u"
+      best_speed="$s"
+    fi
+  done
+  rm -rf "$work"
 
   [ -n "$best" ] || return 1
   _GH_FASTEST_ACCEL_SPEED="$best_speed"
@@ -784,7 +893,7 @@ gh_fastest_accelerator() {
     # Nothing was fast enough. Say so, and let the caller decide.
     echo "gh_accelerator: fastest was ${best} at ${best_speed} B/s, below ${min_speed} B/s" >&2
   fi
-  printf '%s\n' "$best"
+  printf '%s %s\n' "$best" "$best_speed"
   return 0
 }
 

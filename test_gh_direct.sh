@@ -154,6 +154,26 @@ check "the accelerator URL is built correctly" \
   "$(github_accelerator_url 'https://github.com/x/y')"
 
 # --------------------------------------------------------------------------
+# The accelerator's speed has to travel with its URL.
+#
+# The caller captures the accelerator in a command substitution — a
+# subshell — and a variable set inside a subshell is lost when it exits. A
+# global carrying the speed therefore read back as zero in the parent, and
+# the gate concluded that the accelerator was slower than the path it was
+# replacing when it was in fact three times faster. The speed therefore
+# travels in the output, next to the URL.
+# --------------------------------------------------------------------------
+echo
+echo "Accelerator speed travels with the URL:"
+GITHUB_ACCELERATOR_URL="https://a.example"
+GITHUB_ACCELERATOR_FALLBACKS=""
+gh_url_speed_parallel() { printf '%d\n' "${3:-0}"; }
+gh_url_speed() { printf '%d\n' "${3:-0}"; }
+info=$(gh_fastest_accelerator "https://github.com/x/y" 0)
+check "the accelerator URL is reported" "https://a.example/https://github.com/x/y" "${info%% *}"
+check "the speed is reported next to it" "8" "${info##* }"
+
+# --------------------------------------------------------------------------
 # The pinned checksum must be found regardless of the current directory.
 # --------------------------------------------------------------------------
 echo
