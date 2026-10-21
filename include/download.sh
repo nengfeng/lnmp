@@ -2,6 +2,21 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
+# Direct GitHub downloads through an un-poisoned address.
+# See include/gh_direct.sh for why this exists and how it is used.
+if [ -n "${_GH_DIRECT_SH_LOADED:-}" ]; then
+  :
+else
+  _GH_DIRECT_SH_LOADED=1
+  _gh_direct_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+  # Written as an if/else rather than a chain of && so that a missing file
+  # cannot return non-zero from this line: several callers run with `set -e`,
+  # where a non-zero status here would abort the whole install.
+  if [ -n "$_gh_direct_dir" ] && [ -f "${_gh_direct_dir}/gh_direct.sh" ]; then
+    . "${_gh_direct_dir}/gh_direct.sh"
+  fi
+fi
+
 # Enhanced download function with retry, mirror failover and timeout
 # Usage: Download_src [output_filename]
 # Requires: src_url variable must be set before calling

@@ -27,12 +27,34 @@ compute_md5() {
   md5sum "$file" 2>/dev/null | awk '{print $1}'
 }
 
+# 固定干净 IP 访问 GitHub 的辅助函数（见 include/gh_direct.sh）。
+# 这里单独载入，而不是依赖 include/download.sh：本文件被 install.sh 与
+# download_sources.sh 分别引用，不能假定下载层一定先被载入。
+if [ -z "${_GH_DIRECT_SH_LOADED:-}" ]; then
+  _GH_DIRECT_SH_LOADED=1
+  _ghd_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+  if [ -n "$_ghd_dir" ] && [ -f "${_ghd_dir}/gh_direct.sh" ]; then
+    . "${_ghd_dir}/gh_direct.sh"
+  fi
+fi
+
 # Download a checksum file, using the configured GitHub accelerator if the
 # official GitHub checksum URL is blocked or unreachable.
 _download_checksum_file() {
   local checksum_url=$1
   local checksum_file=$2
   local fallback_url=""
+
+  # 首选固定未被污染的 IP 直连。校验和文件同样在 github.com 上，域名一样
+  # 会被污染；加速器只是把问题换了个方向（见 download_sources.sh 里关于
+  # 循环校验的说明）。
+  if [[ "${GH_DIRECT_ENABLED:-y}" != "n" ]] \
+     && [[ "$checksum_url" == "https://github.com/"* || "$checksum_url" == "https://raw.githubusercontent.com/"* ]]; then
+    if gh_direct_download "$checksum_url" "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]; then
+      return 0
+    fi
+    rm -f "$checksum_file"
+  fi
 
   if wget -q "$checksum_url" -O "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]; then
     return 0

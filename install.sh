@@ -292,7 +292,17 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
   if [ -e "${tool_file}" ]; then
     now_script_md5=$(md5sum "${tool_file}" | awk '{print $1}')
     md5_url="https://raw.githubusercontent.com/nengfeng/lnmp/main/md5sum.txt"
-    md5_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${md5_url}" 2>/dev/null || true)
+    # 先试固定干净 IP 直连：raw.githubusercontent.com 与 github.com 一样
+    # 会被污染，而这正是脚本自身校验和清单的来源。
+    md5_tmp=""
+    if [ "${GH_DIRECT_ENABLED:-y}" != "n" ]; then
+      local _md5_pin_file="${TMPDIR:-/tmp}/lnmp_md5sum.$$"
+      if gh_direct_download "${md5_url}" "${_md5_pin_file}" 2>/dev/null && [ -s "${_md5_pin_file}" ]; then
+        md5_tmp=$(cat "${_md5_pin_file}")
+      fi
+      rm -f "${_md5_pin_file}"
+    fi
+    [ -n "${md5_tmp}" ] || md5_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${md5_url}" 2>/dev/null || true)
     if [ -z "${md5_tmp}" ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
       md5_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${GITHUB_ACCELERATOR_URL%/}/${md5_url}" 2>/dev/null || true)
     fi
@@ -310,7 +320,15 @@ if [[ "${md5sum_flag}" == y ]] && [ -n "${tool_file}" ]; then
     # check tightens automatically for artifacts published after v1.7.2
     # without breaking older packages that only have an md5 entry.
     sha_url="https://raw.githubusercontent.com/nengfeng/lnmp/main/sha256sum.txt"
-    sha_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${sha_url}" 2>/dev/null || true)
+    sha_tmp=""
+    if [ "${GH_DIRECT_ENABLED:-y}" != "n" ]; then
+      local _sha_pin_file="${TMPDIR:-/tmp}/lnmp_sha256sum.$$"
+      if gh_direct_download "${sha_url}" "${_sha_pin_file}" 2>/dev/null && [ -s "${_sha_pin_file}" ]; then
+        sha_tmp=$(cat "${_sha_pin_file}")
+      fi
+      rm -f "${_sha_pin_file}"
+    fi
+    [ -n "${sha_tmp}" ] || sha_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${sha_url}" 2>/dev/null || true)
     if [ -z "${sha_tmp}" ] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
       sha_tmp=$(curl --connect-timeout 3 -m 5 -fsS "${GITHUB_ACCELERATOR_URL%/}/${sha_url}" 2>/dev/null || true)
     fi
