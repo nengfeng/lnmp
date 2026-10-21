@@ -22,10 +22,23 @@
 # file can be checked with `sha256sum -c` and edited by hand.
 
 # Where the pinned list lives.
+#
+# Resolved once, at source time, and kept in a variable.
+#
+# Resolving it at use time looks harmless and is not: BASH_SOURCE[0] is the
+# path this file was sourced with, and when that path is relative ("include/
+# pin_checksums.sh") the lookup resolves against whatever directory the caller
+# happens to be in at that moment. A caller that changes directory then finds
+# no pins at all — and that failure is silent: the trust anchor quietly
+# degrades from "the value in the repository" to "whatever the network
+# serves", which is exactly the circularity this file exists to prevent.
+_GH_PIN_CHECKSUMS_FILE=""
+_gpcd_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
+[ -n "$_gpcd_dir" ] && _GH_PIN_CHECKSUMS_FILE="${_gpcd_dir}/component_checksums.txt"
+unset _gpcd_dir
+
 _gh_pin_checksums_file() {
-  local dir
-  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
-  [ -n "$dir" ] && printf '%s\n' "${dir}/component_checksums.txt"
+  printf '%s\n' "${_GH_PIN_CHECKSUMS_FILE}"
 }
 
 # Read the pinned checksum for a file.

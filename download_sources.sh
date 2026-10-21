@@ -446,8 +446,9 @@ verify_checksum() {
       import_pgp_keys "${PGP_KEYS_DIR}" || return 1
       log INFO "Verifying PGP signature..."
       local gpg_out gpg_rc
-      gpg_out=$(gpg --verify "$checksum_file" "$file" 2>&1)
-      gpg_rc=$?
+      # Same reason as in check_download.sh: under "set -e" the assignment
+      # would abort the script before the diagnostic could be printed.
+      gpg_out=$(gpg --verify "$checksum_file" "$file" 2>&1) && gpg_rc=0 || gpg_rc=$?
       if [ "$gpg_rc" -eq 0 ]; then
         log INFO "PGP signature verified successfully"
         return 0
@@ -519,7 +520,7 @@ _url_speed_curl() {
   command -v curl >/dev/null 2>&1 || return 1
 
   local raw
-  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null)
+  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null || true)
   [ -n "${raw}" ] || return 1
 
   printf '%d\n' "${raw%.*}"
@@ -636,41 +637,47 @@ download_file() {
   local part_file="${filename}.part"
   local wget_rc=0
 
-  # 首选：固定未被污染的 IP 直连 GitHub。
-  # 域名被污染时 wget 会挂住或极慢，而 GitHub 的真实地址是通的——用 DoH
-  # 拿到干净的地址再用 curl --resolve 直连，既快，又让信任锚点仍然是
-  # GitHub 的 TLS 证书（走加速器则锚点落在第三方身上）。
+  # 首选：固定未被污染的 IP 直连 GitHub（并行分块）。
+  #
+  # 先测速，再决定用固定 IP 直连还是加速器。
+  #
+  # 测的是固定 IP 路径的并行吞吐，不是单流速度：境内的限速是按流算的，
+  # 单流 22 KB/s 而八路并行能到 176 KB/s，用单流数字做闸门会把快的那条路
+  # 误判成慢的，然后把能直连的机会白白让出去。
+  #
+  # 这不改变信任模型：校验和优先用仓库里钉死的期望值（component_checksums.txt），
+  # 走加速器时校验和仍然从 GitHub 取——固定 IP + TLS 证书验证，两边不同源，
+  # 循环校验不会出现。加速器只负责搬运字节。
   if [[ "$url" == "https://github.com/"* || "$url" == "https://raw.githubusercontent.com/"* ]]; then
-    if gh_direct_download "${url}" "${part_file}"; then
-      log INFO "Fetched through a pinned address (no poisoned DNS involved)"
-      wget_rc=0
-    else
-      rm -f "${part_file}"
-      wget_rc=1
-    fi
-
-  # 固定 IP 直连没成功，才去测速并考虑加速器。
-  # 顺序是关键：测速在前的话，url 一旦被换成加速器地址，上面那段
-  # 就因为不再是 github.com 而整段跳过，固定 IP 的路径根本没被尝试过。
-  # GitHub can be reachable but painfully slow. Do a quick sample and prefer
-  # the accelerator when the official source is lagging behind.
-  if [[ "${url}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
-    local _gh_primary_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
+    local _gh_pinned_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
     _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
     _gh_min_speed=$(( _gh_min_kbps * 1024 ))
-    _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
-    _gh_primary_speed=$(_url_speed_curl "${url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_primary_speed=""
-    if [ -n "${_gh_primary_speed}" ] && [ "${_gh_primary_speed}" -lt "${_gh_min_speed}" ]; then
+    _gh_pinned_speed=""
+    if command -v gh_direct_speed_probe >/dev/null 2>&1; then
+      _gh_pinned_speed=$(gh_direct_speed_probe "${url}" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
+    fi
+    if [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && [ -n "$_gh_pinned_speed" ] && [ "$_gh_pinned_speed" -lt "$_gh_min_speed" ]; then
+      _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
       _gh_accel_speed=$(_url_speed_curl "${_gh_accel_url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_accel_speed=""
-      if [ -n "${_gh_accel_speed}" ] && [ "${_gh_accel_speed}" -ge "${_gh_min_speed}" ]; then
-        log WARN "Official GitHub looks slow (${_gh_primary_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed} B/s)"
+      if [ -n "$_gh_accel_speed" ] && [ "$_gh_accel_speed" -ge "$_gh_min_speed" ]; then
+        log WARN "Pinned path looks slow (${_gh_pinned_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed} B/s)"
         url="${_gh_accel_url}"
         # 记下这个包是加速器给的——后面校验和不能也来自加速器，
         # 否则 SHA256 就是拿它自己跟它自己比，被篡改的包一样能过。
         GH_TARBALL_SOURCE="accelerator"
       fi
     fi
-  fi
+
+    # 固定 IP 直连（并行分块）。只有上面没有把来源换成加速器时才走这里。
+    if [[ "${url}" == "https://github.com/"* || "${url}" == "https://raw.githubusercontent.com/"* ]]; then
+      if gh_direct_download "${url}" "${part_file}"; then
+        log INFO "Fetched through a pinned address (no poisoned DNS involved)"
+        wget_rc=0
+      else
+        rm -f "${part_file}"
+        wget_rc=1
+      fi
+    fi
   fi
 
   if [ ! -s "${part_file}" ] && [ ${wget_rc} -ne 0 ]; then

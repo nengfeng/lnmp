@@ -99,7 +99,10 @@ github_accelerator_url() {
   local url="$1"
   local accelerator="${GITHUB_ACCELERATOR_URL:-}"
   if [ -z "${accelerator}" ] || [[ "${url}" != "https://github.com/"* ]]; then
-    return
+    # Returns success, not "no accelerator": the caller captures this in a
+    # command substitution, and under "set -e" a non-zero status there would
+    # terminate the install for a URL that simply has no accelerator.
+    return 0
   fi
   printf '%s\n' "${accelerator%/}/${url}"
 }
@@ -117,7 +120,7 @@ _url_speed_curl() {
   command -v curl >/dev/null 2>&1 || return 1
 
   local raw
-  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null)
+  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null || true)
   [ -n "${raw}" ] || return 1
 
   printf '%d\n' "${raw%.*}"
@@ -151,6 +154,11 @@ Download_src() {
     file_name="$1"
   fi
 
+  # 这个包是从哪儿来的：GitHub 直连还是加速器。
+  # 后面校验校验和时要用：包和校验和都来自同一个加速器时，SHA256 就是拿它
+  # 自己跟它自己比，被篡改的包一样能过——那种组合必须直接拒绝。
+  GH_TARBALL_SOURCE="github"
+
   # Check if file already exists and has content
   if [ -s "${file_name}" ]; then
     # Integrity probe for cached archives: a truncated file from a previous
@@ -180,13 +188,48 @@ Download_src() {
 
   # 首选：固定未被污染的 IP 直连，并行分块下载。
   #
-  # 这一步必须在测速之前。测速在前的话，urls[0] 一旦被换成加速器地址，
-  # 下面那段就因为不再是 github.com 而整段跳过——境内实测就是这样：日志里
+  # 并行的理由：单条 TCP 流到 GitHub 的 CDN 在境内被限速到十几 KB/s，
+  # 而这个限制是按流算的，不是按整个传输算的，所以分成几段同时拉会快好几倍。
+  local _pinned_done="n"
+
+  # 测速固定 IP 路径，再决定要不要用它下这个文件。
+  #
+  # 境内单流到 GitHub 常常被限到十几 KB/s：能通，但 51MB 要拖四十分钟。
+  # 与其先花四十分钟再发现，不如先花十秒测一下，慢就直接交给加速器。
+  #
+  # 这不改变信任模型：归档的完整性由仓库里钉死的校验和（component_checksums.txt）
+  # 保证，加速器只负责搬运字节——它没法让一个错误的文件通过校验。而固定 IP
+  # 路径拿到的校验和文件本身也是走 GitHub 的 TLS 证书验证的，来源可分。
+  if [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]] \
+     && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] \
+     && command -v gh_direct_speed_probe >/dev/null 2>&1; then
+    local pinned_speed min_speed
+    min_speed=$(github_speed_min_bytes)
+    pinned_speed=$(gh_direct_speed_probe "${urls[0]}" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
+    if [ -n "$pinned_speed" ] && [ "$pinned_speed" -lt "${min_speed}" ]; then
+      echo "${CMSG}Pinned path looks slow (${pinned_speed} B/s < ${min_speed} B/s); switching to the accelerator${CEND}"
+      local accel_url reordered=() _u
+      accel_url=$(github_accelerator_url "${urls[0]}")
+      if [ -n "$accel_url" ]; then
+        reordered+=( "${accel_url}" )
+        for _u in "${urls[@]}"; do
+          [ "$_u" = "${accel_url}" ] && continue
+          reordered+=( "${_u}" )
+        done
+        urls=( "${reordered[@]}" )
+        GH_TARBALL_SOURCE="accelerator"
+      fi
+    fi
+  fi
+
+  # 首选：固定未被污染的 IP 直连，并行分块下载。
+  #
+  # 这一步必须在测速之后。测速在前会把 urls[0] 换成加速器地址，下面这段
+  # 就因为不再是 github.com 而整段跳过——境内实测就是这样：日志里
   # 只有 wget 的输出，固定 IP 路径根本没被尝试过。
   #
   # 并行的理由：单条 TCP 流到 GitHub 的 CDN 在境内被限速到十几 KB/s，
   # 而这个限制是按流算的，不是按整个传输算的，所以分成几段同时拉会快好几倍。
-  local _pinned_done="n"
   if [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]]; then
     if gh_direct_download "${urls[0]}" "${file_name}"; then
       echo "${CMSG}Fetched through a pinned address (no poisoned DNS involved)${CEND}"
@@ -203,7 +246,7 @@ Download_src() {
     min_speed=$(github_speed_min_bytes)
     accel_url=$(github_accelerator_url "${urls[0]}")
     if [ -n "${accel_url}" ]; then
-      primary_speed=$(_url_speed_curl "${urls[0]}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}")
+      primary_speed=$(_url_speed_curl "${urls[0]}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}" || true)
       if [ -n "${primary_speed}" ] && [ "${primary_speed}" -lt "${min_speed}" ]; then
         echo "${CMSG}GitHub primary looks slow (${primary_speed} B/s < ${min_speed} B/s); preferring accelerator${CEND}"
         local reordered=()
@@ -241,6 +284,12 @@ Download_src() {
     local url="${urls[i]}"
     local unavailable_exit=""
     last_url="${url}"
+
+    # 记下这个包是从加速器来的（如果是从加速器来的话）。
+    case "$url" in
+      "${GITHUB_ACCELERATOR_URL%/}/"*) GH_TARBALL_SOURCE="accelerator" ;;
+    esac
+
     if [ "${i}" -eq 0 ]; then
       echo "${CMSG}Downloading ${file_name}...${CEND}"
     else

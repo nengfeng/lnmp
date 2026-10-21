@@ -38,6 +38,17 @@ if [ -z "${_GH_DIRECT_SH_LOADED:-}" ]; then
   fi
 fi
 
+# 仓库里钉死的校验和清单（include/pin_checksums.sh）。同样的理由单独载入：
+# 本文件被 install.sh 与 download_sources.sh 分别引用，不能假定别的文件
+# 先被载入。
+if [ -z "${_GH_PIN_CHECKSUMS_SH_LOADED:-}" ]; then
+  _GH_PIN_CHECKSUMS_SH_LOADED=1
+  _ghpc_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+  if [ -n "$_ghpc_dir" ] && [ -f "${_ghpc_dir}/pin_checksums.sh" ]; then
+    . "${_ghpc_dir}/pin_checksums.sh"
+  fi
+fi
+
 # Download a checksum file, using the configured GitHub accelerator if the
 # official GitHub checksum URL is blocked or unreachable.
 _download_checksum_file() {
@@ -45,25 +56,37 @@ _download_checksum_file() {
   local checksum_file=$2
   local fallback_url=""
 
+  # 来源标记：校验和来自 GitHub 还是来自加速器。
+  # 这不是记账：当包也是从加速器来的时，这个 SHA256 就是拿它自己跟它自己比，
+  # 什么都证明不了（见 verify_sha256 里的拒绝逻辑）。
+  GH_CHECKSUM_SOURCE="github"
+
   # 首选固定未被污染的 IP 直连。校验和文件同样在 github.com 上，域名一样
   # 会被污染；加速器只是把问题换了个方向（见 download_sources.sh 里关于
   # 循环校验的说明）。
   if [[ "${GH_DIRECT_ENABLED:-y}" != "n" ]] \
      && [[ "$checksum_url" == "https://github.com/"* || "$checksum_url" == "https://raw.githubusercontent.com/"* ]]; then
     if gh_direct_download "$checksum_url" "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]; then
+      GH_CHECKSUM_SOURCE="github"
       return 0
     fi
     rm -f "$checksum_file"
   fi
 
   if wget -q "$checksum_url" -O "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]; then
+    GH_CHECKSUM_SOURCE="github"
     return 0
   fi
 
   if [[ "$checksum_url" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ]; then
     fallback_url="${GITHUB_ACCELERATOR_URL%/}/${checksum_url}"
     echo "${CWARNING}Official checksum unavailable, trying accelerator: ${fallback_url}${CEND}"
-    wget -q "$fallback_url" -O "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]
+    if wget -q "$fallback_url" -O "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]; then
+      GH_CHECKSUM_SOURCE="accelerator"
+      return 0
+    fi
+    rm -f "$checksum_file"
+    return 1
   else
     return 1
   fi
@@ -81,20 +104,51 @@ verify_sha256() {
   
   echo "Verifying SHA256 checksum for ${file_name}..."
   
+  # 仓库里钉死的期望值优先。
+  #
+  # 它是源码树的一部分：被审阅、被版本控制，不依赖任何网络源。加速器即使
+  # 同时提供包和校验和，这个锚点也不会跟着它走——循环校验在这里被真正切断，
+  # 而不是靠"两边不同源"这种约定。
+  local expected_pinned=""
+  if command -v gh_pinned_checksum >/dev/null 2>&1; then
+    expected_pinned=$(gh_pinned_checksum "$file_name" 2>/dev/null || true)
+  fi
+  if [ -n "$expected_pinned" ]; then
+    local actual_pinned
+    actual_pinned=$(compute_sha256 "$file_name")
+    if [[ "$expected_pinned" == "$actual_pinned" ]]; then
+      echo "${CGREEN}Checksum verified against the value pinned in the repository: ${actual_pinned}${CEND}"
+      return 0
+    fi
+    echo "${CFAILURE}Checksum mismatch against the value pinned in the repository!${CEND}"
+    echo "Expected: $expected_pinned"
+    echo "Actual:   $actual_pinned"
+    echo "If the version moved, refresh the pin with update_checksums.sh"
+    return 1
+  fi
+  
   if _download_checksum_file "$checksum_url" "$checksum_file"; then
     # 校验和文件可能是 "sha256" 或 "sha256  filename" 格式，只取第一个字段
     local expected=$(awk '{print $1}' "$checksum_file" | tr -d '[:space:]')
     local actual=$(compute_sha256 "$file_name")
     
-    if [[ "$expected" == "$actual" ]]; then
-      echo "${CGREEN}Checksum verified: ${actual}${CEND}"
-      return 0
-    else
+    if [[ "$expected" != "$actual" ]]; then
       echo "${CFAILURE}Checksum mismatch!${CEND}"
       echo "Expected: $expected"
       echo "Actual:   $actual"
       return 1
     fi
+    
+    # 包和校验和都来自同一个加速器时，这个 SHA256 是拿它自己跟它自己比，
+    # 被篡改的包一样能通过——那就等于没有校验。这种组合直接拒绝。
+    if [ "${GH_TARBALL_SOURCE:-github}" = "accelerator" ] \
+       && [ "${GH_CHECKSUM_SOURCE:-github}" = "accelerator" ]; then
+      echo "${CFAILURE}Refusing a checksum that came from the same accelerator as the tarball: it verifies nothing${CEND}"
+      return 1
+    fi
+    
+    echo "${CGREEN}Checksum verified: ${actual}${CEND}"
+    return 0
   else
     echo "${CFAILURE}Failed to download checksum file${CEND}"
     return 1
@@ -146,7 +200,7 @@ verify_php_sha256() {
   local api_url="https://www.php.net/releases/index.php?json&version=${php_ver}&max=1"
   local api_response
   
-  api_response=$(curl -s --connect-timeout 10 --max-time 30 "$api_url" 2>/dev/null)
+  api_response=$(curl -s --connect-timeout 10 --max-time 30 "$api_url" 2>/dev/null || true)
   
   if [ -z "$api_response" ]; then
     echo "${CFAILURE}Could not fetch PHP releases API${CEND}"
@@ -257,9 +311,12 @@ verify_pgp_signature() {
   # actual cause (unknown signer, missing key, bad signature) - without it a
   # PGP failure in the install path is an unexplained die_hard. Mirrors the
   # asc branch of download_sources.sh (pre-download path).
-  local gpg_out
-  gpg_out=$(gpg --verify "${file_name}.asc" "$file_name" 2>&1)
-  local gpg_rc=$?
+  local gpg_out gpg_rc
+  # The status is captured in the same statement: under "set -e" a failing
+  # assignment would abort the install before gpg_rc was ever read, and the
+  # diagnostic below — the one that names the actual cause — would never be
+  # printed.
+  gpg_out=$(gpg --verify "${file_name}.asc" "$file_name" 2>&1) && gpg_rc=0 || gpg_rc=$?
   if [ "$gpg_rc" -eq 0 ]; then
     echo "${CGREEN}${component} PGP signature verified${CEND}"
     return 0
