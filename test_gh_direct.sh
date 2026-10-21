@@ -30,12 +30,16 @@ current_dir="$(dirname "$(readlink -f "$0")")"
 # Sourced with a relative path on purpose: the helpers must not depend on the
 # directory the caller happens to be in.
 cd "${current_dir}"
+. ./include/color.sh
 . ./include/gh_direct.sh
 . ./include/pin_checksums.sh
 . ./include/download.sh
 
 fail=0
 pass=0
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "${tmp}"' EXIT
 
 ok() {
   pass=$((pass + 1))
@@ -174,12 +178,52 @@ check "the accelerator URL is reported" "https://a.example/https://github.com/x/
 check "the speed is reported next to it" "8" "${info##* }"
 
 # --------------------------------------------------------------------------
+# A checksum that came from the same accelerator as the tarball verifies
+# nothing — and the refusal has to happen BEFORE the check is accepted.
+#
+# The signature of a circular verification is that it PASSES: the
+# accelerator's tarball against the accelerator's checksum. A guard that
+# sits behind "the verification failed" therefore never fires, which is
+# exactly where it was: checksum_ok is 1 in the circular case, so the guard
+# was skipped and the download was accepted.
+# --------------------------------------------------------------------------
+echo
+echo "A checksum from the same accelerator is refused:"
+. ./include/check_download.sh
+VERIFY_CHECKSUM=yes
+printf 'x' > "${tmp}/pkg.tar.gz"
+pkg_sha=$(printf 'x' | sha256sum | awk '{print $1}')
+_download_checksum_file() {
+  printf '%s  pkg.tar.gz\n' "${pkg_sha}" > "$2"
+  GH_CHECKSUM_SOURCE="accelerator"
+  return 0
+}
+GH_TARBALL_SOURCE="accelerator"
+if verify_sha256 "${tmp}/pkg.tar.gz" "https://github.com/x/y.sha256" 2>&1 | grep -q "Refusing"; then
+  ok "a checksum from the same accelerator as the tarball is refused"
+else
+  no "a checksum from the same accelerator as the tarball is refused"
+fi
+
+# The opposite combination must still be accepted: the tarball from the
+# accelerator, the checksum from GitHub.
+_download_checksum_file() {
+  printf '%s  pkg.tar.gz\n' "${pkg_sha}" > "$2"
+  GH_CHECKSUM_SOURCE="github"
+  return 0
+}
+GH_TARBALL_SOURCE="accelerator"
+if verify_sha256 "${tmp}/pkg.tar.gz" "https://github.com/x/y.sha256" >/dev/null 2>&1; then
+  ok "a checksum from GitHub is accepted for an accelerated tarball"
+else
+  no "a checksum from GitHub is accepted for an accelerated tarball"
+fi
+
+# --------------------------------------------------------------------------
 # The pinned checksum must be found regardless of the current directory.
 # --------------------------------------------------------------------------
 echo
 echo "Pinned checksum lookup:"
-tmp="$(mktemp -d)"
-trap 'rm -rf "${tmp}"' EXIT
 cp "${current_dir}/component_checksums.txt" "${tmp}/"
 (
   cd "${tmp}"

@@ -750,6 +750,20 @@ download_file() {
             fi
           fi
           if [ "$checksum_ok" -eq 0 ] && download_checksum "$checksum_url" "$checksum_type" "$filename"; then
+            # 包和校验和都来自同一个加速器时，这个 SHA256 是拿它自己跟它自己比，
+            # 被篡改的包一样能通过——那就等于没有校验。
+            #
+            # 这个判断必须在"校验通过"之前做。同源的时候校验**恰恰是**通过的，
+            # 所以把它挂在"校验失败"之后的那条路径上永远也不会触发：之前这条
+            # 拒绝逻辑写在了 checksum_ok -eq 0 的后面，而循环校验通过时
+            # checksum_ok 正好是 1。
+            if [ "${GH_TARBALL_SOURCE:-github}" = "accelerator" ] \
+               && [ "${GH_CHECKSUM_SOURCE:-github}" = "accelerator" ]; then
+              log ERROR "Refusing a checksum that came from the same accelerator as the tarball: it verifies nothing"
+              rm -f "$filename" "${filename}.${checksum_type}"
+              popd > /dev/null
+              return 1
+            fi
             if verify_checksum "$filename" "${filename}.${checksum_type}" "$checksum_type" "$filename"; then
               checksum_ok=1
             else
@@ -760,9 +774,8 @@ download_file() {
             fi
           fi
 
-          # 加速器提供的校验和只有在 tarball 不是来自加速器时才有意义。
-          # 两者都来自同一个加速器时，这个 SHA256 是拿它自己跟它自己比，
-          # 被篡改的包一样能通过——那就等于没有校验。
+          # 第二道同样的防线。上面那道在"校验通过"之前判，这一道在之后；
+          # 两者同源的情况在上面已经被拒了，这里只是不再依赖那一个判断。
           if [ "$checksum_ok" -eq 0 ] && [ "${GH_TARBALL_SOURCE:-github}" = "accelerator" ] \
              && [ "${GH_CHECKSUM_SOURCE:-github}" = "accelerator" ]; then
             log ERROR "Refusing a checksum that came from the same accelerator as the tarball: it verifies nothing"
