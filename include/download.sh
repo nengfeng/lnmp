@@ -178,9 +178,27 @@ Download_src() {
   # accelerator as a final fallback instead of burning the install on GitHub.
   github_accelerator_urls urls
 
+  # 首选：固定未被污染的 IP 直连，并行分块下载。
+  #
+  # 这一步必须在测速之前。测速在前的话，urls[0] 一旦被换成加速器地址，
+  # 下面那段就因为不再是 github.com 而整段跳过——境内实测就是这样：日志里
+  # 只有 wget 的输出，固定 IP 路径根本没被尝试过。
+  #
+  # 并行的理由：单条 TCP 流到 GitHub 的 CDN 在境内被限速到十几 KB/s，
+  # 而这个限制是按流算的，不是按整个传输算的，所以分成几段同时拉会快好几倍。
+  local _pinned_done="n"
+  if [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]]; then
+    if gh_direct_download "${urls[0]}" "${file_name}"; then
+      echo "${CMSG}Fetched through a pinned address (no poisoned DNS involved)${CEND}"
+      _pinned_done="y"
+    else
+      rm -f "${file_name}"
+    fi
+  fi
+
   # GitHub URLs can be reachable but painfully slow. If so, do a quick sample
   # and prefer the accelerator instead of waiting on the full download.
-  if [[ "${urls[0]}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
+  if [ "$_pinned_done" != "y" ] && [[ "${urls[0]}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
     local primary_speed accel_url min_speed
     min_speed=$(github_speed_min_bytes)
     accel_url=$(github_accelerator_url "${urls[0]}")
@@ -198,6 +216,15 @@ Download_src() {
         urls=( "${reordered[@]}" )
       fi
     fi
+  fi
+
+  # 固定 IP 直连已经拿到文件：不再走下面的重试循环（那会把同样的内容再下一遍）。
+  if [ "$_pinned_done" = "y" ]; then
+    if [ -s "${file_name}" ]; then
+      echo "[${CMSG}${file_name}${CEND}] fetched via a pinned address"
+      return 0
+    fi
+    rm -f "${file_name}"
   fi
 
   # Multiple sources: fewer retries each so we fail over quickly. A single

@@ -167,6 +167,90 @@ gh_direct_probe() {
        "${args[@]}" "$url" >/dev/null 2>&1
 }
 
+# How many chunks to fetch at once.
+# A single stream to GitHub's CDN from a mainland network is rate limited to
+# roughly 17 KB/s; the same file over several parallel range requests is
+# several times faster, because the limit is per stream and not per transfer.
+GH_DIRECT_PARALLEL="${GH_DIRECT_PARALLEL:-8}"
+
+# Fetch a byte range into a file.
+# Usage: _gh_fetch_range <url> <start> <end> <out>
+_gh_fetch_range() {
+  local url="$1" start="$2" end="$3" out="$4"
+  curl --connect-timeout 10 -m 1800 --retry 3 --retry-delay 2 --retry-connrefused \
+       -f -r "${start}-${end}" -o "$out" "$url" >/dev/null 2>&1
+}
+
+# Download a URL in parallel chunks.
+# Usage: gh_direct_download_parallel <url> <output-file>
+# Prints nothing. Returns 0 on success.
+# Only usable when the server serves byte ranges; the caller falls back to a
+# single stream when it does not.
+gh_direct_download_parallel() {
+  local url="$1" out="$2"
+  local -a args=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && args+=( "$line" )
+  done < <(gh_resolve_args)
+  [ ${#args[@]} -eq 0 ] && return 1
+
+  # The effective URL after the redirect, carrying the signed query through.
+  local effective
+  effective=$(curl --connect-timeout 10 -m 60 -skIL "${args[@]}" \
+                -o /dev/null -w '%{url_effective}' "$url" 2>/dev/null)
+  [ -z "$effective" ] && effective="$url"
+
+  # A one-byte range request answers with Content-Range, which both proves
+  # that ranges work and gives the total size. Without it there is nothing to
+  # split, and the single-stream path is the only option.
+  local headers size
+  headers=$(curl --connect-timeout 10 -m 30 -skI -r 0-0 "${args[@]}" "$effective" 2>/dev/null)
+  size=$(printf '%s' "$headers" | grep -i '^content-range:' | tr -d '\r' | grep -oE '[0-9]+$')
+  [ -n "$size" ] || return 1
+  [ "$size" -gt 1048576 ] || return 1   # small files are not worth splitting
+
+  local n="${GH_DIRECT_PARALLEL}"
+  [ "$n" -lt 2 ] && return 1
+  [ "$n" -gt 16 ] && n=16
+
+  local work
+  work=$(mktemp -d 2>/dev/null) || return 1
+
+  local chunk=$(( (size + n - 1) / n ))
+  local i start end
+  local pids=()
+  for i in $(seq 0 $((n - 1))); do
+    start=$(( i * chunk ))
+    end=$(( start + chunk - 1 ))
+    [ $end -ge $size ] && end=$(( size - 1 ))
+    [ $start -ge $size ] && continue
+    _gh_fetch_range "$effective" "$start" "$end" "${work}/part.${i}" &
+    pids+=($!)
+  done
+
+  local failed=0
+  for pid in "${pids[@]}"; do
+    wait "$pid" || failed=1
+  done
+
+  if [ $failed -ne 0 ]; then
+    # A chunk did not arrive. Clean up and let the caller fall back to the
+    # single-stream path, which is slower but does not depend on ranges.
+    rm -rf "$work"
+    return 1
+  fi
+
+  # Assemble in order.
+  : > "${out}.assembling"
+  for i in $(seq 0 $((n - 1))); do
+    [ -f "${work}/part.${i}" ] || { rm -rf "$work" "${out}.assembling"; return 1; }
+    cat "${work}/part.${i}" >> "${out}.assembling"
+  done
+  mv -f "${out}.assembling" "$out"
+  rm -rf "$work"
+  return 0
+}
+
 # Download a URL through a pinned address.
 # Usage: gh_direct_download <url> <output-file>
 #
@@ -204,6 +288,14 @@ gh_direct_download() {
   effective=$(curl --connect-timeout 10 -m 60 -skIL "${args[@]}" \
                 -o /dev/null -w '%{url_effective}' "$url" 2>/dev/null)
   [ -z "$effective" ] && effective="$url"
+
+  # Parallel chunks first: a single stream to GitHub's CDN is rate limited to
+  # roughly 17 KB/s from a mainland network, while several range requests at
+  # once are several times faster. Falls through to the single-stream path
+  # when the server does not serve ranges, or when a chunk fails.
+  if gh_direct_download_parallel "$url" "$out"; then
+    return 0
+  fi
 
   local rc
   curl --connect-timeout 10 -m 1800 --retry 3 --retry-delay 2 --retry-connrefused \
