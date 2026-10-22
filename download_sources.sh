@@ -20,7 +20,17 @@ set -e
 # ============================================
 # 初始化
 # ============================================
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+# The directory of THIS file — not of the script that invoked it.
+#
+# $0 is the CALLER's name when this file is sourced, and the offline test
+# suite sources it from tools/. With $0 the paths pointed at
+# tools/include/..., the two includes below were not there, and because
+# "set -e" is on, the failed include took the test script down with it:
+# the suite stopped dead at "offline prefetch covers every installable
+# database version" with no further output.
+#
+# BASH_SOURCE[0] is this file in both cases: run directly and sourced.
+SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 SRC_DIR="${SCRIPT_DIR}/src"
 VERSIONS_FILE="${SCRIPT_DIR}/versions.txt"
 SOURCES_FILE="${SCRIPT_DIR}/sources.conf"
@@ -76,6 +86,24 @@ if [ -f "${SCRIPT_DIR}/options.conf" ]; then
 fi
 MIRROR_BASE_URL="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}"
 GITHUB_ACCELERATOR_URL="${GITHUB_ACCELERATOR_URL:-}"
+
+# 直接固定干净 IP 访问 GitHub（绕过被污染的 DNS），以及仓库内的校验和 pin。
+# 两者都在 include/ 下，前者解 DNS，后者是信任锚点。
+#
+# Guarded, and loudly: a caller that sources this file from elsewhere must
+# not be taken down by a missing include — but a missing trust anchor must
+# never pass unnoticed, because the checksums pinned in the repository are
+# what keeps the verification from being circular.
+if [ -f "${SCRIPT_DIR}/include/gh_direct.sh" ]; then
+  . "${SCRIPT_DIR}/include/gh_direct.sh"
+else
+  echo "Warning: ${SCRIPT_DIR}/include/gh_direct.sh not found; GitHub downloads will not use a pinned address" >&2
+fi
+if [ -f "${SCRIPT_DIR}/include/pin_checksums.sh" ]; then
+  . "${SCRIPT_DIR}/include/pin_checksums.sh"
+else
+  echo "Warning: ${SCRIPT_DIR}/include/pin_checksums.sh not found; the checksums pinned in the repository will NOT be used" >&2
+fi
 
 # 日志函数
 log() {
@@ -320,7 +348,23 @@ download_checksum() {
 
   local checksum_file="${filename}.${checksum_type}"
 
+  # 来源标记：校验和来自 GitHub 还是来自加速器。
+  # 这一点是有意义的，不是记账：加速器同时提供 tarball 和它的校验和，
+  # 那种情况下 SHA256 校验是拿加速器跟它自己比，什么都证明不了。
+  # 调用方据此拒绝"两者同源"的组合。
+  GH_CHECKSUM_SOURCE="github"
+
   log INFO "Downloading checksum: ${checksum_url}"
+
+  # 首选固定干净 IP 直连（校验和文件同样在 github.com 上，域名一样会被污染）
+  if [[ "${checksum_url}" == "https://github.com/"* || "${checksum_url}" == "https://raw.githubusercontent.com/"* ]]; then
+    if gh_direct_download "${checksum_url}" "${checksum_file}" && [ -s "${checksum_file}" ]; then
+      GH_CHECKSUM_SOURCE="github"
+      echo "${checksum_file}"
+      return 0
+    fi
+    rm -f "${checksum_file}"
+  fi
 
   if wget -q "${checksum_url}" -O "${checksum_file}" 2>/dev/null; then
     # 检查文件是否为空
@@ -337,6 +381,7 @@ download_checksum() {
     accelerator_url="${GITHUB_ACCELERATOR_URL%/}/${checksum_url}"
     log WARN "Official checksum unavailable, trying accelerator: ${accelerator_url}"
     if wget -q "${accelerator_url}" -O "${checksum_file}" 2>/dev/null && [ -s "${checksum_file}" ]; then
+      GH_CHECKSUM_SOURCE="accelerator"
       echo "${checksum_file}"
       return 0
     fi
@@ -424,8 +469,9 @@ verify_checksum() {
       import_pgp_keys "${PGP_KEYS_DIR}" || return 1
       log INFO "Verifying PGP signature..."
       local gpg_out gpg_rc
-      gpg_out=$(gpg --verify "$checksum_file" "$file" 2>&1)
-      gpg_rc=$?
+      # Same reason as in check_download.sh: under "set -e" the assignment
+      # would abort the script before the diagnostic could be printed.
+      gpg_out=$(gpg --verify "$checksum_file" "$file" 2>&1) && gpg_rc=0 || gpg_rc=$?
       if [ "$gpg_rc" -eq 0 ]; then
         log INFO "PGP signature verified successfully"
         return 0
@@ -497,7 +543,7 @@ _url_speed_curl() {
   command -v curl >/dev/null 2>&1 || return 1
 
   local raw
-  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null)
+  raw=$(curl --connect-timeout 5 -m "${max_time}" -sS -L -o /dev/null -r "0-${range_end}" -w '%{speed_download}' "${url}" 2>/dev/null || true)
   [ -n "${raw}" ] || return 1
 
   printf '%d\n' "${raw%.*}"
@@ -521,7 +567,10 @@ download_file() {
   local filename=$2
   local checksum_url=$3
   local checksum_type=$4
-  
+
+  # 这个包是从哪儿来的。加速器来源的包，校验和不能也来自加速器。
+  GH_TARBALL_SOURCE="github"
+
   pushd "${SRC_DIR}" > /dev/null
 
   # Fail fast only for HTTP error responses (wget exit >= 8, e.g. 404). Keep
@@ -537,22 +586,6 @@ download_file() {
     return 1
   fi
 
-  # GitHub can be reachable but painfully slow. Do a quick sample and prefer
-  # the accelerator when the official source is lagging behind.
-  if [[ "${url}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
-    local _gh_primary_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
-    _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
-    _gh_min_speed=$(( _gh_min_kbps * 1024 ))
-    _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
-    _gh_primary_speed=$(_url_speed_curl "${url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_primary_speed=""
-    if [ -n "${_gh_primary_speed}" ] && [ "${_gh_primary_speed}" -lt "${_gh_min_speed}" ]; then
-      _gh_accel_speed=$(_url_speed_curl "${_gh_accel_url}" "${GITHUB_SPEED_SAMPLE_BYTES:-2097152}" "${GITHUB_SPEED_TEST_SECONDS:-10}") || _gh_accel_speed=""
-      if [ -n "${_gh_accel_speed}" ] && [ "${_gh_accel_speed}" -ge "${_gh_min_speed}" ]; then
-        log WARN "Official GitHub looks slow (${_gh_primary_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed} B/s)"
-        url="${_gh_accel_url}"
-      fi
-    fi
-  fi
 
   # 检查文件是否已存在
   if [ -f "${filename}" ]; then
@@ -625,9 +658,75 @@ download_file() {
   # 注意：无 pipefail 时 $? 是 tee 的退出码，必须用 PIPESTATUS[0]
   # 判定 wget 的真实退出码（tee 几乎总是成功，会吞掉下载错误）。
   local part_file="${filename}.part"
-  wget --progress=bar:force -c "${url}" -O "${part_file}" 2>&1 | tee -a "${LOG_FILE}"
-  local wget_rc=${PIPESTATUS[0]}
-  if [ ${wget_rc} -eq 8 ]; then
+  local wget_rc=0
+
+  # 首选：固定未被污染的 IP 直连 GitHub（并行分块）。
+  #
+  # 先测速，再决定用固定 IP 直连还是加速器。
+  #
+  # 测的是固定 IP 路径的并行吞吐，不是单流速度：境内的限速是按流算的，
+  # 单流 22 KB/s 而八路并行能到 176 KB/s，用单流数字做闸门会把快的那条路
+  # 误判成慢的，然后把能直连的机会白白让出去。
+  #
+  # 这不改变信任模型：校验和优先用仓库里钉死的期望值（component_checksums.txt），
+  # 走加速器时校验和仍然从 GitHub 取——固定 IP + TLS 证书验证，两边不同源，
+  # 循环校验不会出现。加速器只负责搬运字节。
+  if [[ "$url" == "https://github.com/"* || "$url" == "https://raw.githubusercontent.com/"* ]]; then
+    local _gh_pinned_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
+    _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
+    _gh_min_speed=$(( _gh_min_kbps * 1024 ))
+    _gh_pinned_speed=""
+    if command -v gh_direct_speed_probe >/dev/null 2>&1; then
+      _gh_pinned_speed=$(gh_direct_speed_probe "${url}" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
+    fi
+    if [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && [ -n "$_gh_pinned_speed" ] && [ "$_gh_pinned_speed" -lt "$_gh_min_speed" ]; then
+      # 每个加速器都测一遍，用最快的那个。加速器会下线，只配一个就是单点故障。
+      if command -v gh_fastest_accelerator >/dev/null 2>&1; then
+        # 速度随 URL 一起返回：调用方是命令替换（子 shell），子 shell 里设的
+        # 变量带不出来——父进程读到 0，就会以为加速器比直连还慢而拒绝切换。
+        local _gh_accel_info
+        _gh_accel_info=$(gh_fastest_accelerator "${url}" "${_gh_min_speed}" || true)
+        _gh_accel_url="${_gh_accel_info%% *}"
+        _gh_accel_speed="${_gh_accel_info##* }"
+        case "$_gh_accel_speed" in
+          ''|*[!0-9]*) _gh_accel_speed=0 ;;
+        esac
+      else
+        _gh_accel_url="${GITHUB_ACCELERATOR_URL%/}/${url}"
+        _gh_accel_speed=$(gh_url_speed "${_gh_accel_url}" "${GH_DIRECT_SPEED_SAMPLE_BYTES:-524288}" "${GH_DIRECT_SPEED_TEST_SECONDS:-8}" || true)
+      fi
+      # 只在加速器确实更快时才切换。切到更慢的那个只会更慢。
+      if [ -n "$_gh_accel_url" ] && [ "${_gh_accel_speed:-0}" -ge "$_gh_pinned_speed" ]; then
+        log WARN "Pinned path looks slow (${_gh_pinned_speed} B/s < ${_gh_min_speed} B/s); switching to accelerator (${_gh_accel_speed:-0} B/s): ${_gh_accel_url}"
+        url="${_gh_accel_url}"
+        # 记下这个包是加速器给的——后面校验和不能也来自加速器，
+        # 否则 SHA256 就是拿它自己跟它自己比，被篡改的包一样能过。
+        GH_TARBALL_SOURCE="accelerator"
+      elif [ -n "$_gh_accel_url" ]; then
+        log INFO "Pinned path is slow (${_gh_pinned_speed} B/s) but the accelerator is slower still (${_gh_accel_speed:-0} B/s); staying on the pinned path"
+      fi
+    fi
+
+    # 固定 IP 直连（并行分块）。只有上面没有把来源换成加速器时才走这里。
+    if [[ "${url}" == "https://github.com/"* || "${url}" == "https://raw.githubusercontent.com/"* ]]; then
+      if gh_direct_download "${url}" "${part_file}"; then
+        log INFO "Fetched through a pinned address (no poisoned DNS involved)"
+        wget_rc=0
+      else
+        rm -f "${part_file}"
+        wget_rc=1
+      fi
+    fi
+  fi
+
+  if [ ! -s "${part_file}" ] && [ ${wget_rc} -ne 0 ]; then
+    wget --progress=bar:force -c "${url}" -O "${part_file}" 2>&1 | tee -a "${LOG_FILE}"
+    wget_rc=${PIPESTATUS[0]}
+  fi
+
+  # 8: wget 的 HTTP 错误；22: curl 的 HTTP 错误。两者都表示这个地址没有
+  # 那个文件，重试没有意义。
+  if [ ${wget_rc} -eq 8 ] || [ ${wget_rc} -eq 22 ]; then
     log WARN "Download source returned HTTP error; skipping retries: ${url}"
     [ -f "${part_file}" ] && [ ! -s "${part_file}" ] && rm -f "${part_file}"
     popd > /dev/null
@@ -653,7 +752,41 @@ download_file() {
 
         if [[ -n "$checksum_url" ]] && [ -n "$checksum_type" ] && [[ "$VERIFY_CHECKSUM" == "yes" ]]; then
           local checksum_ok=0
-          if download_checksum "$checksum_url" "$checksum_type" "$filename"; then
+          local pinned_sum
+          pinned_sum=$(gh_pinned_checksum "$filename" 2>/dev/null || true)
+          if [ -n "$pinned_sum" ]; then
+            # 仓库里钉住了这个文件的期望值——用它，网络只负责取字节。
+            # 期望值因此不依赖任何网络源，加速器无法同时提供包和校验和。
+            local actual_sum
+            actual_sum=$(sha256sum "$filename" | awk '{print $1}')
+            if [ "$actual_sum" = "$pinned_sum" ]; then
+              log INFO "Verified against the checksum pinned in the repository"
+              checksum_ok=1
+            else
+              log ERROR "Checksum does not match the value pinned in the repository"
+              log ERROR "  expected: ${pinned_sum}"
+              log ERROR "  actual:   ${actual_sum}"
+              log ERROR "  if the version moved, refresh the pin with update_checksums.sh"
+              rm -f "$filename" "${filename}.${checksum_type}"
+              popd > /dev/null
+              return 1
+            fi
+          fi
+          if [ "$checksum_ok" -eq 0 ] && download_checksum "$checksum_url" "$checksum_type" "$filename"; then
+            # 包和校验和都来自同一个加速器时，这个 SHA256 是拿它自己跟它自己比，
+            # 被篡改的包一样能通过——那就等于没有校验。
+            #
+            # 这个判断必须在"校验通过"之前做。同源的时候校验**恰恰是**通过的，
+            # 所以把它挂在"校验失败"之后的那条路径上永远也不会触发：之前这条
+            # 拒绝逻辑写在了 checksum_ok -eq 0 的后面，而循环校验通过时
+            # checksum_ok 正好是 1。
+            if [ "${GH_TARBALL_SOURCE:-github}" = "accelerator" ] \
+               && [ "${GH_CHECKSUM_SOURCE:-github}" = "accelerator" ]; then
+              log ERROR "Refusing a checksum that came from the same accelerator as the tarball: it verifies nothing"
+              rm -f "$filename" "${filename}.${checksum_type}"
+              popd > /dev/null
+              return 1
+            fi
             if verify_checksum "$filename" "${filename}.${checksum_type}" "$checksum_type" "$filename"; then
               checksum_ok=1
             else
@@ -664,10 +797,26 @@ download_file() {
             fi
           fi
 
+          # 第二道同样的防线。上面那道在"校验通过"之前判，这一道在之后；
+          # 两者同源的情况在上面已经被拒了，这里只是不再依赖那一个判断。
+          if [ "$checksum_ok" -eq 0 ] && [ "${GH_TARBALL_SOURCE:-github}" = "accelerator" ] \
+             && [ "${GH_CHECKSUM_SOURCE:-github}" = "accelerator" ]; then
+            log ERROR "Refusing a checksum that came from the same accelerator as the tarball: it verifies nothing"
+            rm -f "$filename" "${filename}.${checksum_type}"
+            popd > /dev/null
+            return 1
+          fi
+
           if [ "$checksum_ok" -eq 0 ] && [[ "${url}" == "https://github.com/"* ]] && [[ -n "${GITHUB_ACCELERATOR_URL}" ]]; then
             local accelerator_checksum="${GITHUB_ACCELERATOR_URL%/}/${checksum_url}"
             log WARN "Official checksum unavailable, trying accelerator: ${accelerator_checksum}"
             if download_checksum "$accelerator_checksum" "$checksum_type" "$filename"; then
+              if [ "${GH_TARBALL_SOURCE:-github}" = "accelerator" ]; then
+                log ERROR "Refusing a checksum that came from the same accelerator as the tarball: it verifies nothing"
+                rm -f "$filename" "${filename}.${checksum_type}"
+                popd > /dev/null
+                return 1
+              fi
               if ! verify_checksum "$filename" "${filename}.${checksum_type}" "$checksum_type" "$filename"; then
                 log ERROR "Checksum verification failed, removing corrupted file"
                 rm -f "$filename" "${filename}.${checksum_type}"
