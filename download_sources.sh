@@ -20,7 +20,17 @@ set -e
 # ============================================
 # 初始化
 # ============================================
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+# The directory of THIS file — not of the script that invoked it.
+#
+# $0 is the CALLER's name when this file is sourced, and the offline test
+# suite sources it from tools/. With $0 the paths pointed at
+# tools/include/..., the two includes below were not there, and because
+# "set -e" is on, the failed include took the test script down with it:
+# the suite stopped dead at "offline prefetch covers every installable
+# database version" with no further output.
+#
+# BASH_SOURCE[0] is this file in both cases: run directly and sourced.
+SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 SRC_DIR="${SCRIPT_DIR}/src"
 VERSIONS_FILE="${SCRIPT_DIR}/versions.txt"
 SOURCES_FILE="${SCRIPT_DIR}/sources.conf"
@@ -79,8 +89,21 @@ GITHUB_ACCELERATOR_URL="${GITHUB_ACCELERATOR_URL:-}"
 
 # 直接固定干净 IP 访问 GitHub（绕过被污染的 DNS），以及仓库内的校验和 pin。
 # 两者都在 include/ 下，前者解 DNS，后者是信任锚点。
-. "${SCRIPT_DIR}/include/gh_direct.sh"
-. "${SCRIPT_DIR}/include/pin_checksums.sh"
+#
+# Guarded, and loudly: a caller that sources this file from elsewhere must
+# not be taken down by a missing include — but a missing trust anchor must
+# never pass unnoticed, because the checksums pinned in the repository are
+# what keeps the verification from being circular.
+if [ -f "${SCRIPT_DIR}/include/gh_direct.sh" ]; then
+  . "${SCRIPT_DIR}/include/gh_direct.sh"
+else
+  echo "Warning: ${SCRIPT_DIR}/include/gh_direct.sh not found; GitHub downloads will not use a pinned address" >&2
+fi
+if [ -f "${SCRIPT_DIR}/include/pin_checksums.sh" ]; then
+  . "${SCRIPT_DIR}/include/pin_checksums.sh"
+else
+  echo "Warning: ${SCRIPT_DIR}/include/pin_checksums.sh not found; the checksums pinned in the repository will NOT be used" >&2
+fi
 
 # 日志函数
 log() {
