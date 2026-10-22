@@ -191,6 +191,14 @@ Download_src() {
       Download_src "$@"
       return $?
     fi
+    # Align the cached archive too, not only a fresh download: a cache left
+    # un-repacked (by an older build, the pinned-address path, or a
+    # hand-placed GitHub auto-tag archive) would otherwise keep failing the
+    # build step forever. Idempotent: an already-matching archive only pays
+    # for one listing.
+    if ! align_archive_top_dir "${file_name}" "${src_expected_dir:-}"; then
+      echo "${CWARNING}[${file_name}] could not be aligned to its expected top-level dir; if the build complains about a missing dir, delete it and re-download${CEND}"
+    fi
     echo "[${CMSG}${file_name}${CEND}] found"
     return 0
   fi
@@ -303,12 +311,21 @@ Download_src() {
   fi
 
   # 固定 IP 直连已经拿到文件：不再走下面的重试循环（那会把同样的内容再下一遍）。
+  # 拿到的是裸字节，和 wget 路径一样先做完整性探测、对齐顶层目录，通过才算成功。
+  # GitHub 自动 tag 包解出来是 <repo>-<tag> 目录：不对齐就会原样进构建步骤，
+  # 报 "extraction did not produce ..."（境内固定 IP 路径正是这种包的常见入口）。
   if [ "$_pinned_done" = "y" ]; then
     if [ -s "${file_name}" ]; then
-      echo "[${CMSG}${file_name}${CEND}] fetched via a pinned address"
-      return 0
+      if _archive_integrity_ok "${file_name}" \
+         && align_archive_top_dir "${file_name}" "${src_expected_dir:-}"; then
+        echo "[${CMSG}${file_name}${CEND}] fetched via a pinned address"
+        return 0
+      fi
+      echo "${CWARNING}Pinned fetch of ${file_name} failed verification, falling back to the source list${CEND}"
+      rm -f "${file_name}"
+    else
+      rm -f "${file_name}"
     fi
-    rm -f "${file_name}"
   fi
 
   # Multiple sources: fewer retries each so we fail over quickly. A single
@@ -385,8 +402,12 @@ Download_src() {
         if ! _archive_integrity_ok "${file_name}"; then
           echo "${CWARNING}Downloaded ${file_name} failed integrity probe (mirror returned HTML?), discarding...${CEND}"
           rm -f "${file_name}"
+        elif ! align_archive_top_dir "${file_name}" "${src_expected_dir:-}"; then
+          # A failed alignment must not be trusted as a download: the build
+          # step would fail with "did not produce ...", so discard and retry.
+          echo "${CWARNING}Downloaded ${file_name} failed top-level dir alignment, discarding...${CEND}"
+          rm -f "${file_name}"
         else
-          align_archive_top_dir "${file_name}" "${src_expected_dir:-}"
           echo "${CSUCCESS}Successfully downloaded ${file_name} (source: ${url})${CEND}"
           return 0
         fi

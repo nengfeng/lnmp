@@ -28,7 +28,20 @@ enter_src_dir() {
     return 1
   fi
   if ! pushd "${dir}" > /dev/null; then
-    echo "${CERROR}[${component}] extraction of ${tarball} did not produce ${dir}/${CEND}"
+    # Show what the archive actually produced so the failure is self-explanatory.
+    # Typical cause: a GitHub auto-tag archive that was never re-packed (its
+    # top-level dir is <repo>-<tag>, not the release dir).
+    local actual="" first
+    first=$(tar tzf "${tarball}" 2>/dev/null | head -1)
+    case "${first}" in
+      */) actual="${first%/}" ;;
+    esac
+    if [ -n "${actual}" ]; then
+      echo "${CERROR}[${component}] ${tarball} extracts to '${actual}/', not '${dir}/' (a GitHub auto-tag archive left un-repacked).${CEND}"
+      echo "Fix in this src/ dir: mv '${actual}' '${dir}' and re-run — or delete '${actual}' and '${tarball}' and re-run the install (newer lnmp re-packs it automatically).${CEND}"
+    else
+      echo "${CERROR}[${component}] extraction of ${tarball} did not produce ${dir}/${CEND}"
+    fi
     return 1
   fi
   return 0

@@ -14,6 +14,19 @@ fixes, they are grouped by area rather than listed one by one.
 
 ### Fixed
 
+- **A downloaded archive with a mismatched top-level directory no longer reaches
+  the build step.** `Download_src` re-packed fallback-sourced archives (GitHub
+  auto-tag archives unpack to `<repo>-<tag>`, not the release dir) on the wget
+  path only; the pinned-address path and the cache-hit path returned the file
+  without alignment. With savannah unreachable, a complete GitHub fallback
+  archive for freetype (`freetype-VER-2-15-0/`) then failed the PHP
+  dependency build with `extraction of freetype-2.15.0.tar.gz did not
+  produce freetype-2.15.0/`. All three paths now align the archive; the
+  cache path repairs an un-aligned file already in `src/` in place, a failed
+  alignment discards the file instead of claiming success, and the
+  `enter_src_dir` error now names the directory the archive actually
+  produces plus a one-line remedy (rename, or delete and re-download).
+
 - **Corrected the 1.7.6 release notes.** They described `sysv-rc` as an install
   blocker — "does not exist in any supported distribution" — which is false:
   the package is shipped by Debian 12 and 13 (`3.06-4`, `3.14-4`, arch `all`)
