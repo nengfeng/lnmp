@@ -14,6 +14,16 @@ fixes, they are grouped by area rather than listed one by one.
 
 ### Fixed
 
+- **Ubuntu dependency install no longer aborts on a mirror index republish.**
+  `apt-get update` fails with "Hash Sum mismatch" when the mirror republishes
+  the release file (InRelease) and the Packages indexes it signs in separate
+  publication waves — the client fetches the two from different waves. A
+  plain re-run never recovers: apt keeps the InRelease it already fetched, so
+  it keeps signing the new indexes against the stale release. The installer
+  now retries (up to 3 attempts, 30 s apart) and wipes `/var/lib/apt/lists`
+  before each retry so the release and its indexes are re-fetched from the
+  same wave, on both the Ubuntu dependency path and the PostgreSQL apt path.
+
 - **A downloaded archive with a mismatched top-level directory no longer reaches
   the build step.** `Download_src` re-packed fallback-sourced archives (GitHub
   auto-tag archives unpack to `<repo>-<tag>`, not the release dir) on the wget

@@ -256,12 +256,43 @@ installDepsDebian() {
   return 0
 }
 
+# apt-get update can fail with "Hash Sum mismatch" when nothing is wrong on
+# the local machine: the mirror republishes its index files (the InRelease
+# release file and the Packages indexes it signs) non-atomically, and a
+# client that fetches the two from different publication waves checks the
+# received index against the stale hash. The failure self-heals once the
+# waves align, but a plain re-run does not get there on its own: apt keeps
+# the InRelease it already fetched (the cached copy still passes the
+# freshness check), so every re-run re-signs against that stale release
+# file. Wipe /var/lib/apt/lists before each retry to force a consistent
+# re-fetch of the whole release.
+apt_update_with_retry() {
+  local label="${1:-apt-get update}"
+  local attempt=1
+  local max_attempts=3
+  local delay=30
+  while [ ${attempt} -le ${max_attempts} ]; do
+    if apt-get -y update; then
+      return 0
+    fi
+    if [ ${attempt} -eq ${max_attempts} ]; then
+      echo "${CERROR}${label}: apt-get update failed on all ${max_attempts} attempts (mirror may still be republishing its indexes)${CEND}"
+      return 1
+    fi
+    echo "${CWARNING}${label}: apt-get update failed (mirror index republish in progress, 'Hash Sum mismatch'?) — clearing the local apt lists and retrying (${attempt}/${max_attempts}) in ${delay}s...${CEND}"
+    sleep ${delay}
+    rm -rf /var/lib/apt/lists/*
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
 installDepsUbuntu() {
   echo "${CMSG}Removing the conflicting packages...${CEND}"
   purge_conflicting_db_packages
 
   echo "${CMSG}Installing dependencies packages...${CEND}"
-  apt-get -y update || return 1
+  apt_update_with_retry "Ubuntu dependency apt-get update" || return 1
   apt-get -y autoremove > /dev/null 2>&1
   apt-get -yf install > /dev/null 2>&1
   export DEBIAN_FRONTEND=noninteractive

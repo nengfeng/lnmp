@@ -62,7 +62,10 @@ deb [signed-by=/usr/share/keyrings/postgresql.asc] ${PG_REPO_MIRROR} $(lsb_relea
 deb [signed-by=/usr/share/keyrings/postgresql.asc] ${PG_REPO_MIRROR} $(lsb_release -cs)-pgdg ${PG_VER_MAJOR} main
 EOF
 
-  if ! apt-get update -y; then
+  # check_sw.sh is sourced before this file in the install flow, so the
+  # retry helper is available: a "Hash Sum mismatch" on the first attempt
+  # self-heals once the mirror's publication waves align.
+  if ! apt_update_with_retry "PostgreSQL apt-get update"; then
     fail_msg "PostgreSQL apt-get update"
     return 1
   fi
