@@ -21,7 +21,10 @@ WGET_LOG="$work/wget.log"
 CMSG=""; CEND=""; CWARNING=""; CSUCCESS=""; CFAILURE=""; CERROR=""; CYELLOW=""; CGREEN=""
 # wget stub: record the call to a FILE (it runs in a pipeline subshell, so a
 # global counter would be lost) and write a valid gzip to the -O target.
-wget(){ echo "$*" >> "$WGET_LOG"; local out=""; while [ $# -gt 0 ]; do case "$1" in -O) out="$2";; esac; shift; done; [ -n "$out" ] && printf 'x' | gzip > "$out"; return 0; }
+# WGET_FAIL_PAT makes any call whose arguments contain that text fail with
+# wget's HTTP-error code (8), which is how an unavailable mirror behaves.
+WGET_FAIL_PAT=""
+wget(){ local args="$*"; echo "$args" >> "$WGET_LOG"; local out=""; while [ $# -gt 0 ]; do case "$1" in -O) out="$2";; esac; shift; done; if [ -n "${WGET_FAIL_PAT}" ]; then case "$args" in *"${WGET_FAIL_PAT}"*) return 8;; esac; fi; [ -n "$out" ] && printf 'x' | gzip > "$out"; return 0; }
 wget_calls(){ [ -f "$WGET_LOG" ] && wc -l < "$WGET_LOG" || echo 0; }
 die_hard(){ echo "STUB die_hard: $*" >&2; exit 43; }
 fail_msg(){ echo "STUB fail_msg: $*" >&2; }
@@ -46,6 +49,46 @@ rm -f "$WGET_LOG"; printf 'not a gzip' > myfile.tar.gz
 Download_src myfile.tar.gz >/dev/null 2>&1
 [ "$(wget_calls)" -ge 1 ] && ok "corrupt cache is re-downloaded" || ko "corrupt file did not trigger re-download"
 gzip -t myfile.tar.gz >/dev/null 2>&1 && ok "re-downloaded file is a valid gzip" || ko "re-downloaded file is corrupt"
+
+echo "== GitHub path selection (overseas vs mainland) =="
+# The pinned-address machinery exists for mainland networks. Overseas it is a
+# rescue, not the first move: trying it first costs resolution probes on every
+# file and, on a host behind a proxy, can be the difference between a working
+# download and a broken one.
+OUTIP_STATE=CA; gh_direct_preferred; _rc=$?
+[ "$_rc" -ne 0 ] && ok "overseas (CA) -> direct path first" || ko "overseas still prefers the pinned path"
+OUTIP_STATE=CN; gh_direct_preferred && ok "mainland (CN) -> pinned path first" || ko "mainland does not prefer the pinned path"
+OUTIP_STATE="unknown"; gh_direct_preferred && ok "unknown location keeps the China-safe default" || ko "unknown location lost the fallback"
+OUTIP_STATE=CA; GH_DIRECT_ENABLED=y; gh_direct_preferred && ok "GH_DIRECT_ENABLED=y forces the pinned path" || ko "explicit y ignored"
+GH_DIRECT_ENABLED=n; gh_direct_preferred && ko "explicit n ignored" || ok "GH_DIRECT_ENABLED=n refuses the pinned path"
+unset GH_DIRECT_ENABLED OUTIP_STATE
+
+echo "== set_src_url: a mirror selection keeps the official URL as fallback =="
+# Mirrors lag behind upstream releases. If the mirror is chosen and the
+# official URL is not recorded, a mirror 404 becomes a failed install
+# (OpenResty's old mirror URL always 404s; MariaDB/Node lag on new tags).
+USE_CHINA_MIRROR=y
+set_src_url "https://official.invalid/x.tar.gz" "https://mirror.invalid/x.tar.gz"
+[ "$src_url" = "https://mirror.invalid/x.tar.gz" ] && [ "$src_url_fallback" = "https://official.invalid/x.tar.gz" ] \
+  && ok "mirror chosen -> official URL kept as fallback" || ko "fallback lost (src=$src_url fb=$src_url_fallback)"
+USE_CHINA_MIRROR=n
+set_src_url "https://official.invalid/x.tar.gz" "https://mirror.invalid/x.tar.gz"
+[ "$src_url" = "https://official.invalid/x.tar.gz" ] && [ -z "$src_url_fallback" ] \
+  && ok "official chosen -> no needless fallback" || ko "official selection wrong (src=$src_url fb=$src_url_fallback)"
+unset USE_CHINA_MIRROR
+
+echo "== Download_src: an unavailable mirror falls back to the official URL =="
+rm -f "$WGET_LOG" x.tar.gz
+WGET_FAIL_PAT="mirror.invalid"
+src_url="https://mirror.invalid/x.tar.gz"
+src_url_fallback="https://official.invalid/x.tar.gz"
+src_expected_dir=""
+Download_src x.tar.gz >/dev/null 2>&1
+_rc=$?
+WGET_FAIL_PAT=""
+[ "$_rc" -eq 0 ] && ok "fallback source completed the download" || ko "fallback was not used (rc=$_rc)"
+grep -q "mirror.invalid" "$WGET_LOG" && grep -q "official.invalid" "$WGET_LOG" \
+  && ok "both the mirror and the official URL were tried" || ko "one of the two sources was not tried"
 
 echo "== allocator (init_allocator) =="
 cd "$current_dir"
@@ -671,6 +714,26 @@ set +e
 VERSIONS_FILE="$ROOT/versions.txt"
 load_versions >/dev/null 2>&1
 . "$ROOT/versions.txt"
+
+echo "== prefetch: a non-GitHub component actually reaches wget =="
+# Regression (9178bb1): download_file guarded its only wget call with
+# "! -s part && wget_rc -ne 0". wget_rc starts at 0 and a non-GitHub URL never
+# enters the pinned branch, so the guard was false and wget was never called:
+# nginx/php/MariaDB/Node.js all "failed" with "(wget exit code: 0)" without
+# sending a single request.
+_prefetch_dir="$work/prefetch-src"
+mkdir -p "$_prefetch_dir"
+SRC_DIR="$_prefetch_dir"
+LOG_FILE="$work/prefetch.log"
+OUTIP_STATE=CA; export OUTIP_STATE
+rm -f "$WGET_LOG"
+download_file "https://nginx.org/download/nginx-0.0.0.tar.gz" "nginx-0.0.0.tar.gz" "" "" >/dev/null 2>&1
+_rc=$?
+[ "$_rc" -eq 0 ] && ok "non-GitHub download_file succeeds" || ko "non-GitHub download_file failed (rc=$_rc)"
+[ "$(grep -c 'nginx-0.0.0.tar.gz' "$WGET_LOG" 2>/dev/null)" -ge 1 ] \
+  && ok "wget was invoked for a non-GitHub URL" || ko "wget skipped again (the wget_rc gate regression)"
+[ -s "$_prefetch_dir/nginx-0.0.0.tar.gz" ] && ok "file landed in SRC_DIR" || ko "downloaded file missing"
+unset OUTIP_STATE
 
 _pf(){  # _pf <component> <expected version>
   local comp=$1 want=$2 keys got

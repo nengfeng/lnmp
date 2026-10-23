@@ -222,6 +222,16 @@ Download_src() {
   # 而这个限制是按流算的，不是按整个传输算的，所以分成几段同时拉会快好几倍。
   local _pinned_done="n"
 
+  # 境外先走普通下载，境内先走固定 IP/加速器（判定见 gh_direct_preferred）。
+  #
+  # 固定 IP 路径不是境外不能用，而是没必要先绕：直连 GitHub 通常更快，
+  # 而且走代理的主机对"绕过 DNS 直连某个 IP"的行为不可预期。境外的
+  # 固定 IP 只当救援（普通源全失败后，见本函数末尾）。
+  local _prefer_pinned="n"
+  if command -v gh_direct_preferred >/dev/null 2>&1 && gh_direct_preferred; then
+    _prefer_pinned="y"
+  fi
+
   # 测速固定 IP 路径，再决定要不要用它下这个文件。
   #
   # 境内单流到 GitHub 常常被限到十几 KB/s：能通，但 51MB 要拖四十分钟。
@@ -230,7 +240,8 @@ Download_src() {
   # 这不改变信任模型：归档的完整性由仓库里钉死的校验和（component_checksums.txt）
   # 保证，加速器只负责搬运字节——它没法让一个错误的文件通过校验。而固定 IP
   # 路径拿到的校验和文件本身也是走 GitHub 的 TLS 证书验证的，来源可分。
-  if [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]] \
+  if [ "$_prefer_pinned" = "y" ] \
+     && [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]] \
      && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] \
      && command -v gh_direct_speed_probe >/dev/null 2>&1; then
     local pinned_speed min_speed
@@ -279,7 +290,8 @@ Download_src() {
   #
   # 并行的理由：单条 TCP 流到 GitHub 的 CDN 在境内被限速到十几 KB/s，
   # 而这个限制是按流算的，不是按整个传输算的，所以分成几段同时拉会快好几倍。
-  if [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]]; then
+  if [ "$_prefer_pinned" = "y" ] \
+     && [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]]; then
     if gh_direct_download "${urls[0]}" "${file_name}"; then
       echo "${CMSG}Fetched through a pinned address (no poisoned DNS involved)${CEND}"
       _pinned_done="y"
@@ -290,7 +302,7 @@ Download_src() {
 
   # GitHub URLs can be reachable but painfully slow. If so, do a quick sample
   # and prefer the accelerator instead of waiting on the full download.
-  if [ "$_pinned_done" != "y" ] && [[ "${urls[0]}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
+  if [ "$_prefer_pinned" = "y" ] && [ "$_pinned_done" != "y" ] && [[ "${urls[0]}" == "https://github.com/"* ]] && [ -n "${GITHUB_ACCELERATOR_URL:-}" ] && command -v curl >/dev/null 2>&1; then
     local primary_speed accel_url min_speed
     min_speed=$(github_speed_min_bytes)
     accel_url=$(github_accelerator_url "${urls[0]}")
@@ -431,6 +443,25 @@ Download_src() {
       rm -f "${file_name}"
     fi
   done
+
+  # 境外救援：普通源全部失败时，再试一次固定 IP。
+  #
+  # 境外默认不先走固定 IP（见 gh_direct_preferred），但 DNS 被污染、代理
+  # 配置异常时，它仍可能是唯一能出去的路。境内不会走到这里——那边固定 IP
+  # 一开始就试过了。
+  if [ "$_prefer_pinned" != "y" ] \
+     && [[ "${urls[0]}" == "https://github.com/"* || "${urls[0]}" == "https://raw.githubusercontent.com/"* ]] \
+     && command -v gh_direct_download >/dev/null 2>&1; then
+    echo "${CMSG}Direct sources failed; retrying through a pinned address...${CEND}"
+    rm -f "${file_name}"
+    if gh_direct_download "${urls[0]}" "${file_name}" \
+       && _archive_integrity_ok "${file_name}" \
+       && align_archive_top_dir "${file_name}" "${src_expected_dir:-}"; then
+      echo "[${CMSG}${file_name}${CEND}] fetched via a pinned address"
+      return 0
+    fi
+    rm -f "${file_name}"
+  fi
 
   # All sources failed
   echo ""

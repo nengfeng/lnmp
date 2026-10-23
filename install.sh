@@ -774,7 +774,7 @@ if [[ "${nginx_option}" =~ ^[1-3]$ ]]; then
   case "${nginx_option}" in
     1) _dl "nginx-${nginx_ver}.tar.gz" "https://nginx.org/download/nginx-${nginx_ver}.tar.gz" || exit 1 ;;
     2) _dl "tengine-${tengine_ver}.tar.gz" "https://tengine.taobao.org/download/tengine-${tengine_ver}.tar.gz" || exit 1 ;;
-    3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" "${MIRROR_BASE_URL}/openresty/openresty-${openresty_ver}.tar.gz" || exit 1 ;;
+    3) _dl "openresty-${openresty_ver}.tar.gz" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz" || exit 1 ;;
   esac
   # OpenSSL is official-only: major China mirrors do not provide upstream OpenSSL releases.
   _dl "openssl-${openssl_ver}.tar.gz" "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz" || exit 1

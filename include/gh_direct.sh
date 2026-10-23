@@ -96,6 +96,35 @@ GH_KNOWN_ADDRS=(
 # several times faster, because the limit is per stream and not per transfer.
 GH_DIRECT_PARALLEL="${GH_DIRECT_PARALLEL:-8}"
 
+# Should the pinned-address path be tried FIRST?
+#
+# The pinned path exists for mainland networks, where github.com can resolve
+# to a poisoned address and a single stream is throttled to a crawl. Outside
+# the mainland GitHub is normally fast and the direct name works, so going
+# through the pinned machinery first only adds resolution probes and a detour
+# that can break downloads on a host that reaches the network through a proxy.
+#
+# GH_DIRECT_ENABLED keeps its old meaning when set explicitly:
+#   y / yes / force  -> prefer the pinned path everywhere
+#   n / no / 0       -> never use it (gh_direct_download refuses)
+# Otherwise the decision is geographic. An unknown location keeps the old
+# China-safe default: the pinned path works anywhere, and a mainland box whose
+# geo lookup is blocked must not silently lose it.
+#
+# This is about ordering, not availability: outside the mainland the pinned
+# path is still used as a rescue after the direct download fails.
+gh_direct_preferred() {
+  case "${GH_DIRECT_ENABLED:-}" in
+    y|Y|yes|YES|force|FORCE|1) return 0 ;;
+    n|N|no|NO|0) return 1 ;;
+  esac
+  case "${OUTIP_STATE:-}" in
+    CN) return 0 ;;
+    ""|unknown) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Addresses that have been found to work, per host.
 # A plain array would be lost whenever a function is called in a subshell —
 # and the functions here are called in subshells (command substitution, process

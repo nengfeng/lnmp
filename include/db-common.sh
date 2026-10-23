@@ -133,7 +133,9 @@ install_mysql_binary() {
     local url="https://cdn.mysql.com/Downloads/${mysql_dir}/${tarball}"
     echo "${CMSG}Downloading: ${url}${CEND}"
     if ! wget --timeout=60 --tries=3 -O "$tarball" "$url" 2>/dev/null; then
-      url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mysql/downloads/${mysql_dir}/${tarball}"
+      # 镜像站在镜像 cdn.mysql.com 的目录树，路径是 Downloads（大写 D）。
+      # 小写的 downloads 在任何镜像上都不存在，这条兜底等于没有。
+      url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mysql/Downloads/${mysql_dir}/${tarball}"
       echo "${CMSG}Trying mirror: ${url}${CEND}"
       wget --timeout=60 --tries=3 -O "$tarball" "$url" || {
         echo "${CERROR}Failed to download MySQL ${mysql_ver}.${CEND}"
@@ -334,14 +336,18 @@ install_mariadb_binary() {
   # Download if not present
   if [ ! -f "$tarball" ]; then
     echo "${CWARNING}MariaDB tarball not found, downloading...${CEND}"
-    # Try mirror first (faster in China)
+    # 境内先镜像（更快），境外先官方（镜像在境外更慢，而且不一定同步）。
     local mirror_url="${MIRROR_BASE_URL:-https://mirrors.tuna.tsinghua.edu.cn}/mariadb/mariadb-${mariadb_ver}/bintar-linux-systemd-$SYS_ARCH_M/${tarball}"
-    echo "${CMSG}Downloading: ${mirror_url}${CEND}"
-    if ! wget --timeout=60 --tries=3 -O "$tarball" "$mirror_url" 2>/dev/null; then
-      # Try official CDN
-      local url="https://dlm.mariadb.org/MariaDB/mariadb-${mariadb_ver}/bintar-linux-systemd-$SYS_ARCH_M/${tarball}"
-      echo "${CMSG}Trying official: ${url}${CEND}"
-      wget --timeout=60 --tries=3 -O "$tarball" "$url" || {
+    local official_url="https://dlm.mariadb.org/MariaDB/mariadb-${mariadb_ver}/bintar-linux-systemd-$SYS_ARCH_M/${tarball}"
+    local first_url="$official_url" second_url="$mirror_url"
+    if [ "${USE_CHINA_MIRROR:-n}" = "y" ]; then
+      first_url="$mirror_url"
+      second_url="$official_url"
+    fi
+    echo "${CMSG}Downloading: ${first_url}${CEND}"
+    if ! wget --timeout=60 --tries=3 -O "$tarball" "$first_url" 2>/dev/null; then
+      echo "${CMSG}Trying ${second_url}${CEND}"
+      wget --timeout=60 --tries=3 -O "$tarball" "$second_url" || {
         echo "${CERROR}Failed to download MariaDB ${mariadb_ver}.${CEND}"
         echo "${CERROR}Please download manually from https://mariadb.org/download/${CEND}"
         return 1

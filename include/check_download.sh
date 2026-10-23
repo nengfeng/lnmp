@@ -63,8 +63,9 @@ _download_checksum_file() {
 
   # 首选固定未被污染的 IP 直连。校验和文件同样在 github.com 上，域名一样
   # 会被污染；加速器只是把问题换了个方向（见 download_sources.sh 里关于
-  # 循环校验的说明）。
-  if [[ "${GH_DIRECT_ENABLED:-y}" != "n" ]] \
+  # 循环校验的说明）。境内才先走这条路——境外直连 GitHub 又快又稳，
+  # 先绕固定 IP 只是多花解析时间（判定见 include/gh_direct.sh）。
+  if command -v gh_direct_preferred >/dev/null 2>&1 && gh_direct_preferred \
      && [[ "$checksum_url" == "https://github.com/"* || "$checksum_url" == "https://raw.githubusercontent.com/"* ]]; then
     if gh_direct_download "$checksum_url" "$checksum_file" 2>/dev/null && [ -s "$checksum_file" ]; then
       GH_CHECKSUM_SOURCE="github"
@@ -422,11 +423,11 @@ checkDownload() {
       ;;
     3)
       echo "Download openresty..."
-      # ✅ Confirmed available on Tsinghua mirror
-      local official_url="https://openresty.org/download/openresty-${openresty_ver}.tar.gz"
-      local china_url="${MIRROR_BASE_URL}/openresty/openresty-${openresty_ver}.tar.gz"
+      # 默认镜像（tuna）没有 OpenResty 源码包：其 /openresty/ 只是 yum 仓库
+      # 的重定向，<ver>.tar.gz 一律 404。写一个必然 404 的镜像地址只会让
+      # 境内安装先撞一次墙（实测这条路会把整个安装打死），所以只走官方源。
       local file_name="openresty-${openresty_ver}.tar.gz"
-      src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
+      src_url="https://openresty.org/download/openresty-${openresty_ver}.tar.gz"
       Download_src
       verify_pgp_signature "$file_name" "https://openresty.org/download/openresty-${openresty_ver}.tar.gz.asc" "OpenResty" || die_hard "PGP signature verification failed for ${file_name}"
       ;;
@@ -539,8 +540,13 @@ checkDownload() {
         # ✅ Confirmed available on Tsinghua mirror
         local official_url="https://archive.mariadb.org/mariadb-${mariadb_ver}/${FILE_TYPE}/${FILE_NAME}"
         local china_url="${MIRROR_BASE_URL}/mariadb/mariadb-${mariadb_ver}/${FILE_TYPE}/${FILE_NAME}"
-        src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
+        # 镜像会滞后于上游发布：镜像上没有这个版本时必须回落到官方源，
+        # 否则一个 404 就让整个数据库安装失败。
+        set_src_url "$official_url" "$china_url"
         Download_src
+        # 这个回落只属于本组件：不清掉会漏给后面的下载（它们没有自己的
+        # fallback，却会拿 MariaDB 的官方地址去重试）。
+        src_url_fallback=""
         verify_md5_with_retry "$FILE_NAME" "https://archive.mariadb.org/mariadb-${mariadb_ver}/${FILE_TYPE}/md5sums.txt" "$src_url" || die_hard "Checksum verification failed for ${FILE_NAME}"
         ;;
       8)
@@ -716,8 +722,11 @@ checkDownload() {
     local official_url="https://nodejs.org/dist/v${nodejs_ver}/node-v${nodejs_ver}-linux-${SYS_ARCH_n}.tar.gz"
     local china_url="${MIRROR_BASE_URL}/nodejs-release/v${nodejs_ver}/node-v${nodejs_ver}-linux-${SYS_ARCH_n}.tar.gz"
     local file_name="node-v${nodejs_ver}-linux-${SYS_ARCH_n}.tar.gz"
-    src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
+    # 镜像滞后时回落到官方源（理由同 MariaDB）。
+    set_src_url "$official_url" "$china_url"
     Download_src
+    # 同上：回落只属于本组件，不留给后面的下载。
+    src_url_fallback=""
     if [[ "${VERIFY_CHECKSUM}" == "yes" ]]; then
       echo "Verifying Node.js checksum..."
       # Same policy as the PGP checks: "cannot check" (feed unreachable)

@@ -142,30 +142,22 @@ detect_location() {
       return
     fi
   fi
+
+  # ipinfo.io 在境内经常连不上。Cloudflare 的 trace 端点通常可达，且只吐
+  # 一行 loc=XX；它决定不了镜像模式也没关系，但能让固定 IP/直连的先后
+  # 顺序（见 include/gh_direct.sh）按实际位置来。
+  if command -v curl >/dev/null 2>&1; then
+    local trace country
+    trace=$(curl -s --connect-timeout 3 -m 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null || true)
+    country=$(printf '%s\n' "$trace" | sed -n 's/^loc=//p' | head -1)
+    if [ -n "$country" ]; then
+      echo "$country"
+      return
+    fi
+  fi
   
   # 无法检测，默认返回 unknown
   echo "unknown"
-}
-
-# ============================================
-# 获取镜像模式
-# ============================================
-get_mirror_mode() {
-  if [[ "$MIRROR_MODE" == "china" ]] || [[ "$MIRROR_MODE" == "official" ]]; then
-    echo "$MIRROR_MODE"
-    return
-  fi
-  
-  # auto 模式：自动检测
-  log INFO "Detecting IP location..."
-  local location=$(detect_location)
-  log INFO "Detected location: $location"
-  
-  if [[ "$location" == "CN" ]]; then
-    echo "china"
-  else
-    echo "official"
-  fi
 }
 
 # ============================================
@@ -356,8 +348,10 @@ download_checksum() {
 
   log INFO "Downloading checksum: ${checksum_url}"
 
-  # 首选固定干净 IP 直连（校验和文件同样在 github.com 上，域名一样会被污染）
-  if [[ "${checksum_url}" == "https://github.com/"* || "${checksum_url}" == "https://raw.githubusercontent.com/"* ]]; then
+  # 首选固定干净 IP 直连（校验和文件同样在 github.com 上，域名一样会被污染）。
+  # 只在国内先走这条：境外直连更快，没必要为一个几 KB 的文件先绕一圈。
+  if command -v gh_direct_preferred >/dev/null 2>&1 && gh_direct_preferred \
+     && [[ "${checksum_url}" == "https://github.com/"* || "${checksum_url}" == "https://raw.githubusercontent.com/"* ]]; then
     if gh_direct_download "${checksum_url}" "${checksum_file}" && [ -s "${checksum_file}" ]; then
       GH_CHECKSUM_SOURCE="github"
       echo "${checksum_file}"
@@ -658,9 +652,24 @@ download_file() {
   # 注意：无 pipefail 时 $? 是 tee 的退出码，必须用 PIPESTATUS[0]
   # 判定 wget 的真实退出码（tee 几乎总是成功，会吞掉下载错误）。
   local part_file="${filename}.part"
+  # 还没有任何文件。0 曾在这里表示"不用下载"，而下面唯一的 wget 又用
+  # "! part 存在 && wget_rc != 0" 做闸门——非 GitHub 源根本不进固定 IP 分支，
+  # wget_rc 保持 0，于是 wget 一次都没被调用，脚本却报 "wget exit code: 0"。
+  # 现在改回它本来的含义：wget 的退出码，未执行为 0 但不再参与"要不要下载"。
   local wget_rc=0
 
-  # 首选：固定未被污染的 IP 直连 GitHub（并行分块）。
+  # 境外还是境内，决定谁先走。
+  #
+  # 境内：GitHub 域名可能被污染、单流被限速，固定 IP/加速器值得先上；
+  # 境外：GitHub 直连通常又快又稳，先绕路只会多花解析和探测的时间，
+  #       万一主机在代理后面还多一层不确定。所以境外先走普通下载，
+  #       固定 IP 只在直连失败后当救援用。
+  local _prefer_pinned="n"
+  if command -v gh_direct_preferred >/dev/null 2>&1 && gh_direct_preferred; then
+    _prefer_pinned="y"
+  fi
+
+  # 境内首选：固定未被污染的 IP 直连 GitHub（并行分块）。
   #
   # 先测速，再决定用固定 IP 直连还是加速器。
   #
@@ -671,7 +680,8 @@ download_file() {
   # 这不改变信任模型：校验和优先用仓库里钉死的期望值（component_checksums.txt），
   # 走加速器时校验和仍然从 GitHub 取——固定 IP + TLS 证书验证，两边不同源，
   # 循环校验不会出现。加速器只负责搬运字节。
-  if [[ "$url" == "https://github.com/"* || "$url" == "https://raw.githubusercontent.com/"* ]]; then
+  if [ "${_prefer_pinned}" = "y" ] \
+     && [[ "$url" == "https://github.com/"* || "$url" == "https://raw.githubusercontent.com/"* ]]; then
     local _gh_pinned_speed _gh_accel_url _gh_accel_speed _gh_min_kbps _gh_min_speed
     _gh_min_kbps="${GITHUB_SPEED_MIN_KBPS:-256}"
     _gh_min_speed=$(( _gh_min_kbps * 1024 ))
@@ -719,7 +729,11 @@ download_file() {
     fi
   fi
 
-  if [ ! -s "${part_file}" ] && [ ${wget_rc} -ne 0 ]; then
+  # 是否还需要走 wget，只看文件在不在：固定 IP 已经拿到时 part 非空，跳过；
+  # 其余情况（包括非 GitHub 源，固定 IP 分支根本没进）一律交给 wget。
+  # 不能再用 wget_rc 当闸门：它的初始值 0 会让这条唯一的通用下载路径
+  # 在非 GitHub 源上被整段跳过。
+  if [ ! -s "${part_file}" ]; then
     wget --progress=bar:force -c "${url}" -O "${part_file}" 2>&1 | tee -a "${LOG_FILE}"
     wget_rc=${PIPESTATUS[0]}
   fi
@@ -731,6 +745,20 @@ download_file() {
     [ -f "${part_file}" ] && [ ! -s "${part_file}" ] && rm -f "${part_file}"
     popd > /dev/null
     return 1
+  fi
+
+  # 境外救援：直连失败（DNS 被污染、代理异常）时，再试一次固定 IP。
+  # 境内不会走到这里——那边固定 IP 本来就是首选，上面已经试过。
+  if [ ${wget_rc} -ne 0 ] && [ "$_prefer_pinned" != "y" ] \
+     && [[ "$url" == "https://github.com/"* || "$url" == "https://raw.githubusercontent.com/"* ]] \
+     && command -v gh_direct_download >/dev/null 2>&1; then
+    log WARN "Direct download failed; retrying through a pinned address: ${url}"
+    if gh_direct_download "${url}" "${part_file}"; then
+      log INFO "Fetched through a pinned address (direct path failed)"
+      wget_rc=0
+    else
+      rm -f "${part_file}"
+    fi
   fi
   if [ ${wget_rc} -eq 0 ] && [ -s "${part_file}" ]; then
     mv -f "${part_file}" "${filename}"
@@ -841,7 +869,11 @@ download_file() {
     fi
   fi
 
-  log ERROR "Failed to download: ${url} (wget exit code: ${wget_rc})"
+  if [ -s "${part_file}" ]; then
+    log ERROR "Failed to download: ${url} (partial data kept for resume; wget exit code: ${wget_rc})"
+  else
+    log ERROR "Failed to download: ${url} (no data received; wget exit code: ${wget_rc})"
+  fi
   # 清理空的 .part 文件；非空则保留供断点续传
   [ -f "${part_file}" ] && [ ! -s "${part_file}" ] && rm -f "${part_file}"
   # 清理可能存在的空文件
@@ -1234,13 +1266,34 @@ main() {
     esac
   done
   
-  # 确定镜像模式
+  # 确定镜像模式，并顺带定下 GitHub 下载走哪条路。
+  #
+  # 国家只需要检测一次：以前 get_mirror_mode 在命令替换（子 shell）里跑，
+  # 检测结果带不出来，下载层于是不知道自己在境内还是境外。这里让检测
+  # 留在当前 shell，把结果写进 OUTIP_STATE（见 include/gh_direct.sh）。
   local mirror_mode
   if [ -n "$force_mirror" ]; then
     mirror_mode="$force_mirror"
+  elif [ "${MIRROR_MODE}" = "china" ] || [ "${MIRROR_MODE}" = "official" ]; then
+    mirror_mode="${MIRROR_MODE}"
   else
-    mirror_mode=$(get_mirror_mode)
+    log INFO "Detecting IP location..."
+    local location
+    location=$(detect_location)
+    log INFO "Detected location: $location"
+    OUTIP_STATE="$location"
+    if [ "$location" = "CN" ]; then
+      mirror_mode="china"
+    else
+      mirror_mode="official"
+    fi
   fi
+  # 境内先固定 IP/加速器，境外先直连。强制 china 按境内处理；强制
+  # official 不猜国家，保持"不确定"的保守默认（仍先试固定 IP）。
+  if [ "$mirror_mode" = "china" ]; then
+    OUTIP_STATE=CN
+  fi
+  export OUTIP_STATE
   
   log INFO "Using mirror mode: $mirror_mode"
   log INFO "Checksum verification: $VERIFY_CHECKSUM"

@@ -148,6 +148,25 @@ get_mirror_url() {
   fi
 }
 
+# Pick a mirror URL and, when the mirror is chosen, keep the official URL as a
+# fallback. Mirrors lag: a brand-new release may not be on the mirror yet, and
+# without the official URL a mirror 404 becomes a failed install instead of a
+# slower download.
+# Usage: set_src_url <official_url> <china_url>
+# Sets: src_url, src_url_fallback
+# src_url_fallback is a global input to Download_src, not a local: the caller
+# must clear it once that component is downloaded, or the next component (which
+# has no fallback of its own) would retry the previous component's URL.
+set_src_url() {
+  local official_url=$1
+  local china_url=$2
+  src_url=$(get_mirror_url "$official_url" "$china_url" "$USE_CHINA_MIRROR")
+  src_url_fallback=""
+  if [ -n "$china_url" ] && [ "$src_url" = "$china_url" ] && [ "$china_url" != "$official_url" ]; then
+    src_url_fallback="$official_url"
+  fi
+}
+
 # ============================================
 # Memory Allocator Initialization
 # ============================================

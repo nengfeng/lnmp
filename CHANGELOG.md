@@ -14,6 +14,38 @@ fixes, they are grouped by area rather than listed one by one.
 
 ### Fixed
 
+- **`download_sources.sh` downloads non-GitHub components again.** The only
+  general-purpose `wget` call was guarded by
+  `[ ! -s "$part" ] && [ $wget_rc -ne 0 ]`. `wget_rc` starts at 0, and a
+  non-GitHub URL never enters the pinned-address branch that could change it,
+  so the guard was false and wget was never run: nginx, PHP, MariaDB, Node.js,
+  OpenResty and every other non-GitHub component "failed" with
+  `(wget exit code: 0)` without a single request being made (regression from
+  9178bb1). Whether to download now depends only on whether the file is
+  already present, and the error message distinguishes "no data received"
+  from "partial data kept for resume".
+
+- **A China mirror miss no longer aborts the install.** OpenResty was pinned to
+  a Tsinghua URL that does not exist (`/openresty/<ver>.tar.gz` is not mirrored;
+  the directory only redirects to a yum repository), with no official fallback,
+  so a mainland install could not get past the download step. OpenResty now
+  uses the official source, and MariaDB/Node.js — whose mirrors do exist but
+  lag behind new releases — keep the official URL as an automatic fallback.
+  The new `set_src_url` records that fallback, so a mirror miss degrades to a
+  slower download instead of a failed install.
+
+- **Overseas downloads no longer take the mainland detour.** The pinned-IP and
+  accelerator machinery was tried first for every GitHub file regardless of
+  location: extra DNS/DoH probes, a speed sample and a range-request fan-out on
+  a network where plain GitHub is faster, and a detour that can break downloads
+  on a host behind a proxy. `gh_direct_preferred` now decides the order from
+  the detected country: mainland prefers pinned/accelerator, overseas downloads
+  directly and uses the pinned address only as a rescue after the direct path
+  fails. An unknown location keeps the mainland-safe default, and
+  `GH_DIRECT_ENABLED` still forces either behaviour. MariaDB binary downloads
+  follow the same rule, and the MySQL mirror fallback now uses the
+  `Downloads` path (lowercase `downloads` exists on no mirror).
+
 - **Ubuntu dependency install no longer aborts on a mirror index republish.**
   `apt-get update` fails with "Hash Sum mismatch" when the mirror republishes
   the release file (InRelease) and the Packages indexes it signs in separate
