@@ -12,6 +12,8 @@ fixes, they are grouped by area rather than listed one by one.
 
 ## [Unreleased]
 
+## [1.7.7] - 2026-10-24
+
 ### Fixed
 
 - **`download_sources.sh` downloads non-GitHub components again.** The only
@@ -469,7 +471,8 @@ board, and several paths reported success regardless of outcome.
 
 - Default memory allocator switched from tcmalloc to jemalloc.
 
-[Unreleased]: https://github.com/nengfeng/lnmp/compare/v1.7.6...HEAD
+[Unreleased]: https://github.com/nengfeng/lnmp/compare/v1.7.7...HEAD
+[1.7.7]: https://github.com/nengfeng/lnmp/compare/v1.7.6...v1.7.7
 [1.7.6]: https://github.com/nengfeng/lnmp/compare/v1.7.5...v1.7.6
 [1.7.5]: https://github.com/nengfeng/lnmp/compare/v1.7.4...v1.7.5
 [1.7.4]: https://github.com/nengfeng/lnmp/compare/v1.7.3...v1.7.4
