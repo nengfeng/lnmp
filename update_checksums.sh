@@ -39,6 +39,12 @@ export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 . ./include/color.sh 2>/dev/null || true
 . ./include/gh_direct.sh 2>/dev/null || true
+# The component list below is derived from versions.txt so that a version
+# bump (update_versions.sh / the drift workflow) moves the pin sources
+# automatically - a hardcoded copy went stale on the first bump and then
+# silently downgraded every install of the new version to unpinned
+# verification.
+. ./versions.txt
 
 PIN_FILE="./component_checksums.txt"
 CHECK_ONLY="n"
@@ -49,10 +55,10 @@ CHECK_ONLY="n"
 #
 # format: <url of the checksum file>|<name of the tarball inside it>
 COMPONENTS=(
-  "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz.sha256|openssl-3.5.9.tar.gz"
-  "https://github.com/openresty/luajit2/archive/refs/tags/v2.1-20261021.tar.gz|luajit2-2.1-20261021.tar.gz"
-  "https://github.com/openresty/lua-nginx-module/archive/refs/tags/v0.10.32rc6.tar.gz|lua-nginx-module-0.10.32rc6.tar.gz"
-  "https://github.com/openresty/nginx/archive/refs/tags/release-1.30.6.tar.gz|nginx-release-1.30.6.tar.gz"
+  "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz.sha256|openssl-${openssl_ver}.tar.gz"
+  "https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz|luajit2-${luajit2_ver}.tar.gz"
+  "https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz|lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+  "https://github.com/openresty/nginx/archive/refs/tags/release-${nginx_ver}.tar.gz|nginx-release-${nginx_ver}.tar.gz"
 )
 
 # Fetch a file through a pinned address when possible.

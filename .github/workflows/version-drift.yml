@@ -39,10 +39,19 @@ jobs:
       - name: Apply available version bumps
         run: bash update_versions.sh --apply
 
+      - name: Refresh pinned component checksums
+        # A bump of a GitHub-hosted component (openssl / luajit2 /
+        # lua-nginx-module / nginx) moves the tarball that
+        # component_checksums.txt pins: without this refresh every install
+        # of the new version fails checksum verification against the stale
+        # pin. Fatal on failure - a PR that ships a broken pin must not
+        # merge.
+        run: bash update_checksums.sh
+
       - name: Detect changes to versions.txt
         id: diff
         run: |
-          if git diff --quiet -- versions.txt; then
+          if git diff --quiet -- versions.txt component_checksums.txt; then
             echo "changed=no" >> "$GITHUB_OUTPUT"
             echo "No upstream version updates to apply."
           else
@@ -64,7 +73,7 @@ jobs:
           git push origin "$branch"
 
           {
-            echo "Weekly \`update_versions.sh --apply\` produced these changes:"
+            echo "Refreshed pins and upstream version bumps produced these changes:"
             echo
             echo '```'
             git diff --stat "main...HEAD" -- versions.txt
