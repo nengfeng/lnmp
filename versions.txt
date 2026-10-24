@@ -86,9 +86,9 @@ boost_ver=1.77.0
 
 # Others
 ngx_devel_kit_ver=0.3.4
-lua_nginx_module_ver=0.10.32rc6
+lua_nginx_module_ver=0.10.32rc7
 luajit2_ver=2.1-20261023
-lua_resty_core_ver=0.1.35rc1
+lua_resty_core_ver=0.1.35rc2
 lua_resty_lrucache_ver=0.15
 lua_cjson_ver=2.1.0.20
 fail2ban_ver=master

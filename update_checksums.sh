@@ -50,13 +50,6 @@ PIN_FILE="./component_checksums.txt"
 CHECK_ONLY="n"
 [[ "${1:-}" == "--check" ]] && CHECK_ONLY="y"
 
-# Read the versions that versions.txt currently points at, so this script
-# tracks whatever update_versions.sh last wrote instead of a snapshot baked
-# into the script body. A hand-edited version here would silently re-pin a
-# tarball nobody downloads, and the freshly-moved component would keep its
-# stale anchor.
-. ./versions.txt
-
 # The components whose checksums are published as a release file. The URL is
 # the release's checksum file; the entry we keep is the tarball inside it.
 #
@@ -66,6 +59,7 @@ COMPONENTS=(
   "https://github.com/openssl/openssl/releases/download/openssl-${openssl_ver}/openssl-${openssl_ver}.tar.gz.sha256|openssl-${openssl_ver}.tar.gz"
   "https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz|luajit2-${luajit2_ver}.tar.gz"
   "https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz|lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
+  "https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz|lua-resty-core-${lua_resty_core_ver}.tar.gz"
   "https://github.com/openresty/nginx/archive/refs/tags/release-${nginx_ver}.tar.gz|nginx-release-${nginx_ver}.tar.gz"
 )
 

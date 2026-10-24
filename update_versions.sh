@@ -527,6 +527,9 @@ LUA_NGINX_RESTY_CORE_MAP=(
     ["0.10.32rc4"]="0.1.35rc1"
     ["0.10.32rc5"]="0.1.35rc1"
     ["0.10.32rc6"]="0.1.35rc1"
+    # rc7 adds the C-level "compress certificates set from ssl_certificate_by_lua*"
+    # API; core rc2 exposes it as ngx.ssl.compress_certs(), so it needs rc7.
+    ["0.10.32rc7"]="0.1.35rc2"
 )
 
 _check_nginx_lua_group() {
