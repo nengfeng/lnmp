@@ -12,6 +12,14 @@ fixes, they are grouped by area rather than listed one by one.
 
 ## [Unreleased]
 
+### Changed
+
+- **Bundled CA bundle refreshed** to Mozilla's 2026-10-20 set (118 roots,
+  `src/cacert.pem`). The installer ships this file and reuses it when present,
+  so the bundled copy never refreshed itself on new installs, and OpenSSL-based
+  builds (`/usr/local/openssl/cert.pem`) inherited the old roots. Existing
+  hosts can refresh their copies with `./upgrade.sh --cacert`.
+
 ## [1.7.7] - 2026-10-24
 
 ### Fixed
