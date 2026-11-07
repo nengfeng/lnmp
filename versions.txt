@@ -2,7 +2,7 @@
 # Web
 nginx_ver=1.30.6
 tengine_ver=3.1.0
-openresty_ver=1.31.1.1
+openresty_ver=1.31.8.1
 openssl_ver=3.5.9
 
 pcre_ver=10.49
@@ -52,14 +52,14 @@ apcu_ver=5.1.28
 phalcon_ver=5.23.0
 yaf_ver=3.3.6
 yar_ver=2.3.4
-swoole_ver=6.2.3
+swoole_ver=6.2.4
 xdebug_ver=3.5.3
 
 # Ftp
 pureftpd_ver=1.0.54
 
 # Redis
-redis_ver=8.10.2
+redis_ver=8.10.3
 pecl_redis_ver=6.3.0
 
 # Memcached
@@ -69,7 +69,7 @@ pecl_memcached_ver=3.4.0
 pecl_memcache_ver=8.2
 
 # MongoDB
-pecl_mongodb_ver=2.5.5
+pecl_mongodb_ver=2.5.7
 
 # phpMyadmin
 phpmyadmin_ver=5.2.3
