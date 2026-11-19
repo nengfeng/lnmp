@@ -598,6 +598,13 @@ _php_rollback >/dev/null 2>&1; _rc=$?
 [ "$(cat "$_php_install/state" 2>/dev/null)" = "broken2" ] && ok "failed restore is undone: original moved back (reversible)" || ko "original content lost on failed restore: [$(cat "$_php_install/state" 2>/dev/null)]"
 unset php_install_dir backup_php_dir BACKUP_DIR
 
+echo "== _php_version_is_supported (include/upgrade_php.sh) =="
+if _php_version_is_supported 8.5.13; then ok "minor bump 8.5.13 is accepted"; else ko "8.5.13 was rejected"; fi
+if _php_version_is_supported 8.4.28; then ok "same minor 8.4.28 is accepted"; else ko "8.4.28 was rejected"; fi
+if _php_version_is_supported 8.2.0; then ko "unsupported 8.2.0 was accepted"; else ok "unsupported 8.2.0 is rejected"; fi
+if _php_version_is_supported 8.6.0; then ko "unsupported 8.6.0 was accepted"; else ok "unsupported 8.6.0 is rejected"; fi
+if _php_version_is_supported 8.5; then ko "malformed 8.5 was accepted"; else ok "malformed 8.5 is rejected"; fi
+
 echo "== rollback_db_upgrade (include/upgrade_db.sh) =="
 # The invariants: a missing *_old_<ts> backup must abort with rc!=0 and say so,
 # and a rollback whose old server won't come back must also fail loudly rather

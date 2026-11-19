@@ -34,6 +34,17 @@ _php_rollback() {
   return 0
 }
 
+# Is <version> inside the supported PHP minor window (8.PHP_MINOR_MIN ..
+# 8.PHP_MINOR_MAX)?  The upgrade path reuses the installed configure command,
+# so a minor bump (e.g. 8.4 -> 8.5) is allowed as long as the target minor is
+# one this LNMP release supports.
+_php_version_is_supported() {
+  local ver=$1 minor
+  [[ "${ver}" =~ ^8\.([0-9]+)\.([0-9]+)$ ]] || return 1
+  minor=$((10#${BASH_REMATCH[1]}))
+  php_tag_is_supported "8${minor}"
+}
+
 Upgrade_PHP() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${php_install_dir}" ] && echo "${CWARNING}PHP is not installed on your system! ${CEND}" && exit 1
@@ -54,44 +65,10 @@ Upgrade_PHP() {
   echo
   echo "Current PHP Version: ${CMSG}$OLD_php_ver${CEND}"
   
-  # ========== 【新增】升级前备份 ==========
-  BACKUP_DIR="/data/backup/php_backup_$(date +%Y%m%d_%H%M%S)"
-  mkdir -p "${BACKUP_DIR}"
-  echo "${CCYAN}Backing up PHP ${OLD_php_ver} to ${BACKUP_DIR}...${CEND}"
-
-  # 备份并验证
-  if ! cp -a "${php_install_dir}" "${BACKUP_DIR}/"; then
-    echo "${CFAILURE}Backup failed! Aborting upgrade.${CEND}"
-    rm -rf "${BACKUP_DIR}"
-    exit 1
-  fi
-
-  # 验证备份完整性
-  local backup_php_dir="${BACKUP_DIR}/$(basename "${php_install_dir}")"
-  if [ ! -f "${backup_php_dir}/bin/php" ]; then
-    echo "${CFAILURE}Backup verification failed! Aborting upgrade.${CEND}"
-    rm -rf "${BACKUP_DIR}"
-    exit 1
-  fi
-  echo "${CSUCCESS}Backup completed successfully.${CEND}"
-
-  # 创建回滚脚本（使用硬编码路径）
-  cat > "${BACKUP_DIR}/rollback.sh" << ROLLBACK_EOF
-#!/bin/bash
-echo "Rolling back PHP..."
-svc_stop php-fpm
-rm -rf "${php_install_dir}"
-cp -a "${backup_php_dir}" "${php_install_dir}"
-svc_start php-fpm
-echo "PHP rolled back successfully"
-ROLLBACK_EOF
-  chmod +x "${BACKUP_DIR}/rollback.sh"
-  # ======================================
-  
   while :; do echo
     [ "${php_flag}" != 'y' ] && read -e -p "Please input upgrade PHP Version(Default: $Latest_php_ver): " NEW_php_ver
     NEW_php_ver=${NEW_php_ver:-${Latest_php_ver}}
-    if [[ "${NEW_php_ver%.*}" == "${OLD_php_ver%.*}" ]]; then
+    if _php_version_is_supported "${NEW_php_ver}"; then
       local file_name="php-${NEW_php_ver}.tar.gz"
       if [ ! -s "${file_name}" ]; then
         echo "Downloading PHP ${NEW_php_ver}..."
@@ -132,10 +109,44 @@ ROLLBACK_EOF
       fi
       break
     else
-      echo "${CWARNING}input error! ${CEND}Please only input '${CMSG}${OLD_php_ver%.*}.xx${CEND}'"
+      echo "${CWARNING}input error! ${CEND}Please input a supported version '${CMSG}8.${PHP_MINOR_MIN}.xx ~ 8.${PHP_MINOR_MAX}.xx${CEND}'"
       [[ "${php_flag}" == y ]] && exit
     fi
   done
+
+  # ========== 升级前备份（校验通过后再备份，避免无效输入也产生备份） ==========
+  BACKUP_DIR="/data/backup/php_backup_$(date +%Y%m%d_%H%M%S)"
+  mkdir -p "${BACKUP_DIR}"
+  echo "${CCYAN}Backing up PHP ${OLD_php_ver} to ${BACKUP_DIR}...${CEND}"
+
+  # 备份并验证
+  if ! cp -a "${php_install_dir}" "${BACKUP_DIR}/"; then
+    echo "${CFAILURE}Backup failed! Aborting upgrade.${CEND}"
+    rm -rf "${BACKUP_DIR}"
+    exit 1
+  fi
+
+  # 验证备份完整性
+  local backup_php_dir="${BACKUP_DIR}/$(basename "${php_install_dir}")"
+  if [ ! -f "${backup_php_dir}/bin/php" ]; then
+    echo "${CFAILURE}Backup verification failed! Aborting upgrade.${CEND}"
+    rm -rf "${BACKUP_DIR}"
+    exit 1
+  fi
+  echo "${CSUCCESS}Backup completed successfully.${CEND}"
+
+  # 创建回滚脚本（使用硬编码路径）
+  cat > "${BACKUP_DIR}/rollback.sh" << ROLLBACK_EOF
+#!/bin/bash
+echo "Rolling back PHP..."
+svc_stop php-fpm
+rm -rf "${php_install_dir}"
+cp -a "${backup_php_dir}" "${php_install_dir}"
+svc_start php-fpm
+echo "PHP rolled back successfully"
+ROLLBACK_EOF
+  chmod +x "${BACKUP_DIR}/rollback.sh"
+  # ======================================
 
   if [ -s "php-${NEW_php_ver}.tar.gz" ]; then
     echo "[${CMSG}php-${NEW_php_ver}.tar.gz${CEND}] found"
