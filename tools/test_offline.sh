@@ -646,6 +646,19 @@ _cc=$(_php_configure_command)
 unset php_install_dir
 rm -rf "$_cc_php"
 
+echo "== _php_restore_iconv_header (include/upgrade_php.sh) =="
+_ri_dir="$work/iconv"; mkdir -p "$_ri_dir"
+printf 'stale GNU libiconv header\n' > "$_ri_dir/iconv.h"
+_php_iconv_hdr="$_ri_dir/iconv.h"
+_php_iconv_bak="$_ri_dir/iconv.h.lnmp-bak"
+/bin/mv -f "${_php_iconv_hdr}" "${_php_iconv_bak}"
+_php_restore_iconv_header
+[ -f "${_php_iconv_hdr}" ] && [ ! -e "${_php_iconv_bak}" ] \
+  && ok "stale iconv header is restored" || ko "iconv header was not restored"
+[ -z "${_php_iconv_bak}" ] && ok "backup marker is cleared" || ko "backup marker was left set"
+rm -rf "$_ri_dir"
+unset _php_iconv_hdr _php_iconv_bak
+
 echo "== rollback_db_upgrade (include/upgrade_db.sh) =="
 # The invariants: a missing *_old_<ts> backup must abort with rc!=0 and say so,
 # and a rollback whose old server won't come back must also fail loudly rather

@@ -36,6 +36,15 @@ _php_rollback() {
   return 0
 }
 
+# Restore a temporarily hidden /usr/local/include/iconv.h.  Older LNMP
+# releases installed GNU libiconv into /usr/local; its iconv.h shadows glibc's
+# and #defines iconv_open to libiconv_open, while this build is configured for
+# glibc iconv, so bundled libgd fails with undefined references to libiconv_*.
+_php_restore_iconv_header() {
+  [ -n "${_php_iconv_bak:-}" ] && /bin/mv -f "${_php_iconv_bak}" "${_php_iconv_hdr}" 2>/dev/null
+  _php_iconv_bak=""
+}
+
 # Is <version> inside the supported PHP minor window (8.PHP_MINOR_MIN ..
 # 8.PHP_MINOR_MAX)?  The upgrade path reuses the installed configure command,
 # so a minor bump (e.g. 8.4 -> 8.5) is allowed as long as the target minor is
@@ -212,6 +221,18 @@ ROLLBACK_EOF
       sed -i '/OPENSSL_SSLV23_PADDING/i#ifdef RSA_SSLV23_PADDING' ext/openssl/openssl.c
       sed -i '/OPENSSL_SSLV23_PADDING/a#endif' ext/openssl/openssl.c
     fi
+    # Hide a stale GNU libiconv header for this build only.  The build uses
+    # glibc iconv; the header is restored after make (and by the EXIT trap if
+    # configure/make fails or the script is interrupted).
+    _php_iconv_hdr="/usr/local/include/iconv.h"
+    _php_iconv_bak=""
+    if [ -f /usr/include/iconv.h ] && [ -f "${_php_iconv_hdr}" ] \
+      && grep -q 'libiconv' "${_php_iconv_hdr}" 2>/dev/null; then
+      _php_iconv_bak="${_php_iconv_hdr}.lnmp-bak"
+      /bin/mv -f "${_php_iconv_hdr}" "${_php_iconv_bak}"
+      trap _php_restore_iconv_header EXIT
+    fi
+
     make clean || true
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
     # Get original configure command and fix iconv settings.
@@ -233,6 +254,10 @@ ROLLBACK_EOF
       popd > /dev/null
       rm -rf php-${NEW_php_ver}
       exit 1
+    fi
+    if [ -n "${_php_iconv_bak}" ]; then
+      _php_restore_iconv_header
+      trap - EXIT
     fi
     
     # ========== 【新增】编译后验证 ==========
