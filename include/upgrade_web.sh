@@ -170,7 +170,7 @@ Upgrade_Nginx() {
     ${nginx_install_dir}/sbin/nginx -V &> "${nginx_v_tmp}"
     nginx_configure_args_tmp=$(grep 'configure arguments:' "${nginx_v_tmp}" | awk -F: '{print $2}')
     rm -f "${nginx_v_tmp}"
-    nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-[0-9.]\+\(rc[0-9]\+\)\?@lua-nginx-module-${lua_nginx_module_ver}@" | sed "s@--with-openssl=../openssl-[0-9.]\+\(rc[0-9]\+\)\?@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@")
+    nginx_configure_args=$(echo ${nginx_configure_args_tmp} | sed "s@lua-nginx-module-[0-9.]\+\(rc[0-9]\+\)\?@lua-nginx-module-${lua_nginx_module_ver}@" | sed "s@--with-openssl=../openssl-[0-9.]\+\(rc[0-9]\+\)\?@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@" | sed "s@--with-pcre=../pcre-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Apply allocator from options.conf
     # ld-opt values may contain spaces; set_ld_opt tokenizes safely
@@ -368,7 +368,7 @@ Upgrade_Tengine() {
     ${tengine_install_dir}/sbin/nginx -V &> "${tengine_v_tmp}"
     tengine_configure_args_tmp=$(grep 'configure arguments:' "${tengine_v_tmp}" | awk -F: '{print $2}')
     rm -f "${tengine_v_tmp}"
-    tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-[0-9.]\+\(rc[0-9]\+\)\?@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@")
+    tengine_configure_args=$(echo ${tengine_configure_args_tmp} | sed "s@--with-openssl=../openssl-[0-9.]\+\(rc[0-9]\+\)\?@--with-openssl=../openssl-${openssl_ver}@" | sed "s@--with-pcre=../pcre2-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@" | sed "s@--with-pcre=../pcre-[0-9.]\+\(rc[0-9]\+\)\?@--with-pcre=../pcre2-${pcre_ver}@")
 
     # Apply allocator from options.conf
     # ld-opt values may contain spaces; set_ld_opt tokenizes safely
