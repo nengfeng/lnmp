@@ -29,9 +29,9 @@ pgsql17_ver=17.12
 pgsql16_ver=16.16
 
 # PHP
-php83_ver=8.3.36
-php84_ver=8.4.27
-php85_ver=8.5.12
+php83_ver=8.3.37
+php84_ver=8.4.28
+php85_ver=8.5.13
 
 # Nodejs
 nodejs_ver=20.20.2
