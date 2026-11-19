@@ -6,7 +6,7 @@ openresty_ver=1.31.8.1
 openssl_ver=3.5.9
 
 pcre_ver=10.49
-nghttp2_ver=1.59.0
+nghttp2_ver=1.71.0
 
 # DB
 mysql97_ver=9.7.4
