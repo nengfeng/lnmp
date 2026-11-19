@@ -10,6 +10,61 @@ user or a contributor, and leave pure release-housekeeping (`chore(release):`,
 checksum records, version bumps) out. Where a release carried a large volume of
 fixes, they are grouped by area rather than listed one by one.
 
+## [1.7.9] - 2026-11-20
+
+### Fixed
+
+- **Web-server upgrades no longer fail at `init_by_lua` with
+  `module 'resty.core' not found`.** Older Nginx/Tengine builds without
+  LuaJIT shipped a `nginx.conf` with no `lua_package_path`; the upgrade added
+  the Lua modules but not the path, so the new master died and the hot swap
+  rolled back. The upgrade now injects `lua_package_path`/`lua_package_cpath`
+  into the installed config when they are absent (Nginx, Tengine, OpenResty).
+
+- **PHP minor-version upgrades are supported (for example 8.4 → 8.5).**
+  `upgrade.sh --php` previously rejected anything outside the installed
+  `8.4.xx` series after a backup had already been created. It now accepts any
+  patch in the supported 8.3/8.4/8.5 window, backs up only after validation,
+  rebuilds PECL extensions on a minor bump (the extension ABI changes), and
+  detects the installed extension set from `php.d` because `options.conf` does
+  not persist the install-time `--php_extensions` choice.
+
+- **PHP upgrades tolerate a broken old `php` binary.** If a library under the
+  old PHP was upgraded out from under it (`libzip.so.4` → `libzip.so.5`),
+  `php -i` failed, leaving an empty configure command and a misleading
+  `No targets specified and no makefile found`. The upgrade now falls back to
+  `php-config --configure-options` (a shell script) for the original configure
+  options.
+
+- **PHP builds no longer fail on hosts with a stale GNU libiconv header.**
+  Older LNMP releases installed GNU libiconv into `/usr/local`; its
+  `iconv.h` shadows glibc's and maps `iconv_open` to `libiconv_open`, while
+  PHP is configured for glibc iconv, so bundled libgd failed with undefined
+  `libiconv_*` references. The header is temporarily hidden for the PHP build
+  and restored afterward, including on failure.
+
+- **Database upgrades do not ask for the root password repeatedly.** An empty
+  `dbrootpwd` made the `mysql` client open its own interactive
+  `Enter password:` prompt; the script could not capture it and never
+  persisted it, so `mysqldump` and later steps asked again. The upgrade now
+  prompts explicitly when the stored password is empty and writes the verified
+  value back to `options.conf`.
+
+- **Legacy `--with-pcre=../pcre-*` configure arguments are rewritten to
+  PCRE2** during Nginx/Tengine upgrades, matching the PCRE2 build used since
+  1.7.6.
+
+### Changed
+
+- **Component updates:** nghttp2 1.59.0 → 1.71.0 and libzip 1.11.4 → 1.12.1
+  are now tracked by `update_versions.sh`; PHP 8.3.36 → 8.3.37,
+  8.4.27 → 8.4.28, 8.5.12 → 8.5.13.
+
+- **The database upgrade prompt defaults to the latest patch release for the
+  installed major.minor series from `versions.txt`** (for example 10.11.14 →
+  default 10.11.20) instead of merely echoing the installed version.
+  Cross-series database upgrades remain manual.
+
 ## [1.7.8] - 2026-11-19
 
 ### Fixed
