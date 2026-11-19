@@ -460,6 +460,11 @@ check_latest "nghttp2" "$nghttp2_ver" \
   "https://github.com/nghttp2/nghttp2/releases.atom" \
   "<title>[^<]*v?\K[0-9]+\.[0-9]+\.[0-9]+" "sort -V | tail -1" nghttp2_ver
 
+# --- libzip (PHP zip extension dependency) ---
+check_latest "libzip" "$libzip_ver" \
+  "https://libzip.org/download/" \
+  'libzip-\K[0-9]+\.[0-9]+\.[0-9]+(?=\.tar\.gz)' "sort -V | tail -1" libzip_ver
+
 # --- LuaJIT (web scraping tags atom) ---
 luajit_latest=$(curl -sL --connect-timeout 10 --max-time 20 \
   "https://github.com/openresty/luajit2/tags.atom" 2>/dev/null | \

@@ -62,6 +62,7 @@ COMPONENTS=(
   "https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz|lua-resty-core-${lua_resty_core_ver}.tar.gz"
   "https://github.com/openresty/nginx/archive/refs/tags/release-${nginx_ver}.tar.gz|nginx-release-${nginx_ver}.tar.gz"
   "https://github.com/nghttp2/nghttp2/releases/download/v${nghttp2_ver}/nghttp2-${nghttp2_ver}.tar.gz|nghttp2-${nghttp2_ver}.tar.gz"
+  "https://libzip.org/download/libzip-${libzip_ver}.tar.gz|libzip-${libzip_ver}.tar.gz"
 )
 
 # Fetch a file through a pinned address when possible.
