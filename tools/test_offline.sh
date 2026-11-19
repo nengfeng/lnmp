@@ -431,6 +431,19 @@ got=$(set_ld_opt "--with-ld-opt=-old --with-http_ssl_module" "-new")
 got=$(set_ld_opt "--prefix=/opt/x --with-http_v2_module" "-L/foo")
 [ "$got" = "--prefix=/opt/x --with-http_v2_module" ] && ok "absent flag is left alone (caller appends)" || ko "got [$got]"
 
+echo "== _ensure_lua_package_path (include/upgrade_web.sh) =="
+_lp_conf="$work/nginx_lua.conf"
+printf 'http {\n    server {\n        listen 80;\n    }\n}\n' > "$_lp_conf"
+_ensure_lua_package_path "$_lp_conf"
+grep -q 'lua_package_path "/usr/local/lib/lua/5.1/?.lua' "$_lp_conf" \
+  && ok "missing lua_package_path is injected" || ko "lua_package_path was not injected"
+grep -q 'lua_package_cpath "/usr/local/lib/lua/5.1/?.so' "$_lp_conf" \
+  && ok "missing lua_package_cpath is injected" || ko "lua_package_cpath was not injected"
+_ensure_lua_package_path "$_lp_conf"
+[ "$(grep -c 'lua_package_path' "$_lp_conf")" -eq 1 ] \
+  && ok "existing lua_package_path is not duplicated" || ko "lua_package_path was duplicated"
+rm -f "$_lp_conf"
+
 echo "== cleanup_mysql_files / cleanup_mariadb_files (include/db-common.sh) =="
 _cdir="$work/cleanup"; mkdir -p "$_cdir"; pushd "$_cdir" > /dev/null
 export SYS_ARCH_M=x86_64

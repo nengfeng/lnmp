@@ -38,6 +38,28 @@ set_ld_opt() {
   echo "${out# }"
 }
 
+# Ensure the installed nginx.conf can load lua-resty-core / lua-cjson.
+# Older LNMP builds without LuaJIT shipped a config that never had a
+# lua_package_path; the upgrade adds the Lua modules but not the path, so the
+# new master dies at init_by_lua with "module 'resty.core' not found".
+_ensure_lua_package_path() {
+  local conf="$1"
+  [ -f "$conf" ] || return 0
+  if grep -q 'lua_package_path' "$conf"; then
+    return 0
+  fi
+  local tmp
+  tmp=$(mktemp "${conf}.XXXXXX") || return 1
+  awk '
+    { print }
+    /^[[:space:]]*http[[:space:]]*\{/ && !done {
+      print "    lua_package_path \"/usr/local/lib/lua/5.1/?.lua;/usr/local/lib/lua/5.1/?/init.lua;;\";"
+      print "    lua_package_cpath \"/usr/local/lib/lua/5.1/?.so;;\";"
+      done=1
+    }
+  ' "$conf" > "$tmp" && mv "$tmp" "$conf" || { rm -f "$tmp"; return 1; }
+}
+
 # Verified zero-downtime binary swap via USR2/QUIT.
 # Usage: _nginx_hot_swap <active_bin> <backup_bin> <service_name>
 # Assumes new binary already installed at <active_bin>.
@@ -237,6 +259,7 @@ Upgrade_Nginx() {
     fi
 
     tar xzf nginx-${NEW_nginx_ver}.tar.gz || { fail_msg "Nginx upgrade (extract nginx)"; }
+    _ensure_lua_package_path "${nginx_install_dir}/conf/nginx.conf"
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
@@ -362,6 +385,7 @@ Upgrade_Tengine() {
       char=$(get_char)
     fi
     tar xzf tengine-${NEW_tengine_ver}.tar.gz || { fail_msg "Tengine upgrade (extract tengine)"; }
+    _ensure_lua_package_path "${tengine_install_dir}/conf/nginx.conf"
     pushd tengine-${NEW_tengine_ver}
     make clean || true
     local tengine_v_tmp=$(mktemp "${current_dir}/src/tengine_v.XXXXXX")
@@ -545,6 +569,7 @@ Upgrade_OpenResty() {
       char=$(get_char)
     fi
     tar xzf openresty-${NEW_openresty_ver}.tar.gz || { fail_msg "OpenResty upgrade (extract openresty)"; }
+    _ensure_lua_package_path "${openresty_install_dir}/nginx/conf/nginx.conf"
 
     # Build brotli static library for ngx_brotli
     if [ -d "ngx_brotli/deps/brotli" ]; then
