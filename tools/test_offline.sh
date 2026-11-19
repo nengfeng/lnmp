@@ -606,20 +606,13 @@ if _php_version_is_supported 8.6.0; then ko "unsupported 8.6.0 was accepted"; el
 if _php_version_is_supported 8.5; then ko "malformed 8.5 was accepted"; else ok "malformed 8.5 is rejected"; fi
 
 echo "== _detect_enabled_php_exts (include/upgrade_php.sh) =="
-# options.conf does not persist --php_extensions, so the upgrade must discover
-# the extension set from the modules the installed PHP actually loaded.
-_det_php="$work/php_detect"; mkdir -p "$_det_php/bin"
-cat > "$_det_php/bin/php" <<'DETECT_EOF'
-#!/bin/bash
-cat <<'MODULES'
-Core
-redis
-memcached
-ionCube Loader
-xdebug
-MODULES
-DETECT_EOF
-chmod +x "$_det_php/bin/php"
+# options.conf does not persist --php_extensions, and the old php binary can be
+# broken by a library soname bump, so the upgrade reads the php.d ini files.
+_det_php="$work/php_detect"; mkdir -p "$_det_php/etc/php.d"
+touch "$_det_php/etc/php.d/05-redis.ini" \
+      "$_det_php/etc/php.d/05-memcached.ini" \
+      "$_det_php/etc/php.d/00-ioncube.ini" \
+      "$_det_php/etc/php.d/08-xdebug.ini"
 unset pecl_redis pecl_memcached pecl_ioncube pecl_xdebug pecl_imagick
 php_install_dir="$_det_php"
 _detect_enabled_php_exts
@@ -630,6 +623,28 @@ _detect_enabled_php_exts
 [ -z "${pecl_imagick}" ] && ok "absent imagick stays disabled" || ko "imagick was falsely enabled"
 unset php_install_dir pecl_redis pecl_memcached pecl_ioncube pecl_xdebug
 rm -rf "$_det_php"
+
+echo "== _php_configure_command (include/upgrade_php.sh) =="
+# A broken old php binary (libzip soname bump) must not dead-end the upgrade;
+# php-config is a shell script and still exposes the original options.
+_cc_php="$work/php_cc"; mkdir -p "$_cc_php/bin"
+printf '#!/bin/sh\nexit 1\n' > "$_cc_php/bin/php"
+printf '#!/bin/sh\necho \"--prefix=/usr/local/php --enable-fpm --with-zip=/usr/local\"\n' > "$_cc_php/bin/php-config"
+chmod +x "$_cc_php/bin/php" "$_cc_php/bin/php-config"
+php_install_dir="$_cc_php"
+_cc=$(_php_configure_command)
+[ "${_cc}" = "./configure --prefix=/usr/local/php --enable-fpm --with-zip=/usr/local" ] \
+  && ok "falls back to php-config when php -i is unusable" || ko "fallback command was [${_cc}]"
+cat > "$_cc_php/bin/php" <<'CC_PHP_EOF'
+#!/bin/sh
+echo "Configure Command => './configure' '--prefix=/from/php-i' --enable-fpm"
+CC_PHP_EOF
+chmod +x "$_cc_php/bin/php"
+_cc=$(_php_configure_command)
+[ "${_cc}" = "'./configure' '--prefix=/from/php-i' --enable-fpm" ] \
+  && ok "prefers php -i when the binary works" || ko "php -i command was [${_cc}]"
+unset php_install_dir
+rm -rf "$_cc_php"
 
 echo "== rollback_db_upgrade (include/upgrade_db.sh) =="
 # The invariants: a missing *_old_<ts> backup must abort with rc!=0 and say so,

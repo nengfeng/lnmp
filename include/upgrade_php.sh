@@ -47,31 +47,48 @@ _php_version_is_supported() {
   php_tag_is_supported "8${minor}"
 }
 
-# Rebuild the PHP extension flags from the modules the installed PHP actually
-# loaded.  options.conf does not persist the install-time --php_extensions
-# choice, so after a minor bump (8.4 -> 8.5, new extension ABI) the old .so
-# files are invisible to the new binary and must be recompiled.
+# Rebuild the PHP extension flags from the installed php.d ini files.
+# options.conf does not persist the install-time --php_extensions choice, and
+# after a minor bump (8.4 -> 8.5, new extension ABI) the old .so files are
+# invisible to the new binary and must be recompiled.  Reading php.d is also
+# deliberate: the old php binary can itself be broken (e.g. libzip soname
+# changed under it), while the ini files are plain text.
 _detect_enabled_php_exts() {
-  local mods ext flag
-  mods="$(${php_install_dir}/bin/php -m 2>/dev/null)"
-  for ext in "${!EXT_FLAGS[@]}"; do
-    flag="${EXT_FLAGS[$ext]}"
-    case "${ext}" in
-      ioncube)   printf '%s\n' "${mods}" | grep -qi '^ioncube loader$' && printf -v "${flag}" 1 ;;
-      imagick)   printf '%s\n' "${mods}" | grep -qi '^imagick$'       && printf -v "${flag}" 1 ;;
-      fileinfo)  printf '%s\n' "${mods}" | grep -qi '^fileinfo$'      && printf -v "${flag}" 1 ;;
-      imap)      printf '%s\n' "${mods}" | grep -qi '^imap$'          && printf -v "${flag}" 1 ;;
-      ldap)      printf '%s\n' "${mods}" | grep -qi '^ldap$'          && printf -v "${flag}" 1 ;;
-      phalcon)   printf '%s\n' "${mods}" | grep -qi '^phalcon$'       && printf -v "${flag}" 1 ;;
-      yaf)       printf '%s\n' "${mods}" | grep -qi '^yaf$'           && printf -v "${flag}" 1 ;;
-      redis)     printf '%s\n' "${mods}" | grep -qi '^redis$'         && printf -v "${flag}" 1 ;;
-      memcached) printf '%s\n' "${mods}" | grep -qi '^memcached$'     && printf -v "${flag}" 1 ;;
-      memcache)  printf '%s\n' "${mods}" | grep -qi '^memcache$'      && printf -v "${flag}" 1 ;;
-      mongodb)   printf '%s\n' "${mods}" | grep -qi '^mongodb$'       && printf -v "${flag}" 1 ;;
-      swoole)    printf '%s\n' "${mods}" | grep -qi '^swoole$'        && printf -v "${flag}" 1 ;;
-      xdebug)    printf '%s\n' "${mods}" | grep -qi '^xdebug$'        && printf -v "${flag}" 1 ;;
+  local ini_dir="${php_install_dir}/etc/php.d" ini ext flag
+  [ -d "${ini_dir}" ] || return 0
+  for ini in "${ini_dir}"/*.ini; do
+    [ -f "${ini}" ] || continue
+    case "${ini##*/}" in
+      00-ioncube.ini)   ext=ioncube ;;
+      03-imagick.ini)   ext=imagick ;;
+      04-fileinfo.ini)  ext=fileinfo ;;
+      04-imap.ini)      ext=imap ;;
+      04-ldap.ini)      ext=ldap ;;
+      04-phalcon.ini)   ext=phalcon ;;
+      04-yaf.ini)       ext=yaf ;;
+      05-redis.ini)     ext=redis ;;
+      05-memcached.ini) ext=memcached ;;
+      05-memcache.ini)  ext=memcache ;;
+      06-swoole.ini)    ext=swoole ;;
+      07-mongodb.ini)   ext=mongodb ;;
+      08-xdebug.ini)    ext=xdebug ;;
+      *) continue ;;
     esac
+    flag="${EXT_FLAGS[$ext]}"
+    [ -n "${flag}" ] && printf -v "${flag}" 1
   done
+}
+
+# Original configure command for the installed PHP.  Prefer `php -i`; fall
+# back to `php-config --configure-options` when the old php binary cannot run
+# (libzip/other soname bumps).  php-config is a shell script and still works.
+_php_configure_command() {
+  local cmd
+  cmd=$(${php_install_dir}/bin/php -i 2>/dev/null | grep 'Configure Command' | awk -F'=>' '{print $2}' | sed 's/^ *//')
+  if [ -z "${cmd}" ]; then
+    cmd="./configure $(${php_install_dir}/bin/php-config --configure-options 2>/dev/null)"
+  fi
+  printf '%s' "${cmd}"
 }
 
 Upgrade_PHP() {
@@ -195,10 +212,11 @@ ROLLBACK_EOF
       sed -i '/OPENSSL_SSLV23_PADDING/i#ifdef RSA_SSLV23_PADDING' ext/openssl/openssl.c
       sed -i '/OPENSSL_SSLV23_PADDING/a#endif' ext/openssl/openssl.c
     fi
-    make clean
+    make clean || true
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/:$PKG_CONFIG_PATH
-    # Get original configure command and fix iconv settings
-    local configure_cmd=$(${php_install_dir}/bin/php -i | grep 'Configure Command' | awk -F'=>' '{print $2}')
+    # Get original configure command and fix iconv settings.
+    local configure_cmd
+    configure_cmd=$(_php_configure_command)
     # Fix iconv: use glibc's iconv (bare --with-iconv, no GNU libiconv path/plug)
     configure_cmd=$(echo "${configure_cmd}" | sed 's|--with-iconv=[^ ]*|--with-iconv|g')
     # Force glibc iconv: do NOT link GNU libiconv even if present on the system
