@@ -73,32 +73,38 @@ Upgrade_DB() {
   { [ -z "${db_install_dir}" ] || [ ! -e "${db_install_dir}/bin/mysql" ]; } && echo "${CWARNING}MySQL/MariaDB is not installed on your system! ${CEND}" && exit 1
   [[ "${armplatform}" == y ]] && echo "${CWARNING}The arm architecture operating system does not support upgrading MySQL/MariaDB! ${CEND}" && exit 1
 
-  # check db passwd
+  # check db passwd.  Do not pass -p when the stored password is empty:
+  # `mysql -uroot -p""` makes the client open its own interactive
+  # "Enter password:" prompt, which the script cannot capture, and then the
+  # password is not written back, so every later mysql/mysqldump call asks
+  # again.  Prompt explicitly instead and persist the verified value.
+  local db_pwd_args=()
   while :; do
-    ${db_install_dir}/bin/mysql -uroot -p"${dbrootpwd}" -e "quit" > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    db_pwd_args=()
+    [ -n "${dbrootpwd}" ] && db_pwd_args=(-p"${dbrootpwd}")
+    if [ -n "${dbrootpwd}" ] && ${db_install_dir}/bin/mysql -uroot "${db_pwd_args[@]}" -e "quit" > /dev/null 2>&1; then
+      break
+    fi
+    echo
+    read -er -p "Please input the root password of database: " NEW_dbrootpwd || { echo "${CFAILURE}No interactive terminal available (stdin closed), aborting.${CEND}" && exit 1; }
+    # Same restriction as input_password / --dbrootpwd: these characters
+    # cannot survive the sed-based options.conf rewrite below
+    case "${NEW_dbrootpwd}" in
+      *'+'*|*'|'*|*'&'*)
+        echo "${CWARNING}Database root password cannot contain + or | or &. Please re-enter.${CEND}"
+        continue
+        ;;
+    esac
+    db_pwd_args=()
+    [ -n "${NEW_dbrootpwd}" ] && db_pwd_args=(-p"${NEW_dbrootpwd}")
+    if ${db_install_dir}/bin/mysql -uroot "${db_pwd_args[@]}" -e "quit" >/dev/null 2>&1; then
+      dbrootpwd=${NEW_dbrootpwd}
+      local pwd_escaped=$(escape_password "${dbrootpwd}")
+      sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
+      chmod 600 ../options.conf
       break
     else
-      echo
-      read -er -p "Please input the root password of database: " NEW_dbrootpwd || { echo "${CFAILURE}No interactive terminal available (stdin closed), aborting.${CEND}" && exit 1; }
-      # Same restriction as input_password / --dbrootpwd: these characters
-      # cannot survive the sed-based options.conf rewrite below
-      case "${NEW_dbrootpwd}" in
-        *'+'*|*'|'*|*'&'*)
-          echo "${CWARNING}Database root password cannot contain + or | or &. Please re-enter.${CEND}"
-          continue
-          ;;
-      esac
-      ${db_install_dir}/bin/mysql -uroot -p"${NEW_dbrootpwd}" -e "quit" >/dev/null 2>&1
-      if [ $? -eq 0 ]; then
-        dbrootpwd=${NEW_dbrootpwd}
-        local pwd_escaped=$(escape_password "${dbrootpwd}")
-        sed -i "s+^dbrootpwd.*+dbrootpwd='${pwd_escaped}'+" ../options.conf
-        chmod 600 ../options.conf
-        break
-      else
-        echo "${CFAILURE}${DB} root password incorrect,Please enter again! ${CEND}"
-      fi
+      echo "${CFAILURE}${DB} root password incorrect,Please enter again! ${CEND}"
     fi
   done
 
@@ -131,9 +137,33 @@ Upgrade_DB() {
   #upgrade
   echo
   echo "Current ${DB} Version: ${CMSG}${OLD_db_ver}${CEND}"
+
+  # Offer the latest patch release recorded in versions.txt for the installed
+  # major.minor series, instead of only echoing the old installed version.
+  local _db_series="$(echo ${OLD_db_ver} | awk -F. '{print $1"."$2}')"
+  local Latest_db_ver="${OLD_db_ver}"
+  case "${DB}" in
+    MariaDB)
+      case "${_db_series}" in
+        12.3) Latest_db_ver=${mariadb123_ver} ;;
+        11.8) Latest_db_ver=${mariadb118_ver} ;;
+        11.4) Latest_db_ver=${mariadb114_ver} ;;
+        10.11) Latest_db_ver=${mariadb1011_ver} ;;
+      esac
+      ;;
+    MySQL)
+      case "${_db_series}" in
+        9.7) Latest_db_ver=${mysql97_ver} ;;
+        8.4) Latest_db_ver=${mysql84_ver} ;;
+        8.0) Latest_db_ver=${mysql80_ver} ;;
+      esac
+      ;;
+  esac
+
   while :; do echo
-    [ "${db_flag}" != 'y' ] && read -e -p "Please input upgrade ${DB} Version(example: ${OLD_db_ver}): " NEW_db_ver
-    if [[ "$(echo ${NEW_db_ver} | awk -F. '{print $1"."$2}')" == "$(echo ${OLD_db_ver} | awk -F. '{print $1"."$2}')" ]]; then
+    [ "${db_flag}" != 'y' ] && read -e -p "Please input upgrade ${DB} Version(Default: ${Latest_db_ver}): " NEW_db_ver
+    NEW_db_ver=${NEW_db_ver:-${Latest_db_ver}}
+    if [[ "$(echo ${NEW_db_ver} | awk -F. '{print $1"."$2}')" == "${_db_series}" ]]; then
       if [[ "${DB}" == MariaDB ]]; then
         DB_filename=mariadb-${NEW_db_ver}-linux-systemd-$SYS_ARCH_M
         DB_URL=${DOWN_ADDR}/mariadb-${NEW_db_ver}/bintar-linux-systemd-$SYS_ARCH_M/${DB_filename}.tar.gz
