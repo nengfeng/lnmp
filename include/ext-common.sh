@@ -53,8 +53,9 @@ install_php_ext() {
   local func1=$(echo "$spec" | cut -d'|' -f2)
   local func2=$(echo "$spec" | cut -d'|' -f3)
 
-  # shellcheck disable=SC1090  # include/${script} is built from EXT_SCRIPTS
-  . include/${script}
+  # shellcheck disable=SC1090  # ${script} is built from EXT_SCRIPTS
+  # Absolute path: callers may be in src/ (upgrade) or the repo root (install).
+  . "${current_dir}/include/${script}"
   local rc
   ${func1} 2>&1 | tee -a ${current_dir}/install.log
   rc=${PIPESTATUS[0]}
@@ -79,8 +80,8 @@ uninstall_php_ext() {
 
   local script=$(echo "$spec" | cut -d'|' -f1)
 
-  # shellcheck disable=SC1090  # include/${script} is built from EXT_SCRIPTS
-  . include/${script}
+  # shellcheck disable=SC1090  # ${script} is built from EXT_SCRIPTS
+  . "${current_dir}/include/${script}"
   # Uninstall functions may appear at any field; only run fields named Uninstall_*
   local i=1
   while true; do

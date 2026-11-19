@@ -605,6 +605,32 @@ if _php_version_is_supported 8.2.0; then ko "unsupported 8.2.0 was accepted"; el
 if _php_version_is_supported 8.6.0; then ko "unsupported 8.6.0 was accepted"; else ok "unsupported 8.6.0 is rejected"; fi
 if _php_version_is_supported 8.5; then ko "malformed 8.5 was accepted"; else ok "malformed 8.5 is rejected"; fi
 
+echo "== _detect_enabled_php_exts (include/upgrade_php.sh) =="
+# options.conf does not persist --php_extensions, so the upgrade must discover
+# the extension set from the modules the installed PHP actually loaded.
+_det_php="$work/php_detect"; mkdir -p "$_det_php/bin"
+cat > "$_det_php/bin/php" <<'DETECT_EOF'
+#!/bin/bash
+cat <<'MODULES'
+Core
+redis
+memcached
+ionCube Loader
+xdebug
+MODULES
+DETECT_EOF
+chmod +x "$_det_php/bin/php"
+unset pecl_redis pecl_memcached pecl_ioncube pecl_xdebug pecl_imagick
+php_install_dir="$_det_php"
+_detect_enabled_php_exts
+[ "${pecl_redis}" = 1 ] && ok "redis is detected and enabled" || ko "redis was not detected"
+[ "${pecl_memcached}" = 1 ] && ok "memcached is detected and enabled" || ko "memcached was not detected"
+[ "${pecl_ioncube}" = 1 ] && ok "ioncube loader is detected and enabled" || ko "ioncube loader was not detected"
+[ "${pecl_xdebug}" = 1 ] && ok "xdebug is detected and enabled" || ko "xdebug was not detected"
+[ -z "${pecl_imagick}" ] && ok "absent imagick stays disabled" || ko "imagick was falsely enabled"
+unset php_install_dir pecl_redis pecl_memcached pecl_ioncube pecl_xdebug
+rm -rf "$_det_php"
+
 echo "== rollback_db_upgrade (include/upgrade_db.sh) =="
 # The invariants: a missing *_old_<ts> backup must abort with rc!=0 and say so,
 # and a rollback whose old server won't come back must also fail loudly rather

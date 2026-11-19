@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # BLOG:  https://github.com/nengfeng/lnmp
 
+. ./include/ext-common.sh
+
 # Default checksum verification setting
 VERIFY_CHECKSUM="${VERIFY_CHECKSUM:-yes}"
 
@@ -45,6 +47,33 @@ _php_version_is_supported() {
   php_tag_is_supported "8${minor}"
 }
 
+# Rebuild the PHP extension flags from the modules the installed PHP actually
+# loaded.  options.conf does not persist the install-time --php_extensions
+# choice, so after a minor bump (8.4 -> 8.5, new extension ABI) the old .so
+# files are invisible to the new binary and must be recompiled.
+_detect_enabled_php_exts() {
+  local mods ext flag
+  mods="$(${php_install_dir}/bin/php -m 2>/dev/null)"
+  for ext in "${!EXT_FLAGS[@]}"; do
+    flag="${EXT_FLAGS[$ext]}"
+    case "${ext}" in
+      ioncube)   printf '%s\n' "${mods}" | grep -qi '^ioncube loader$' && printf -v "${flag}" 1 ;;
+      imagick)   printf '%s\n' "${mods}" | grep -qi '^imagick$'       && printf -v "${flag}" 1 ;;
+      fileinfo)  printf '%s\n' "${mods}" | grep -qi '^fileinfo$'      && printf -v "${flag}" 1 ;;
+      imap)      printf '%s\n' "${mods}" | grep -qi '^imap$'          && printf -v "${flag}" 1 ;;
+      ldap)      printf '%s\n' "${mods}" | grep -qi '^ldap$'          && printf -v "${flag}" 1 ;;
+      phalcon)   printf '%s\n' "${mods}" | grep -qi '^phalcon$'       && printf -v "${flag}" 1 ;;
+      yaf)       printf '%s\n' "${mods}" | grep -qi '^yaf$'           && printf -v "${flag}" 1 ;;
+      redis)     printf '%s\n' "${mods}" | grep -qi '^redis$'         && printf -v "${flag}" 1 ;;
+      memcached) printf '%s\n' "${mods}" | grep -qi '^memcached$'     && printf -v "${flag}" 1 ;;
+      memcache)  printf '%s\n' "${mods}" | grep -qi '^memcache$'      && printf -v "${flag}" 1 ;;
+      mongodb)   printf '%s\n' "${mods}" | grep -qi '^mongodb$'       && printf -v "${flag}" 1 ;;
+      swoole)    printf '%s\n' "${mods}" | grep -qi '^swoole$'        && printf -v "${flag}" 1 ;;
+      xdebug)    printf '%s\n' "${mods}" | grep -qi '^xdebug$'        && printf -v "${flag}" 1 ;;
+    esac
+  done
+}
+
 Upgrade_PHP() {
   pushd ${current_dir}/src > /dev/null
   [ ! -e "${php_install_dir}" ] && echo "${CWARNING}PHP is not installed on your system! ${CEND}" && exit 1
@@ -64,6 +93,9 @@ Upgrade_PHP() {
   fi
   echo
   echo "Current PHP Version: ${CMSG}$OLD_php_ver${CEND}"
+
+  # Capture the extension set before the install tree is replaced.
+  _detect_enabled_php_exts
   
   while :; do echo
     [ "${php_flag}" != 'y' ] && read -e -p "Please input upgrade PHP Version(Default: $Latest_php_ver): " NEW_php_ver
@@ -211,6 +243,20 @@ ROLLBACK_EOF
       echo "${CFAILURE}PHP installation failed! Rolling back...${CEND}"
       _php_rollback
       exit 1
+    fi
+
+    # A minor bump changes the extension ABI, so the old .so files no longer
+    # load. Recompile every extension the old install had enabled. Same-minor
+    # patch upgrades keep the same ABI and skip this extra rebuild.
+    if [ "${OLD_php_ver%.*}" != "${NEW_php_ver%.*}" ]; then
+      echo "Reinstalling PHP extensions..."
+      if ! install_enabled_exts; then
+        echo "${CFAILURE}PHP extension install failed! Rolling back...${CEND}"
+        _php_rollback
+        popd > /dev/null || true
+        rm -rf php-${NEW_php_ver}
+        exit 1
+      fi
     fi
     
     # ========== 【新增】安装后验证 ==========
