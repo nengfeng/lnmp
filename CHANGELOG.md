@@ -10,7 +10,23 @@ user or a contributor, and leave pure release-housekeeping (`chore(release):`,
 checksum records, version bumps) out. Where a release carried a large volume of
 fixes, they are grouped by area rather than listed one by one.
 
-## [Unreleased]
+## [1.7.8] - 2026-11-19
+
+### Fixed
+
+- **Nginx 1.30.6 → 1.30.7 fixes several security issues.** The stable
+  release carries eight security fixes: a `try_files` + `alias` buffer
+  overflow (CVE-2026-125283), an HTTP/2 flow-control window overflow
+  (CVE-2026-123007), HTTP/2 and HTTP/3 use-after-free conditions when
+  `worker_connections` is exhausted (CVE-2026-123633, CVE-2026-121810), a
+  `resolver` use-after-free with simultaneous subrequest resolution
+  (CVE-2026-123634), a mail-proxy use-after-free (CVE-2026-113425), a
+  stream-module client-certificate verification issue that can select the
+  default server instead of the SNI-matched one (CVE-2026-120967), a
+  `ngx_stream_ssl_preread_module` ClientHello parsing difference that can
+  bypass security restrictions (CVE-2026-123640), and an SSL request-body
+  endless-loop condition (CVE-2026-118899). Existing hosts should upgrade
+  with `./upgrade.sh --nginx` (or the matching web-server upgrade path).
 
 ### Changed
 
@@ -19,6 +35,14 @@ fixes, they are grouped by area rather than listed one by one.
   so the bundled copy never refreshed itself on new installs, and OpenSSL-based
   builds (`/usr/local/openssl/cert.pem`) inherited the old roots. Existing
   hosts can refresh their copies with `./upgrade.sh --cacert`.
+
+- **Component updates:** OpenResty 1.31.1.1 → 1.31.8.1; MariaDB 12.3.3 →
+  12.3.4, 11.8.9 → 11.8.10, 11.4.13 → 11.4.14, 10.11.19 → 10.11.20;
+  PostgreSQL 16.15 → 16.16, 17.11 → 17.12, 18.6 → 18.7; LuaJIT
+  2.1-20261023 → 2.1-20261117; Redis 8.10.2 → 8.10.3; pecl-mongodb 2.5.5 →
+  2.5.7; pecl-swoole 6.2.3 → 6.2.6; and the OpenResty Lua pair
+  lua-nginx-module 0.10.32rc7 → 0.10.32rc8 with lua-resty-core
+  0.1.35rc2 → 0.1.35rc3. `component_checksums.txt` was refreshed to match.
 
 ## [1.7.7] - 2026-10-24
 
@@ -479,7 +503,8 @@ board, and several paths reported success regardless of outcome.
 
 - Default memory allocator switched from tcmalloc to jemalloc.
 
-[Unreleased]: https://github.com/nengfeng/lnmp/compare/v1.7.7...HEAD
+[Unreleased]: https://github.com/nengfeng/lnmp/compare/v1.7.8...HEAD
+[1.7.8]: https://github.com/nengfeng/lnmp/compare/v1.7.7...v1.7.8
 [1.7.7]: https://github.com/nengfeng/lnmp/compare/v1.7.6...v1.7.7
 [1.7.6]: https://github.com/nengfeng/lnmp/compare/v1.7.5...v1.7.6
 [1.7.5]: https://github.com/nengfeng/lnmp/compare/v1.7.4...v1.7.5
