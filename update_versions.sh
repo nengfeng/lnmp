@@ -530,6 +530,9 @@ LUA_NGINX_RESTY_CORE_MAP=(
     # rc7 adds the C-level "compress certificates set from ssl_certificate_by_lua*"
     # API; core rc2 exposes it as ngx.ssl.compress_certs(), so it needs rc7.
     ["0.10.32rc7"]="0.1.35rc2"
+    # rc8 is the receiveuntil/timeout test-and-fix follow-up to rc7; core
+    # rc3 is the matching core release for that module line.
+    ["0.10.32rc8"]="0.1.35rc3"
 )
 
 _check_nginx_lua_group() {
