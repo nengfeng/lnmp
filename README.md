@@ -210,6 +210,8 @@ uninstall_enabled_exts
 
 `sources.conf` 中 `china_mirror_url` 为空的组件表示默认镜像不提供该包，境内下载会直接使用官方源，不会先撞一次 404。
 
+GitHub 归档包（`/owner/repo/archive/...`）在境内模式会优先使用 `codeload.github.com`；实测与 `github.com` 内容完全一致。GitHub Release 资产不能用 codeload 替代，仍走官方源加加速器兜底。
+
 支持的镜像站 (`options.conf`):
 ```bash
 MIRROR_BASE_URL=https://mirrors.tuna.tsinghua.edu.cn  # 清华 (默认)

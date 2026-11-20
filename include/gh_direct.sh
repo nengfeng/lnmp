@@ -747,6 +747,17 @@ gh_accelerator_list() {
   return 0
 }
 
+# Map a GitHub archive URL to the codeload host. codeload serves the same
+# bytes for /owner/repo/archive/... URLs and is often reachable/faster from
+# mainland China when github.com is not. Release-asset URLs are not archive
+# URLs and return empty: codeload cannot serve them, and the tag archive is
+# not equivalent (for example pcre2's release tarball has a different
+# top-level dir and generated configure script).
+github_codeload_url() {
+  local url="$1"
+  printf '%s\n' "${url}" | sed -n 's#https://github\.com/\([^/]\+\)/\([^/]\+\)/archive/\(refs/tags/\|refs/heads/\)\{0,1\}\(.*\)\.tar\.gz#https://codeload.github.com/\1/\2/tar.gz/\3\4#p'
+}
+
 # The accelerator URL for a GitHub URL, one per accelerator.
 gh_accelerator_urls_for() {
   local url="$1" accel

@@ -931,6 +931,16 @@ download_component() {
       local download_info=$(build_download_url "$url_template" "$filename_template" "$ver")
       local url=$(echo "$download_info" | cut -d'|' -f1)
       local filename=$(echo "$download_info" | cut -d'|' -f2)
+
+      # GitHub archive URLs: in China mode prefer codeload, which serves the
+      # same bytes and avoids github.com when it is blocked or slow. Release
+      # assets are not rewritten; codeload cannot serve them and the tag
+      # archive is not equivalent.
+      if [[ "$mirror_mode" == "china" ]]; then
+        local codeload_url
+        codeload_url=$(github_codeload_url "$url")
+        [ -n "$codeload_url" ] && url="$codeload_url"
+      fi
       
       # 构建校验码 URL
       local checksum_url=""

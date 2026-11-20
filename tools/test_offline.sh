@@ -61,6 +61,22 @@ OUTIP_STATE=CN; gh_direct_preferred && ok "mainland (CN) -> pinned path first" |
 OUTIP_STATE="unknown"; gh_direct_preferred && ok "unknown location keeps the China-safe default" || ko "unknown location lost the fallback"
 OUTIP_STATE=CA; GH_DIRECT_ENABLED=y; gh_direct_preferred && ok "GH_DIRECT_ENABLED=y forces the pinned path" || ko "explicit y ignored"
 GH_DIRECT_ENABLED=n; gh_direct_preferred && ko "explicit n ignored" || ok "GH_DIRECT_ENABLED=n refuses the pinned path"
+
+echo "== github_codeload_url (include/gh_direct.sh) =="
+_cc=$(github_codeload_url "https://github.com/openresty/lua-resty-core/archive/v0.1.35rc3.tar.gz")
+[ "${_cc}" = "https://codeload.github.com/openresty/lua-resty-core/tar.gz/v0.1.35rc3" ] \
+  && ok "archive tag maps to codeload" || ko "archive tag mapping was [${_cc}]"
+_cc=$(github_codeload_url "https://github.com/google/ngx_brotli/archive/refs/heads/master.tar.gz")
+[ "${_cc}" = "https://codeload.github.com/google/ngx_brotli/tar.gz/refs/heads/master" ] \
+  && ok "archive branch maps to codeload" || ko "archive branch mapping was [${_cc}]"
+_cc=$(github_codeload_url "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.gz")
+[ -z "${_cc}" ] && ok "release asset is not rewritten" || ko "release asset was rewritten to [${_cc}]"
+_cc=$(github_codeload_url "https://example.com/owner/repo/archive/v1.tar.gz")
+[ -z "${_cc}" ] && ok "non-GitHub URL is ignored" || ko "non-GitHub URL was rewritten to [${_cc}]"
+_cu=( "https://github.com/openresty/lua-resty-core/archive/v0.1.35rc3.tar.gz" )
+github_codeload_urls _cu
+[ "${#_cu[@]}" -eq 2 ] && [ "${_cu[1]}" = "https://codeload.github.com/openresty/lua-resty-core/tar.gz/v0.1.35rc3" ] \
+  && ok "codeload fallback is appended to the source list" || ko "codeload fallback list was [${_cu[*]}]"
 unset GH_DIRECT_ENABLED OUTIP_STATE
 
 echo "== set_src_url: a mirror selection keeps the official URL as fallback =="

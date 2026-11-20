@@ -137,6 +137,24 @@ github_speed_min_bytes() {
   printf '%d\n' "$((min_kbps * 1024))"
 }
 
+# Append a codeload equivalent for every GitHub archive URL in the array
+# named by $1. codeload is byte-identical for archive URLs and is a useful
+# mainland fallback when github.com is blocked or slow. Release-asset URLs
+# are left alone (github_codeload_url returns empty for them).
+github_codeload_urls() {
+  local -n _cl_urls=$1
+  local _u _c _x _found
+  for _u in "${_cl_urls[@]}"; do
+    _c=$(github_codeload_url "${_u}")
+    [ -n "${_c}" ] || continue
+    _found="no"
+    for _x in "${_cl_urls[@]}"; do
+      [ "${_x}" = "${_c}" ] && _found="yes" && break
+    done
+    [ "${_found}" = "no" ] && _cl_urls+=( "${_c}" )
+  done
+}
+
 # Append accelerator fallbacks for every GitHub URL in the array named by $1.
 github_accelerator_urls() {
   local -n _urls=$1
@@ -210,6 +228,11 @@ Download_src() {
     read -ra _fb <<< "${src_url_fallback}"
     urls+=( "${_fb[@]}" )
   fi
+
+  # GitHub archives have a byte-identical codeload equivalent; try it before
+  # the third-party accelerator. Release assets are not rewritten (codeload
+  # cannot serve them).
+  github_codeload_urls urls
 
   # GitHub Releases/archives are common in this installer. In mainland China
   # the official GitHub URL may be slow or blocked, so add a configurable
