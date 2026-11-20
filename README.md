@@ -205,8 +205,10 @@ uninstall_enabled_exts
 ### 镜像自动选择 (默认)
 
 脚本自动检测 IP 位置：
-- **中国 IP** → `MIRROR_BASE_URL` (清华镜像)
+- **中国 IP** → `MIRROR_BASE_URL` (清华镜像)，但只用于 `sources.conf` 中确实存在对应版本文件的组件；目前主要是 MariaDB 和 Node.js
 - **其他地区** → 官方源
+
+`sources.conf` 中 `china_mirror_url` 为空的组件表示默认镜像不提供该包，境内下载会直接使用官方源，不会先撞一次 404。
 
 支持的镜像站 (`options.conf`):
 ```bash
