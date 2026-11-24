@@ -18,6 +18,11 @@ if origin_scheme_end then
 end
 local uh = escape(origin_host)
 
+-- Load the pure rewrite module once per request, before any body chunk is
+-- filtered. body_filter_by_lua_file executes on every chunk, so loading it
+-- there would recompile the module in the hot path.
+ngx.ctx.rp_rewrite = assert(loadfile(tostring(ngx.var.rp_rewrite_module)))()
+
 local function replace_bounded(s, prefix_pat, replacement)
   local pat = "(" .. prefix_pat .. uh .. ")"
   local out = {}
@@ -91,7 +96,7 @@ if cookies and upstream_host ~= "" then
   for i, c in ipairs(cookies) do
     out[i] = tostring(c):gsub("([Dd]omain%s*=%s*)([^;%s]+)", function(prefix, dom)
       local dom_l = dom:lower()
-      local dom_host = dom_l:gsub("^%.", ""):match("^([^:]+)") or dom_l
+      local dom_host = (dom_l:gsub("^%.", ""):match("^([^:]+)") or dom_l):gsub("%.$", "")
       if dom_host == uh then
         local repl = public_host
         if dom_l:sub(1, 1) == "." then

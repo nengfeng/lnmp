@@ -211,6 +211,64 @@ HOME="${_saved_home}"; unset _saved_home
 web_install_dir="${_saved_web:-${TMP_DIR}/nginx}"; PATH_SSL="${_saved_ssl:-${TMP_DIR}/nginx/conf/ssl}"
 RP_BASE_DIR="${TMP_DIR}/meta"; RP_BACKUP_DIR="${TMP_DIR}/backup"; RP_LOG_FILE="${TMP_DIR}/operations.log"
 
+echo "== helper normalization =="
+[ "$(rp_verify_nginx 1)" = "on" ] && ok "verify 1 -> on" || ko "verify 1 not normalized"
+[ "$(rp_verify_nginx 0)" = "off" ] && ok "verify 0 -> off" || ko "verify 0 not normalized"
+[ "$(rp_verify_nginx on)" = "on" ] && ok "verify on -> on" || ko "verify on not normalized"
+rp_valid_timeout 10 && ok "timeout 10 valid" || ko "timeout 10 invalid"
+rp_valid_timeout 0 && ko "timeout 0 accepted" || ok "timeout 0 rejected"
+rp_valid_timeout abc && ko "timeout abc accepted" || ok "timeout abc rejected"
+[ "$(rp_host_header_value custom custom.example b.example a.example)" = "custom.example" ] \
+  && ok "probe Host custom" || ko "probe Host custom wrong"
+[ "$(rp_host_header_value public custom.example b.example a.example)" = "a.example" ] \
+  && ok "probe Host public uses A" || ko "probe Host public wrong"
+[ "$(rp_host_header_value upstream custom.example b.example a.example)" = "b.example" ] \
+  && ok "probe Host upstream uses B" || ko "probe Host upstream wrong"
+
+echo "== backup rotation =="
+BK_TMP="${TMP_DIR}/bk"
+mkdir -p "${BK_TMP}"
+_saved_backup_dir="${RP_BACKUP_DIR}"; _saved_keep="${RP_BACKUP_KEEP:-}"
+RP_BACKUP_DIR="${BK_TMP}"; RP_BACKUP_KEEP=2
+for i in 1 2 3 4; do
+  printf 'x\n' >"${TMP_DIR}/src"
+  rp_backup_file "${TMP_DIR}/src" rotate.label >/dev/null || { ko "backup $i failed"; break; }
+done
+bk_count=$(find "${BK_TMP}" -maxdepth 1 -type f -name 'rotate.label.*' | wc -l)
+[ "${bk_count}" -eq 2 ] && ok "backups pruned to 2" || ko "backup count ${bk_count}, want 2"
+RP_BACKUP_DIR="${_saved_backup_dir}"; RP_BACKUP_KEEP="${_saved_keep}"
+unset _saved_backup_dir _saved_keep
+
+echo "== custom certificate key matching =="
+CERT_TMP="${TMP_DIR}/certs"
+mkdir -p "${CERT_TMP}"
+openssl ecparam -name prime256v1 -genkey -noout -out "${CERT_TMP}/k1.pem" 2>/dev/null
+openssl req -x509 -new -key "${CERT_TMP}/k1.pem" -days 1 -subj /CN=a.example -out "${CERT_TMP}/c1.pem" 2>/dev/null
+openssl ecparam -name prime256v1 -genkey -noout -out "${CERT_TMP}/k2.pem" 2>/dev/null
+openssl req -x509 -new -key "${CERT_TMP}/k2.pem" -days 1 -subj /CN=a.example -out "${CERT_TMP}/c2.pem" 2>/dev/null
+_saved_ssl="${PATH_SSL}"; _saved_backup_dir="${RP_BACKUP_DIR}"; _saved_log="${RP_LOG_FILE}"
+PATH_SSL="${CERT_TMP}/ssl"; RP_BACKUP_DIR="${CERT_TMP}/backups"; RP_LOG_FILE="${CERT_TMP}/ops.log"
+if rp_cert_custom a.example "${CERT_TMP}/c1.pem" "${CERT_TMP}/k1.pem"; then
+  ok "ECDSA cert/key match accepted"
+else
+  ko "ECDSA cert/key match rejected"
+fi
+if rp_cert_custom a.example "${CERT_TMP}/c1.pem" "${CERT_TMP}/k2.pem"; then
+  ko "mismatched ECDSA key accepted"
+else
+  ok "mismatched ECDSA key rejected"
+fi
+PATH_SSL="${_saved_ssl}"; RP_BACKUP_DIR="${_saved_backup_dir}"; RP_LOG_FILE="${_saved_log}"
+unset _saved_ssl _saved_backup_dir _saved_log
+
+echo "== non-interactive auto requires email =="
+# Reuse the fake-nginx flow environment set up earlier; stdin is /dev/null.
+if ( rp_command_add b.example http://127.0.0.1:8080/ upstream "" 0 auto "" "" on 10 60 1 1 1 "" "" ) </dev/null >/dev/null 2>&1; then
+  ko "non-interactive auto accepted empty email"
+else
+  ok "non-interactive auto rejected empty email"
+fi
+
 echo "== pure Lua rewriter =="
 lua_bin=""
 command -v luajit >/dev/null 2>&1 && lua_bin=luajit

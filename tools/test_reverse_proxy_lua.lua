@@ -173,6 +173,7 @@ if setfenv then
         rp_upstream_host = "b.example.com",
         rp_public_host = "a.example",
         rp_public_origin = "https://a.example",
+        rp_rewrite_module = root .. "/config/reverse_proxy/rp_rewrite.lua",
       },
       header = {
         location = location,
@@ -190,9 +191,10 @@ if setfenv then
     return ngx.header, ngx.ctx
   end
 
-  local h
-  h = run_header("https://b.example.com:8443/path", nil)
+  local h, hctx
+  h, hctx = run_header("https://b.example.com:8443/path", nil)
   eq(h.location, "https://a.example/path", "Location port consumed")
+  if hctx.rp_rewrite then ok("header filter loads rewrite module once per request") else ko("header filter did not load rewrite module") end
   h = run_header("https://b.example.com.evil.com/x", nil)
   eq(h.location, "https://b.example.com.evil.com/x", "Location subdomain look-alike intact")
   h = run_header(nil, "sess=1; Domain=b.example.com:8443; Path=/")
@@ -203,6 +205,10 @@ if setfenv then
   cookie = h.set_cookie
   if type(cookie) == "table" then cookie = cookie[1] end
   eq(cookie, "sess=1; Domain=.a.example; Path=/", "Set-Cookie leading-dot domain rewritten")
+  h = run_header(nil, "sess=1; Domain=b.example.com.; Path=/")
+  cookie = h.set_cookie
+  if type(cookie) == "table" then cookie = cookie[1] end
+  eq(cookie, "sess=1; Domain=a.example; Path=/", "Set-Cookie trailing-root-dot rewritten")
   h = run_header(nil, nil, "image/png")
   if h.content_length == 123 then ok("non-text Content-Length kept") else ko("non-text Content-Length cleared") end
   h = run_header(nil, nil, "text/html")

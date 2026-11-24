@@ -725,3 +725,11 @@ curl -H 'Host: a.example' http://127.0.0.1/ | grep -i 'b.example'
 - `update` / `delete` / `show` / `test` 先做 domain 合法性校验，拒绝路径穿越。
 - HTTPS 上游默认配置 `proxy_ssl_trusted_certificate`（系统 CA 包）和 `proxy_ssl_verify_depth 2`。
 - Location / Set-Cookie / body 替换改为有边界、可消费端口的匹配，避免子域误伤与端口泄漏。
+- 连通性检查改为失败即中止（除非 `--skip-upstream-check`），并使用 `--host-header` 解析出的实际 Host。
+- `update` 回滚将 verify 值归一化为 nginx 的 `on`/`off`；`update` 校验 timeout。
+- `rp_body.lua` 不再每个 chunk 重新加载模块，改由 header filter 每请求加载一次并放入 `ngx.ctx`。
+- 自定义证书改为比较公钥材料，支持 RSA / ECDSA / Ed25519。
+- 非交互 `--cert auto` 强制要求 `--email`。
+- 备份按 label 保留最近 10 份（`RP_BACKUP_KEEP` 可覆盖）。
+- Cookie Domain 同时处理前导点和末尾根点。
+- `test` 使用 `--resolve` 让 HTTPS 探测带正确 SNI。

@@ -112,6 +112,35 @@ rp_validate_domain() {
 
 # Parse an upstream URL into RP_UPSTREAM_SCHEME/HOST/PORT/PATH.
 # Returns non-zero for anything other than http(s)://host[:port]/ .
+rp_verify_on() {
+  case "$1" in
+    1|on|yes|true) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+rp_verify_nginx() {
+  if rp_verify_on "$1"; then
+    printf 'on\n'
+  else
+    printf 'off\n'
+  fi
+}
+
+rp_valid_timeout() {
+  [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+# Shell value used for probing / curl (not the nginx config token).
+rp_host_header_value() {
+  local mode="$1" custom="$2" upstream_host="$3" domain="$4"
+  case "${mode}" in
+    custom) printf '%s' "${custom}" ;;
+    public) printf '%s' "${domain}" ;;
+    *) printf '%s' "${upstream_host}" ;;
+  esac
+}
+
 rp_parse_upstream() {
   local url="$1"
   RP_UPSTREAM_SCHEME=""
@@ -517,10 +546,24 @@ rp_meta_save() {
 
 rp_backup_file() {
   local src="$1" label="$2"
-  local dst
+  local dst keep count
   mkdir -p "${RP_BACKUP_DIR}" || return 1
-  dst="${RP_BACKUP_DIR}/${label}.$(date +%Y%m%d%H%M%S).$$"
+  dst="${RP_BACKUP_DIR}/${label}.$(date +%Y%m%d%H%M%S).$$.${RANDOM}"
   cp -a "${src}" "${dst}" || return 1
+
+  keep="${RP_BACKUP_KEEP:-10}"
+  if [ "${keep}" -gt 0 ] 2>/dev/null; then
+    count=$(find "${RP_BACKUP_DIR}" -maxdepth 1 -type f -name "${label}.*" 2>/dev/null | wc -l)
+    if [ "${count}" -gt "${keep}" ]; then
+      find "${RP_BACKUP_DIR}" -maxdepth 1 -type f -name "${label}.*" \
+        -printf '%T@ %p\n' 2>/dev/null \
+        | sort -n | head -n $(( count - keep )) \
+        | while IFS= read -r line; do
+            rm -f "${line#* }"
+          done
+    fi
+  fi
+
   printf '%s\n' "${dst}"
 }
 
@@ -953,10 +996,21 @@ rp_cert_custom() {
     rp_die "Invalid private key: ${key_file}"
     return 1
   fi
-  local cert_mod key_mod
-  cert_mod=$(openssl x509 -in "${crt}" -noout -modulus 2>/dev/null | openssl md5 2>/dev/null || true)
-  key_mod=$(openssl rsa -in "${key}" -noout -modulus 2>/dev/null | openssl md5 2>/dev/null || true)
-  if [ -n "${cert_mod}" ] && [ -n "${key_mod}" ] && [ "${cert_mod}" != "${key_mod}" ]; then
+  # Compare public-key material, not just RSA modulus: ECDSA and Ed25519 keys
+  # have no modulus and would otherwise skip the match check entirely.
+  local cert_pub key_pub
+  cert_pub=$(openssl x509 -in "${crt}" -noout -pubkey 2>/dev/null \
+    | openssl pkey -pubin -outform DER 2>/dev/null \
+    | openssl md5 2>/dev/null) || true
+  key_pub=$(openssl pkey -in "${key}" -pubout -outform DER 2>/dev/null \
+    | openssl md5 2>/dev/null) || true
+  if [ -z "${cert_pub}" ] || [ -z "${key_pub}" ]; then
+    if [ -n "${backup}" ]; then mv -f "${backup}" "${crt}"; fi
+    rm -f "${key}"
+    rp_die "Unable to derive public key from certificate or private key"
+    return 1
+  fi
+  if [ "${cert_pub}" != "${key_pub}" ]; then
     if [ -n "${backup}" ]; then mv -f "${backup}" "${crt}"; fi
     rm -f "${key}"
     rp_die "Certificate and private key do not match"
@@ -1085,7 +1139,8 @@ rp_command_add() {
   fi
   case "${cert_mode}" in auto|custom|none) ;; *) rp_die "Invalid cert mode: ${cert_mode}"; return 1 ;; esac
   case "${rewrite}" in 0|1) ;; *) rp_die "rewrite must be 0 or 1"; return 1 ;; esac
-  [[ "${connect_timeout}" =~ ^[1-9][0-9]*$ && "${read_timeout}" =~ ^[1-9][0-9]*$ ]] || { rp_die "Invalid timeout"; return 1; }
+  rp_valid_timeout "${connect_timeout}" && rp_valid_timeout "${read_timeout}" \
+    || { rp_die "Invalid timeout (must be a positive integer)"; return 1; }
 
   local existing
   existing=$(rp_metadata_file "${domain}")
@@ -1112,10 +1167,13 @@ rp_command_add() {
   fi
 
   if [ "${skip_check}" != "1" ]; then
-    local curl_args=( -fsS --connect-timeout 10 -m 20 -H "Host: ${RP_UPSTREAM_HOST}" )
-    [ "${verify}" = "1" ] || curl_args+=( -k )
+    local probe_host curl_args
+    probe_host=$(rp_host_header_value "${host_header_mode}" "${RP_CUSTOM_HOST}" "${RP_UPSTREAM_HOST}" "${domain}")
+    curl_args=( -fsS --connect-timeout 10 -m 20 -H "Host: ${probe_host}" )
+    rp_verify_on "${verify}" || curl_args+=( -k )
     if ! curl "${curl_args[@]}" "${upstream}" >/dev/null 2>&1; then
-      rp_log WARN "Upstream ${upstream} connectivity check failed; continuing (use --skip-upstream-check to silence)"
+      rp_die "Upstream connectivity check failed for ${upstream} (Host: ${probe_host}); use --skip-upstream-check to override"
+      return 1
     fi
   fi
 
@@ -1128,6 +1186,10 @@ rp_command_add() {
 
   case "${cert_mode}" in
     auto)
+      if [ -z "${email}" ] && [ ! -t 0 ]; then
+        rp_die "Non-interactive --cert auto requires --email"
+        return 1
+      fi
       rp_cert_issue_auto "${domain}" "${email}" "${dns_api}" || return 1
       ;;
     custom)
@@ -1143,7 +1205,7 @@ rp_command_add() {
   proxy_host=$(rp_resolve_proxy_host "${host_header_mode}" "${RP_CUSTOM_HOST}" "${RP_UPSTREAM_HOST}")
 
   rp_write_vhost_raw "${domain}" "${cert_mode}" "${RP_UPSTREAM_URL}" "${proxy_host}" \
-    "${connect_timeout}" "${read_timeout}" "$([ "${verify}" = "1" ] && printf on || printf off)" \
+    "${connect_timeout}" "${read_timeout}" "$(rp_verify_nginx "${verify}")" \
     "${RP_UPSTREAM_HOST}" "${rewrite}" || return 1
 
   if ! rp_nginx_test; then
@@ -1202,16 +1264,21 @@ rp_command_update() {
 
   case "${cert_mode}" in auto|custom|none) ;; *) rp_die "Invalid cert mode: ${cert_mode}"; return 1 ;; esac
   case "${rewrite}" in 0|1) ;; *) rp_die "rewrite must be 0 or 1"; return 1 ;; esac
+  rp_valid_timeout "${connect_timeout}" && rp_valid_timeout "${read_timeout}" \
+    || { rp_die "Invalid timeout (must be a positive integer)"; return 1; }
 
   if [ "${allow_private}" != "1" ]; then
     rp_check_ssrf "${RP_UPSTREAM_HOST}" || { rp_die "Upstream host ${RP_UPSTREAM_HOST} resolves to a blocked address"; return 1; }
   fi
 
   if [ "${skip_check}" != "1" ]; then
-    local curl_args=( -fsS --connect-timeout 10 -m 20 -H "Host: ${RP_UPSTREAM_HOST}" )
-    [ "${verify}" = "1" ] || curl_args+=( -k )
+    local probe_host curl_args
+    probe_host=$(rp_host_header_value "${host_header_mode}" "${RP_CUSTOM_HOST}" "${RP_UPSTREAM_HOST}" "${domain}")
+    curl_args=( -fsS --connect-timeout 10 -m 20 -H "Host: ${probe_host}" )
+    rp_verify_on "${verify}" || curl_args+=( -k )
     if ! curl "${curl_args[@]}" "${RP_UPSTREAM_URL}" >/dev/null 2>&1; then
-      rp_log WARN "Upstream ${RP_UPSTREAM_URL} connectivity check failed; continuing"
+      rp_die "Upstream connectivity check failed for ${RP_UPSTREAM_URL} (Host: ${probe_host}); use --skip-upstream-check to override"
+      return 1
     fi
   fi
 
@@ -1224,6 +1291,10 @@ rp_command_update() {
   case "${cert_mode}" in
     auto)
       if ! rp_cert_exists "${domain}" || rp_cert_needs_renew "${domain}"; then
+        if [ -z "${email}" ] && [ ! -t 0 ]; then
+          rp_die "Non-interactive --cert auto requires --email"
+          return 1
+        fi
         rp_cert_issue_auto "${domain}" "${email}" "${dns_api}" || return 1
       fi
       ;;
@@ -1236,7 +1307,7 @@ rp_command_update() {
   local proxy_host
   proxy_host=$(rp_resolve_proxy_host "${host_header_mode}" "${RP_CUSTOM_HOST}" "${RP_UPSTREAM_HOST}")
   rp_write_vhost_raw "${domain}" "${cert_mode}" "${RP_UPSTREAM_URL}" "${proxy_host}" \
-    "${connect_timeout}" "${read_timeout}" "$([ "${verify}" = "1" ] && printf on || printf off)" \
+    "${connect_timeout}" "${read_timeout}" "$(rp_verify_nginx "${verify}")" \
     "${RP_UPSTREAM_HOST}" "${rewrite}" || return 1
 
   if ! rp_nginx_test; then
@@ -1245,7 +1316,7 @@ rp_command_update() {
     rp_write_vhost_raw "${domain}" "$(rp_meta_get cert_mode)" "${old_url}" \
       "$(rp_resolve_proxy_host "$(rp_meta_get host_header)" "${old_custom_host}" "${old_host}")" \
       "$(rp_meta_get connect_timeout)" "$(rp_meta_get read_timeout)" \
-      "$(rp_meta_get verify_upstream)" "${old_host}" "$(rp_meta_get rewrite)" || true
+      "$(rp_verify_nginx "$(rp_meta_get verify_upstream)")" "${old_host}" "$(rp_meta_get rewrite)" || true
     rp_nginx_test || true
     rp_die "Updated configuration failed nginx -t; previous configuration restored"
     return 1
@@ -1333,17 +1404,18 @@ rp_command_test() {
   cert_mode=$(rp_meta_get cert_mode)
   upstream_host=$(rp_meta_get upstream_host)
   rp_nginx_test || return 1
-  local url scheme
+  local url scheme port curl_args
   if [ "${cert_mode}" = "none" ]; then
-    scheme="http"; url="http://127.0.0.1/"
+    scheme="http"; port=80; url="http://${domain}/"
   else
-    scheme="https"; url="https://127.0.0.1/"
+    scheme="https"; port=443; url="https://${domain}/"
   fi
-  local out headers body
+  curl_args=( -k -sS --max-time 20 --resolve "${domain}:${port}:127.0.0.1" )
+  local headers body
   headers=$(mktemp) || return 1
   body=$(mktemp) || { rm -f "${headers}"; return 1; }
   local rc=0
-  curl -k -sS --max-time 20 -H "Host: ${domain}" -D "${headers}" -o "${body}" "${url}" || rc=$?
+  curl "${curl_args[@]}" -D "${headers}" -o "${body}" "${url}" || rc=$?
   if [ "${rc}" -ne 0 ]; then
     rp_log WARN "Local request through ${scheme} failed (rc=${rc})"
   else

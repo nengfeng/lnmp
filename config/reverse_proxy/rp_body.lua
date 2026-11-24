@@ -4,7 +4,12 @@
 -- All string/state logic lives in rp_rewrite.lua so it can be tested without
 -- nginx. This file is only the ngx.arg / ngx.ctx adapter.
 
-local rewrite = assert(loadfile(tostring(ngx.var.rp_rewrite_module)))()
+local rewrite = ngx.ctx.rp_rewrite
+if not rewrite then
+  -- Fallback for configurations where header_filter did not run first.
+  rewrite = assert(loadfile(tostring(ngx.var.rp_rewrite_module)))()
+  ngx.ctx.rp_rewrite = rewrite
+end
 
 local state = ngx.ctx.rp_state
 if not state then
