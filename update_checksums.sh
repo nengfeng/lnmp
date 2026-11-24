@@ -60,18 +60,42 @@ COMPONENTS=(
   "https://github.com/openresty/luajit2/archive/refs/tags/v${luajit2_ver}.tar.gz|luajit2-${luajit2_ver}.tar.gz"
   "https://github.com/openresty/lua-nginx-module/archive/refs/tags/v${lua_nginx_module_ver}.tar.gz|lua-nginx-module-${lua_nginx_module_ver}.tar.gz"
   "https://github.com/openresty/lua-resty-core/archive/refs/tags/v${lua_resty_core_ver}.tar.gz|lua-resty-core-${lua_resty_core_ver}.tar.gz"
-  "https://github.com/openresty/nginx/archive/refs/tags/release-${nginx_ver}.tar.gz|nginx-release-${nginx_ver}.tar.gz"
+  "https://nginx.org/download/nginx-${nginx_ver}.tar.gz|nginx-${nginx_ver}.tar.gz"
   "https://github.com/nghttp2/nghttp2/releases/download/v${nghttp2_ver}/nghttp2-${nghttp2_ver}.tar.gz|nghttp2-${nghttp2_ver}.tar.gz"
   "https://libzip.org/download/libzip-${libzip_ver}.tar.gz|libzip-${libzip_ver}.tar.gz"
 )
 
+# A download that returned 200 is still not necessarily the archive: a mirror
+# or CDN error page can be saved as a short file. Hashing that body would put
+# an error string into the repository's trust anchor (this happened for nginx
+# when its old openresty/nginx tag URL started returning 404).
+_downloaded_archive_ok() {
+  local file_name="$1"
+  case "${file_name}" in
+    *.tar.gz|*.tgz) gzip -t "${file_name}" 2>/dev/null ;;
+    *.tar.bz2) bzip2 -t "${file_name}" 2>/dev/null ;;
+    *.tar.xz) xz -t "${file_name}" 2>/dev/null ;;
+    *) return 0 ;;
+  esac
+}
+
 # Fetch a file through a pinned address when possible.
 fetch() {
   local url="$1" out="$2"
+  local ok=1
   if gh_direct_download "$url" "$out" 2>/dev/null && [ -s "$out" ]; then
-    return 0
+    _downloaded_archive_ok "$out" && ok=0
   fi
-  curl -sL --connect-timeout 10 -m 120 -o "$out" "$url" 2>/dev/null && [ -s "$out" ]
+  if [ "$ok" -ne 0 ]; then
+    rm -f "$out"
+    if curl -sL --connect-timeout 10 -m 120 -o "$out" "$url" 2>/dev/null && [ -s "$out" ]; then
+      _downloaded_archive_ok "$out" || { rm -f "$out"; return 1; }
+    else
+      rm -f "$out"
+      return 1
+    fi
+  fi
+  return 0
 }
 
 work=$(mktemp -d)
