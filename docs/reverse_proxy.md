@@ -395,8 +395,8 @@ Lua 文件通过这些变量工作，不在 Lua 代码里硬编码域名。
 
 职责：
 
-- 改写 `Location` 中的上游 origin。
-- 改写 `Set-Cookie` 中已有的 `Domain=B`。
+- 改写 `Location` 中的上游 origin；显式数字端口随 host 一起消费，避免泄漏到 A。
+- 改写 `Set-Cookie` 中已有的 `Domain=B`；比较时忽略端口和前导点。
 - 不主动给 `__Host-` Cookie 添加 Domain。
 - 如果响应是文本类型且未被压缩，清除 `Content-Length`；非文本或 `Content-Encoding` 非空时不清除，直接 passthrough。
 - 不处理 `Path` 前缀重写，因为 MVP 不支持上游子路径。
@@ -405,7 +405,8 @@ Lua 文件通过这些变量工作，不在 Lua 代码里硬编码域名。
 
 - `ngx.header.content_length = nil` 用于清除上游长度；如当前模块版本行为不一致，回退到 `proxy_hide_header Content-Length`。
 - `Set-Cookie` 可能是字符串或数组，统一按数组处理。
-- 只替换精确等于上游 host 的 Domain，大小写不敏感。
+- 只替换精确等于上游 host 的 Domain，大小写不敏感；带端口或前导点的值按 host 部分比较。
+- Location / body 替换都有 host 边界检查，不会把 `B.evil.com` 当成 `B`。
 
 ### 7.2 `rp_body.lua`
 
@@ -460,9 +461,11 @@ Lua 文件通过这些变量工作，不在 Lua 代码里硬编码域名。
 - 检测 `Content-Encoding`，有压缩则整个响应 passthrough，不做体重写。
 - 超过 `max_bytes` 后进入 passthrough；已改写部分和未改写部分都会完整输出，不允许丢尾部。
 - 替换：
-  - `https://B`
-  - `http://B`
-  - `//B`
+  - `https://B[:port]`
+  - `http://B[:port]`
+  - `//B[:port]`
+
+  显式数字端口随 host 一起消费；匹配要求后续字符不是 host 名字符，句末 `.` 只在后面不再跟域名标签时视为边界。
 - 保留路径、query、锚点。
 - 不处理 `https:\/\/B`、`https%3A%2F%2FB` 等编码变体，除非后续增加显式选项。
 
@@ -713,4 +716,12 @@ curl -H 'Host: a.example' http://127.0.0.1/ | grep -i 'b.example'
 16. **未指定地址**：除私网段外，同时拒绝 `0.0.0.0/8` 和 `::/128`；否则 `0.0.0.0` 这类记录在部分系统上仍可能连到本机。
 17. **体重写内存控制**：用中间水位冲刷替代整页缓冲；冲刷前扫描 `(cut - overlap, cut]` 危险窗口并回退到潜在匹配起点之前，防止跨块 URL 被截断；eof 非空 chunk 必须拼接后再输出，并对此设计专门测试。
 
-以上修订已并入本文件。方案可以进入实现阶段。
+以上修订已并入本文件。
+
+## 14. 实现期修复记录
+
+- `update` 未传 `--email` / `--dns_api` / `--host-header` 时从元数据补齐，不再覆盖为空；渲染使用补齐后的 custom Host。
+- DNS-01 模式失败或成功都不删除现网 vhost；HTTP-01 的 bootstrap 失败会恢复备份。
+- `update` / `delete` / `show` / `test` 先做 domain 合法性校验，拒绝路径穿越。
+- HTTPS 上游默认配置 `proxy_ssl_trusted_certificate`（系统 CA 包）和 `proxy_ssl_verify_depth 2`。
+- Location / Set-Cookie / body 替换改为有边界、可消费端口的匹配，避免子域误伤与端口泄漏。

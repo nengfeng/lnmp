@@ -576,17 +576,43 @@ rp_proxy_set_lines() {
 EOF
 }
 
+rp_ca_bundle_path() {
+  local p
+  for p in \
+    /etc/ssl/certs/ca-certificates.crt \
+    /etc/pki/tls/certs/ca-bundle.crt \
+    /etc/ssl/cert.pem; do
+    if [ -s "${p}" ]; then
+      printf '%s\n' "${p}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 rp_render_proxy_location() {
   local upstream_url="$1" proxy_host="$2" connect_timeout="$3" read_timeout="$4"
   local verify_upstream="$5" rewrite="$6"
-  local extra_ssl="" rewrite_block="" sets_block=""
+  local extra_ssl="" rewrite_block="" ca_bundle=""
 
   if [ "${upstream_url#https://}" != "${upstream_url}" ]; then
+    if [ "${verify_upstream}" = "on" ]; then
+      ca_bundle=$(rp_ca_bundle_path || true)
+    fi
+    local extra_ca=""
+    if [ -n "${ca_bundle}" ]; then
+      extra_ca=$(cat <<EOF
+        proxy_ssl_trusted_certificate ${ca_bundle};
+        proxy_ssl_verify_depth 2;
+EOF
+)
+    fi
     extra_ssl=$(cat <<EOF
 
         proxy_ssl_server_name on;
         proxy_ssl_name ${7};
         proxy_ssl_verify ${verify_upstream};
+${extra_ca}
 EOF
 )
   fi
@@ -818,15 +844,17 @@ rp_cert_issue_auto() {
   chmod 755 "${webroot}" 2>/dev/null || true
 
   local conf="${web_install_dir}/conf/vhost/${domain}.conf"
-  local had_conf=0 conf_backup=""
+  local had_conf=0 conf_backup="" wrote_bootstrap=0
 
+  # DNS-01 does not need a challenge vhost. In that mode the existing vhost
+  # must stay untouched until the caller renders the final configuration.
   if [ -z "${dns_api}" ]; then
     if [ -f "${conf}" ]; then
       had_conf=1
       conf_backup=$(rp_backup_file "${conf}" "${domain}.acme-bootstrap") || return 1
     fi
 
-  cat >"${conf}.tmp.$$" <<EOF
+    cat >"${conf}.tmp.$$" <<EOF
 # ${RP_MANAGED_MARK} (ACME bootstrap)
 server {
     listen 80;
@@ -842,46 +870,61 @@ server {
     }
 }
 EOF
-  mv -f "${conf}.tmp.$$" "${conf}"
-  if ! rp_nginx_test; then
-    rm -f "${conf}"
-    if [ "${had_conf}" = "1" ]; then mv -f "${conf_backup}" "${conf}"; fi
-    return 1
-  fi
-  if ! rp_nginx_reload; then
-    rm -f "${conf}"
-    if [ "${had_conf}" = "1" ]; then mv -f "${conf_backup}" "${conf}"; fi
-    rp_nginx_test || true
-    return 1
-  fi
+    mv -f "${conf}.tmp.$$" "${conf}"
+    wrote_bootstrap=1
+
+    if ! rp_nginx_test; then
+      rm -f "${conf}"
+      if [ "${had_conf}" = "1" ]; then mv -f "${conf_backup}" "${conf}"; fi
+      return 1
+    fi
+    if ! rp_nginx_reload; then
+      rm -f "${conf}"
+      if [ "${had_conf}" = "1" ]; then
+        mv -f "${conf_backup}" "${conf}"
+        rp_nginx_reload || true
+      fi
+      return 1
+    fi
   fi
 
   local args=( --force --issue -d "${domain}" -w "${webroot}" )
   if [ -n "${email}" ]; then args+=( --accountemail "${email}" ); fi
   if [ -n "${dns_api}" ]; then args=( --force --issue --dns "${dns_api}" -d "${domain}" ); fi
-  "${acme}" "${args[@]}" >/dev/null 2>&1 || {
-    rm -f "${conf}"
-    if [ "${had_conf}" = "1" ]; then mv -f "${conf_backup}" "${conf}"; fi
-    rp_nginx_test || rp_nginx_reload || true
+
+  if ! "${acme}" "${args[@]}" >/dev/null 2>&1; then
+    if [ "${wrote_bootstrap}" = "1" ]; then
+      rm -f "${conf}"
+      if [ "${had_conf}" = "1" ]; then
+        mv -f "${conf_backup}" "${conf}"
+        rp_nginx_reload || true
+      fi
+    fi
     rp_die "acme.sh issuance failed for ${domain}"
     return 1
-  }
+  fi
 
   mkdir -p "${PATH_SSL}" || return 1
-  "${acme}" --install-cert -d "${domain}" \
+  if ! "${acme}" --install-cert -d "${domain}" \
     --fullchain-file "${PATH_SSL}/${domain}.crt" \
     --key-file "${PATH_SSL}/${domain}.key" \
-    --reloadcmd "${nginx_bin} -s reload" >/dev/null 2>&1 || {
-    rm -f "${conf}" "${PATH_SSL}/${domain}.crt" "${PATH_SSL}/${domain}.key"
-    if [ "${had_conf}" = "1" ]; then mv -f "${conf_backup}" "${conf}"; fi
-    rp_nginx_test || rp_nginx_reload || true
+    --reloadcmd "${nginx_bin} -s reload" >/dev/null 2>&1; then
+    rm -f "${PATH_SSL}/${domain}.crt" "${PATH_SSL}/${domain}.key"
+    if [ "${wrote_bootstrap}" = "1" ]; then
+      rm -f "${conf}"
+      if [ "${had_conf}" = "1" ]; then
+        mv -f "${conf_backup}" "${conf}"
+        rp_nginx_reload || true
+      fi
+    fi
     rp_die "acme.sh install-cert failed for ${domain}"
     return 1
-  }
+  fi
 
-  # Remove the bootstrap conf; the real one is written by the caller.
-  rm -f "${conf}"
-  rp_nginx_test || rp_nginx_reload
+  # HTTP-01 only: remove the bootstrap so the caller can write the final vhost.
+  if [ "${wrote_bootstrap}" = "1" ]; then
+    rm -f "${conf}"
+  fi
   return 0
 }
 
@@ -1094,8 +1137,10 @@ rp_command_add() {
   esac
 
   RP_UPSTREAM_URL=$(rp_upstream_url "${RP_UPSTREAM_SCHEME}" "${RP_UPSTREAM_HOST}" "${RP_UPSTREAM_PORT}")
+  RP_EMAIL="${email}"
+  RP_DNS_API="${dns_api}"
   local proxy_host
-  proxy_host=$(rp_resolve_proxy_host "${host_header_mode}" "${custom_host}" "${RP_UPSTREAM_HOST}")
+  proxy_host=$(rp_resolve_proxy_host "${host_header_mode}" "${RP_CUSTOM_HOST}" "${RP_UPSTREAM_HOST}")
 
   rp_write_vhost_raw "${domain}" "${cert_mode}" "${RP_UPSTREAM_URL}" "${proxy_host}" \
     "${connect_timeout}" "${read_timeout}" "$([ "${verify}" = "1" ] && printf on || printf off)" \
@@ -1121,6 +1166,7 @@ rp_command_update() {
   local skip_check="${13}" allow_private="${14}"
   local cert_file="${15}" key_file="${16}"
 
+  rp_validate_domain "${domain}" || { rp_die "Invalid domain: ${domain}"; return 1; }
   rp_meta_load "${domain}" || { rp_die "No reverse proxy metadata for ${domain}"; return 1; }
   local old_url old_scheme old_host old_port
   old_url=$(rp_meta_get upstream_url)
@@ -1188,7 +1234,7 @@ rp_command_update() {
   esac
 
   local proxy_host
-  proxy_host=$(rp_resolve_proxy_host "${host_header_mode}" "${custom_host}" "${RP_UPSTREAM_HOST}")
+  proxy_host=$(rp_resolve_proxy_host "${host_header_mode}" "${RP_CUSTOM_HOST}" "${RP_UPSTREAM_HOST}")
   rp_write_vhost_raw "${domain}" "${cert_mode}" "${RP_UPSTREAM_URL}" "${proxy_host}" \
     "${connect_timeout}" "${read_timeout}" "$([ "${verify}" = "1" ] && printf on || printf off)" \
     "${RP_UPSTREAM_HOST}" "${rewrite}" || return 1
@@ -1207,8 +1253,11 @@ rp_command_update() {
   rp_nginx_reload || return 1
 
   RP_HOST_HEADER_MODE="${host_header_mode}"
+  RP_CUSTOM_HOST="${RP_CUSTOM_HOST}"
   RP_REWRITE="${rewrite}"
   RP_CERT_MODE="${cert_mode}"
+  RP_EMAIL="${email}"
+  RP_DNS_API="${dns_api}"
   RP_VERIFY_UPSTREAM="${verify}"
   RP_CONNECT_TIMEOUT="${connect_timeout}"
   RP_READ_TIMEOUT="${read_timeout}"
@@ -1220,6 +1269,7 @@ rp_command_update() {
 
 rp_command_delete() {
   local domain="$1" purge_cert="$2"
+  rp_validate_domain "${domain}" || { rp_die "Invalid domain: ${domain}"; return 1; }
   rp_meta_load "${domain}" || { rp_die "No reverse proxy metadata for ${domain}"; return 1; }
   local conf
   conf=$(rp_vhost_path "${domain}")
@@ -1254,6 +1304,7 @@ rp_command_list() {
 
 rp_command_show() {
   local domain="$1"
+  rp_validate_domain "${domain}" || { rp_die "Invalid domain: ${domain}"; return 1; }
   rp_meta_load "${domain}" || { rp_die "No reverse proxy metadata for ${domain}"; return 1; }
   local key file
   echo "== metadata =="
@@ -1276,6 +1327,7 @@ rp_command_show() {
 
 rp_command_test() {
   local domain="$1"
+  rp_validate_domain "${domain}" || { rp_die "Invalid domain: ${domain}"; return 1; }
   rp_meta_load "${domain}" || { rp_die "No reverse proxy metadata for ${domain}"; return 1; }
   local cert_mode upstream_host
   cert_mode=$(rp_meta_get cert_mode)

@@ -114,6 +114,12 @@ echo "${conf}" | grep -q 'header_filter_by_lua_file' && ok "rewrite header filte
 echo "${conf}" | grep -q 'body_filter_by_lua_file' && ok "rewrite body filter present" || ko "rewrite body filter missing"
 echo "${conf}" | grep -q 'proxy_set_header Accept-Encoding "";' && ok "identity encoding requested" || ko "identity encoding missing"
 echo "${conf}" | grep -q 'proxy_ssl_verify on;' && ok "upstream TLS verification on" || ko "upstream TLS verification missing"
+if ca=$(rp_ca_bundle_path); then
+  echo "${conf}" | grep -q "proxy_ssl_trusted_certificate ${ca};" \
+    && ok "CA bundle configured (${ca})" || ko "CA bundle missing from config"
+else
+  echo "  [SKIP] no system CA bundle found"
+fi
 echo "${conf}" | grep -q 'sub_filter' && ko "sub_filter present" || ok "no sub_filter"
 echo "${conf}" | grep -q "${RP_LUA_DIR}/rp_body.lua" && ok "persistent Lua path used" || ko "repo Lua path used"
 echo "${conf}" | grep -q 'server_name a.example;' && ok "server_name rendered" || ko "server_name missing"
@@ -125,6 +131,85 @@ echo "${conf_none}" | grep -q 'ssl_certificate' && ko "cert none still has TLS" 
 echo "${conf_none}" | grep -q 'well-known/acme-challenge' && ko "cert none has ACME challenge" || ok "cert none omits ACME challenge"
 echo "${conf_none}" | grep -q 'header_filter_by_lua_file' && ko "no-rewrite still has Lua" || ok "no-rewrite omits Lua"
 echo "${conf_none}" | grep -q 'proxy_pass https://b.example.com;' && ok "proxy_pass rendered" || ko "proxy_pass missing"
+
+echo "== subcommand domain validation =="
+if rp_command_show '../../etc/cron.d/x' >/dev/null 2>&1; then
+  ko "show accepted path-traversal domain"
+else
+  ok "show rejected path-traversal domain"
+fi
+if rp_command_delete '../../etc/cron.d/x' 0 >/dev/null 2>&1; then
+  ko "delete accepted path-traversal domain"
+else
+  ok "delete rejected path-traversal domain"
+fi
+
+echo "== update preserves unsupplied fields =="
+FLOW_TMP="${TMP_DIR}/flow"
+mkdir -p "${FLOW_TMP}/nginx/conf/vhost" "${FLOW_TMP}/nginx/sbin" "${FLOW_TMP}/base/conf" \
+  "${FLOW_TMP}/base/lua" "${FLOW_TMP}/logs" "${FLOW_TMP}/wwwlogs"
+cat >"${FLOW_TMP}/nginx/sbin/nginx" <<'EOS'
+#!/bin/bash
+exit 0
+EOS
+chmod +x "${FLOW_TMP}/nginx/sbin/nginx"
+_saved_web="${web_install_dir}"; _saved_bin="${nginx_bin}"; _saved_ssl="${PATH_SSL}"
+_saved_base="${RP_BASE_DIR}"; _saved_conf="${RP_CONF_DIR}"; _saved_lua="${RP_LUA_DIR}"
+_saved_backup="${RP_BACKUP_DIR}"; _saved_log="${RP_LOG_FILE}"; _saved_logs="${RP_PUBLIC_LOG_DIR}"
+web_install_dir="${FLOW_TMP}/nginx"
+nginx_bin="${FLOW_TMP}/nginx/sbin/nginx"
+PATH_SSL="${FLOW_TMP}/nginx/conf/ssl"
+RP_BASE_DIR="${FLOW_TMP}/base"
+RP_CONF_DIR="${FLOW_TMP}/base/conf"
+RP_LUA_DIR="${FLOW_TMP}/base/lua"
+RP_BACKUP_DIR="${FLOW_TMP}/base/backups"
+RP_LOG_FILE="${FLOW_TMP}/base/operations.log"
+RP_PUBLIC_LOG_DIR="${FLOW_TMP}/wwwlogs"
+rp_nginx_reload() { "${nginx_bin}" -s reload; }
+RP_HOST_HEADER_MODE=custom
+RP_CUSTOM_HOST=custom.example
+RP_REWRITE=0
+RP_CERT_MODE=none
+RP_EMAIL=keep@example
+RP_DNS_API=dns_ali
+RP_VERIFY_UPSTREAM=on
+RP_CONNECT_TIMEOUT=10
+RP_READ_TIMEOUT=60
+RP_FORCE=1
+rp_command_add a.example http://127.0.0.1:8080/ custom custom.example 0 none keep@example dns_ali on 10 60 1 1 1 "" "" >/dev/null 2>&1 \
+  && ok "flow add succeeded" || ko "flow add failed"
+rp_command_update a.example http://127.0.0.1:9090/ "" "" "" "" "" "" "" "" "" 1 1 1 "" "" >/dev/null 2>&1 \
+  && ok "flow update succeeded" || ko "flow update failed"
+rp_meta_load a.example
+[ "$(rp_meta_get email)" = "keep@example" ] && ok "email preserved on update" || ko "email cleared on update"
+[ "$(rp_meta_get dns_api)" = "dns_ali" ] && ok "dns_api preserved on update" || ko "dns_api cleared on update"
+[ "$(rp_meta_get custom_host)" = "custom.example" ] && ok "custom Host preserved in metadata" || ko "custom Host lost in metadata"
+grep -q 'proxy_set_header Host custom.example;' "${FLOW_TMP}/nginx/conf/vhost/a.example.conf" \
+  && ok "custom Host preserved in rendered config" || ko "custom Host lost in rendered config"
+web_install_dir="${_saved_web}"; nginx_bin="${_saved_bin}"; PATH_SSL="${_saved_ssl}"
+RP_BASE_DIR="${_saved_base}"; RP_CONF_DIR="${_saved_conf}"; RP_LUA_DIR="${_saved_lua}"
+RP_BACKUP_DIR="${_saved_backup}"; RP_LOG_FILE="${_saved_log}"; RP_PUBLIC_LOG_DIR="${_saved_logs}"
+unset _saved_web _saved_bin _saved_ssl _saved_base _saved_conf _saved_lua _saved_backup _saved_log _saved_logs
+
+ echo "== DNS-01 failure keeps the live vhost =="
+DNS_TMP="${TMP_DIR}/dns"
+mkdir -p "${DNS_TMP}/home/.acme.sh" "${DNS_TMP}/nginx/conf/vhost" "${DNS_TMP}/base/backups"
+printf '#!/bin/bash\nexit 1\n' >"${DNS_TMP}/home/.acme.sh/acme.sh"
+chmod +x "${DNS_TMP}/home/.acme.sh/acme.sh"
+printf 'live-vhost-marker\n' >"${DNS_TMP}/nginx/conf/vhost/a.example.conf"
+_saved_home="${HOME}"
+web_install_dir="${DNS_TMP}/nginx"
+PATH_SSL="${DNS_TMP}/nginx/conf/ssl"
+RP_BASE_DIR="${DNS_TMP}/base"
+RP_BACKUP_DIR="${DNS_TMP}/base/backups"
+RP_LOG_FILE="${DNS_TMP}/base/operations.log"
+HOME="${DNS_TMP}/home"
+rp_cert_issue_auto a.example "" dns_ali >/dev/null 2>&1 && ko "DNS-01 failure returned success" || ok "DNS-01 failure reported"
+[ "$(cat "${DNS_TMP}/nginx/conf/vhost/a.example.conf")" = "live-vhost-marker" ] \
+  && ok "live vhost untouched after DNS-01 failure" || ko "live vhost deleted after DNS-01 failure"
+HOME="${_saved_home}"; unset _saved_home
+web_install_dir="${_saved_web:-${TMP_DIR}/nginx}"; PATH_SSL="${_saved_ssl:-${TMP_DIR}/nginx/conf/ssl}"
+RP_BASE_DIR="${TMP_DIR}/meta"; RP_BACKUP_DIR="${TMP_DIR}/backup"; RP_LOG_FILE="${TMP_DIR}/operations.log"
 
 echo "== pure Lua rewriter =="
 lua_bin=""

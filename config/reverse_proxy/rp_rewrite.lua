@@ -32,15 +32,64 @@ function M.rewrite_text(text, upstream_origin, public_origin, public_host)
   local uh = M.escape(upstream_host)
 
   if uh ~= "" then
-    text = text:gsub("https://" .. uh, function()
-      return public_origin
-    end)
-    text = text:gsub("http://" .. uh, function()
-      return public_origin
-    end)
-    text = text:gsub("//" .. uh, function()
-      return "//" .. public_host
-    end)
+    local function replace_bounded(s, prefix_pat, replacement)
+      local pat = "(" .. prefix_pat .. uh .. ")"
+      local out = {}
+      local search = 1
+      while search <= #s do
+        local st, en = s:find(pat, search, false)
+        if not st then
+          out[#out + 1] = s:sub(search)
+          break
+        end
+
+        -- Consume an explicit numeric port together with the host so an
+        -- upstream port can never leak onto A's public origin.
+        local port_end = en
+        if s:sub(en + 1, en + 1) == ":" then
+          local j = en + 2
+          while s:sub(j, j):match("%d") do
+            j = j + 1
+          end
+          if j > en + 2 then
+            port_end = j - 1
+          end
+        end
+
+        local nxt = s:sub(port_end + 1, port_end + 1)
+        local ok = false
+        if nxt == "" then
+          ok = true
+        elseif nxt:match("^[A-Za-z0-9_~-]") then
+          ok = false
+        elseif nxt == "." then
+          -- A period is a valid sentence end, but not when it starts another
+          -- domain label (b.example.com.evil.com).
+          local after = s:sub(port_end + 2, port_end + 2)
+          if after == "" then
+            ok = true
+          elseif after:match("^[A-Za-z0-9_-]") then
+            ok = false
+          else
+            ok = true
+          end
+        else
+          ok = true
+        end
+
+        if ok then
+          out[#out + 1] = s:sub(search, st - 1)
+          out[#out + 1] = replacement
+        else
+          out[#out + 1] = s:sub(search, port_end)
+        end
+        search = port_end + 1
+      end
+      return table.concat(out)
+    end
+
+    text = replace_bounded(text, "https?://", public_origin)
+    text = replace_bounded(text, "//", "//" .. public_host)
   end
 
   return text

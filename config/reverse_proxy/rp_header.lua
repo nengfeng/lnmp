@@ -2,6 +2,7 @@
 -- header_filter_by_lua_file for LNMP reverse proxy managed sites.
 
 local h = ngx.header
+local upstream_origin = tostring(ngx.var.rp_upstream_origin or "")
 local upstream_host = tostring(ngx.var.rp_upstream_host or "")
 local public_host = tostring(ngx.var.rp_public_host or "")
 local public_origin = tostring(ngx.var.rp_public_origin or "")
@@ -10,19 +11,71 @@ local function escape(s)
   return (tostring(s):gsub("([%[%]%.%/%)%(%)%+%-%?%*%^%$%%])", "%%%1"))
 end
 
--- Rewrite Location headers that point at the upstream origin.
-if h.location and upstream_host ~= "" then
-  local uh = escape(upstream_host)
+local origin_scheme_end = upstream_origin:find("://", 1, true)
+local origin_host = upstream_origin
+if origin_scheme_end then
+  origin_host = upstream_origin:sub(origin_scheme_end + 3)
+end
+local uh = escape(origin_host)
+
+local function replace_bounded(s, prefix_pat, replacement)
+  local pat = "(" .. prefix_pat .. uh .. ")"
+  local out = {}
+  local search = 1
+  while search <= #s do
+    local st, en = s:find(pat, search, false)
+    if not st then
+      out[#out + 1] = s:sub(search)
+      break
+    end
+
+    local port_end = en
+    if s:sub(en + 1, en + 1) == ":" then
+      local j = en + 2
+      while s:sub(j, j):match("%d") do
+        j = j + 1
+      end
+      if j > en + 2 then
+        port_end = j - 1
+      end
+    end
+
+    local nxt = s:sub(port_end + 1, port_end + 1)
+    local ok = false
+    if nxt == "" then
+      ok = true
+    elseif nxt:match("^[A-Za-z0-9_~-]") then
+      ok = false
+    elseif nxt == "." then
+      local after = s:sub(port_end + 2, port_end + 2)
+      if after == "" then
+        ok = true
+      elseif after:match("^[A-Za-z0-9_-]") then
+        ok = false
+      else
+        ok = true
+      end
+    else
+      ok = true
+    end
+
+    if ok then
+      out[#out + 1] = s:sub(search, st - 1)
+      out[#out + 1] = replacement
+    else
+      out[#out + 1] = s:sub(search, port_end)
+    end
+    search = port_end + 1
+  end
+  return table.concat(out)
+end
+
+-- Rewrite Location headers that point at the upstream origin. The port is
+-- consumed with the host so an upstream port never leaks onto A.
+if h.location and uh ~= "" then
   local loc = tostring(h.location)
-  loc = loc:gsub("https://" .. uh, function()
-    return public_origin
-  end)
-  loc = loc:gsub("http://" .. uh, function()
-    return public_origin
-  end)
-  loc = loc:gsub("//" .. uh, function()
-    return "//" .. public_host
-  end)
+  loc = replace_bounded(loc, "https?://", public_origin)
+  loc = replace_bounded(loc, "//", "//" .. public_host)
   h.location = loc
 end
 
@@ -37,8 +90,14 @@ if cookies and upstream_host ~= "" then
   local uh = upstream_host:lower()
   for i, c in ipairs(cookies) do
     out[i] = tostring(c):gsub("([Dd]omain%s*=%s*)([^;%s]+)", function(prefix, dom)
-      if dom:lower() == uh then
-        return prefix .. public_host
+      local dom_l = dom:lower()
+      local dom_host = dom_l:gsub("^%.", ""):match("^([^:]+)") or dom_l
+      if dom_host == uh then
+        local repl = public_host
+        if dom_l:sub(1, 1) == "." then
+          repl = "." .. public_host
+        end
+        return prefix .. repl
       end
       return prefix .. dom
     end)

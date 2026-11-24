@@ -63,6 +63,37 @@ eq(
   "IPv6-literal upstream escaping"
 )
 
+-- Prefix matching must not eat a longer host name.
+eq(
+  m.rewrite_text("https://b.example.com.evil.com/x", "https://b.example.com", "https://a.example", "a.example"),
+  "https://b.example.com.evil.com/x",
+  "subdomain look-alike left intact"
+)
+eq(
+  m.rewrite_text("//b.example.com.evil.com/x", "https://b.example.com", "https://a.example", "a.example"),
+  "//b.example.com.evil.com/x",
+  "protocol-relative subdomain look-alike left intact"
+)
+
+-- A sentence period after the host is not part of the host.
+eq(
+  m.rewrite_text("see https://b.example.com.", "https://b.example.com", "https://a.example", "a.example"),
+  "see https://a.example.",
+  "trailing sentence period preserved"
+)
+
+-- Explicit upstream ports are consumed, not leaked onto A.
+eq(
+  m.rewrite_text("https://b.example.com:8443/x", "https://b.example.com:8443", "https://a.example", "a.example"),
+  "https://a.example/x",
+  "configured upstream port stripped"
+)
+eq(
+  m.rewrite_text("https://b.example.com:8443/x", "https://b.example.com", "https://a.example", "a.example"),
+  "https://a.example/x",
+  "explicit default-port form stripped"
+)
+
 -- Every two-chunk split of a body must match one-shot rewriting.
 local full = "head https://b.example.com:8443/path tail http://b.example.com:8443/x //b.example.com:8443/y end"
 local expected = m.rewrite_text(full, opts.upstream_origin, opts.public_origin, opts.public_host)
@@ -130,6 +161,54 @@ if over_got:sub(-#tail) == tail then
   ok("over-max tail preserved verbatim")
 else
   ko("over-max tail lost")
+end
+
+-- Header filter tests use a tiny ngx mock. setfenv is Lua 5.1/luajit only.
+if setfenv then
+  local header_path = root .. "/config/reverse_proxy/rp_header.lua"
+  local function run_header(location, cookies, content_type, content_encoding)
+    local ngx = {
+      var = {
+        rp_upstream_origin = "https://b.example.com:8443",
+        rp_upstream_host = "b.example.com",
+        rp_public_host = "a.example",
+        rp_public_origin = "https://a.example",
+      },
+      header = {
+        location = location,
+        set_cookie = cookies,
+        content_type = content_type or "text/html",
+        content_encoding = content_encoding,
+        content_length = 123,
+      },
+      ctx = {},
+    }
+    local env = setmetatable({ ngx = ngx }, { __index = _G })
+    local f = assert(loadfile(header_path))
+    setfenv(f, env)
+    f()
+    return ngx.header, ngx.ctx
+  end
+
+  local h
+  h = run_header("https://b.example.com:8443/path", nil)
+  eq(h.location, "https://a.example/path", "Location port consumed")
+  h = run_header("https://b.example.com.evil.com/x", nil)
+  eq(h.location, "https://b.example.com.evil.com/x", "Location subdomain look-alike intact")
+  h = run_header(nil, "sess=1; Domain=b.example.com:8443; Path=/")
+  local cookie = h.set_cookie
+  if type(cookie) == "table" then cookie = cookie[1] end
+  eq(cookie, "sess=1; Domain=a.example; Path=/", "Set-Cookie port stripped")
+  h = run_header(nil, "sess=1; Domain=.b.example.com; Path=/")
+  cookie = h.set_cookie
+  if type(cookie) == "table" then cookie = cookie[1] end
+  eq(cookie, "sess=1; Domain=.a.example; Path=/", "Set-Cookie leading-dot domain rewritten")
+  h = run_header(nil, nil, "image/png")
+  if h.content_length == 123 then ok("non-text Content-Length kept") else ko("non-text Content-Length cleared") end
+  h = run_header(nil, nil, "text/html")
+  if h.content_length == nil then ok("text Content-Length cleared") else ko("text Content-Length not cleared") end
+else
+  print("  [SKIP] setfenv unavailable; header filter mock skipped")
 end
 
 print()
