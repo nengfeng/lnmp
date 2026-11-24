@@ -99,6 +99,7 @@ vim options.conf
 ├── uninstall.sh        # 卸载脚本
 ├── upgrade.sh          # 升级脚本
 ├── vhost.sh            # 虚拟主机管理 (支持 HTTPS)
+├── reverse_proxy.sh    # 反向代理管理 (独立脚本，支持 L2 改写)
 ├── addons.sh           # 附加组件 (Composer/Fail2ban/WAF)
 ├── pureftpd_vhost.sh   # FTP 虚拟用户管理
 ├── reset_db_root_password.sh  # 数据库密码重置
@@ -438,6 +439,14 @@ systemctl {start|stop|restart} redis-server
 # 虚拟主机
 ./vhost.sh                    # 添加
 ./vhost.sh del                # 删除
+
+# 反向代理（独立脚本，不写入 vhost.sh 管理范围）
+./reverse_proxy.sh add -d a.example -u https://b.example
+./reverse_proxy.sh list
+./reverse_proxy.sh show -d a.example
+./reverse_proxy.sh test -d a.example
+./reverse_proxy.sh delete -d a.example
+# 详见 docs/reverse_proxy.md
 
 # 数据库密码重置
 ./reset_db_root_password.sh
