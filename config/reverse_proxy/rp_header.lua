@@ -16,7 +16,21 @@ local origin_host = upstream_origin
 if origin_scheme_end then
   origin_host = upstream_origin:sub(origin_scheme_end + 3)
 end
-local uh = escape(origin_host)
+-- Match the host without assuming its explicit port: URLs may omit the port
+-- even when the configured upstream origin carries one.
+local origin_host_only = origin_host
+if origin_host_only:sub(1, 1) == "[" then
+  local close = origin_host_only:find("]", 2, true)
+  if close then
+    origin_host_only = origin_host_only:sub(1, close)
+  end
+else
+  local port_sep = origin_host_only:find(":", 1, true)
+  if port_sep then
+    origin_host_only = origin_host_only:sub(1, port_sep - 1)
+  end
+end
+local uh = escape(origin_host_only)
 
 -- Load the pure rewrite module once per request, before any body chunk is
 -- filtered. body_filter_by_lua_file executes on every chunk, so loading it
@@ -84,6 +98,36 @@ if h.location and uh ~= "" then
   h.location = loc
 end
 
+-- Rewrite other response headers that may contain absolute upstream URLs.
+-- Content-Location / Refresh / Link are commonly generated with absolute
+-- locations; proxy_redirect only covers Location.
+local function rewrite_abs_value(value)
+  local s = tostring(value)
+  s = replace_bounded(s, "https?://", public_origin)
+  s = replace_bounded(s, "//", "//" .. public_host)
+  return s
+end
+
+local function rewrite_header_field(field)
+  local value = h[field]
+  if not value then return end
+  if type(value) == "table" then
+    local out = {}
+    for i, v in ipairs(value) do
+      out[i] = rewrite_abs_value(v)
+    end
+    h[field] = out
+  else
+    h[field] = rewrite_abs_value(value)
+  end
+end
+
+if uh ~= "" then
+  rewrite_header_field("content-location")
+  rewrite_header_field("refresh")
+  rewrite_header_field("link")
+end
+
 -- Rewrite Domain attributes on Set-Cookie. Never invent a Domain for
 -- __Host- cookies; only replace an existing exact match.
 local cookies = h.set_cookie
@@ -119,7 +163,9 @@ if not content_encoding then
   if content_type:match("^text/")
     or content_type:match("^application/javascript")
     or content_type:match("^application/json")
-    or content_type:match("^application/xml") then
+    or content_type:match("^application/xml")
+    or content_type:match("^application/xhtml%+xml")
+    or content_type:match("^application/ld%+json") then
     body_ok = true
   end
 end

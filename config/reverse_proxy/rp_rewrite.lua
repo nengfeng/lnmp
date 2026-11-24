@@ -13,6 +13,28 @@ function M.escape(s)
   return (tostring(s):gsub("([%[%]%.%/%)%(%)%+%-%?%*%^%$%%])", "%%%1"))
 end
 
+-- Return the host portion of an origin without its explicit port.
+-- IPv6 literals keep their brackets.
+function M.host_without_port(origin)
+  local s = tostring(origin or "")
+  local scheme_end = s:find("://", 1, true)
+  if scheme_end then
+    s = s:sub(scheme_end + 3)
+  end
+  if s:sub(1, 1) == "[" then
+    local close = s:find("]", 2, true)
+    if close then
+      return s:sub(1, close)
+    end
+    return s
+  end
+  local port_sep = s:find(":", 1, true)
+  if port_sep then
+    return s:sub(1, port_sep - 1)
+  end
+  return s
+end
+
 -- Rewrite upstream origins in a text segment.
 --
 -- upstream_origin is the normalized base URL of B, for example
@@ -24,12 +46,9 @@ function M.rewrite_text(text, upstream_origin, public_origin, public_host)
   public_origin = tostring(public_origin or "")
   public_host = tostring(public_host or "")
 
-  local scheme_end = upstream_origin:find("://", 1, true)
-  local upstream_host = upstream_origin
-  if scheme_end then
-    upstream_host = upstream_origin:sub(scheme_end + 3)
-  end
-  local uh = M.escape(upstream_host)
+  -- Match the host without assuming its explicit port: bodies may use
+  -- https://b.example.com/x while the configured upstream is :8443.
+  local uh = M.escape(M.host_without_port(upstream_origin))
 
   if uh ~= "" then
     local function replace_bounded(s, prefix_pat, replacement)

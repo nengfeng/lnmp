@@ -579,21 +579,41 @@ rp_nginx_test() {
   return "${rc}"
 }
 
+# Resolve the master PID from the effective configuration. Avoid pgrep -f,
+# which can match unrelated shell commands that merely contain the binary path.
+rp_nginx_pid_file() {
+  local out pid
+  out=$("${nginx_bin}" -T 2>/dev/null) || return 1
+  pid=$(printf '%s\n' "${out}" \
+    | sed -n 's/^[[:space:]]*pid[[:space:]]\+\([^;]*\);.*$/\1/p' \
+    | head -n 1)
+  [ -n "${pid}" ] || return 1
+  printf '%s\n' "${pid}"
+}
+
 rp_nginx_reload() {
-  local output
+  local output rc pid_file
   output=$("${nginx_bin}" -s reload 2>&1)
-  local rc=$?
+  rc=$?
   if [ "${rc}" -ne 0 ]; then
     printf '%s\n' "${output}" >&2
     return 1
   fi
   sleep 0.3
-  pgrep -f "${nginx_bin}" >/dev/null 2>&1 || pgrep -x nginx >/dev/null 2>&1
+  pid_file=$(rp_nginx_pid_file) || return 0
+  [ -s "${pid_file}" ] || return 0
+  kill -0 "$(cat "${pid_file}" 2>/dev/null)" 2>/dev/null
 }
 
 rp_nginx_supports_http2_on() {
   local ver major minor
-  ver=$("${nginx_bin}" -v 2>&1 | sed -n 's/.*nginx version: nginx\///p')
+  # Official nginx reports "nginx version: nginx/..." while OpenResty reports
+  # "nginx version: openresty/...". Accept both so modern OpenResty uses the
+  # http2 on; directive instead of the deprecated listen parameter.
+  ver=$("${nginx_bin}" -v 2>&1 \
+    | sed -n -e 's/.*nginx version: nginx\///p' -e 's/.*nginx version: openresty\///p' \
+    | head -n 1)
+  ver="${ver%% *}"
   [ -n "${ver}" ] || return 1
   major="${ver%%.*}"
   minor="${ver#*.}"; minor="${minor%%.*}"
@@ -664,6 +684,7 @@ EOF
     rewrite_block=$(cat <<'EOF'
 
         proxy_set_header Accept-Encoding "";
+        proxy_redirect off;
         header_filter_by_lua_file __RP_HEADER_LUA__;
         body_filter_by_lua_file __RP_BODY_LUA__;
 EOF

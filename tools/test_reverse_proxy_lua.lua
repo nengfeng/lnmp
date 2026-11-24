@@ -93,6 +93,16 @@ eq(
   "https://a.example/x",
   "explicit default-port form stripped"
 )
+eq(
+  m.rewrite_text("https://b.example.com/x", "https://b.example.com:8443", "https://a.example", "a.example"),
+  "https://a.example/x",
+  "body URL without explicit upstream port rewritten"
+)
+eq(
+  m.rewrite_text("//b.example.com/x", "http://b.example.com:8080", "http://a.example", "a.example"),
+  "//a.example/x",
+  "protocol-relative body URL without port rewritten"
+)
 
 -- Every two-chunk split of a body must match one-shot rewriting.
 local full = "head https://b.example.com:8443/path tail http://b.example.com:8443/x //b.example.com:8443/y end"
@@ -166,7 +176,7 @@ end
 -- Header filter tests use a tiny ngx mock. setfenv is Lua 5.1/luajit only.
 if setfenv then
   local header_path = root .. "/config/reverse_proxy/rp_header.lua"
-  local function run_header(location, cookies, content_type, content_encoding)
+  local function run_header(location, cookies, content_type, content_encoding, extra_headers)
     local ngx = {
       var = {
         rp_upstream_origin = "https://b.example.com:8443",
@@ -184,6 +194,9 @@ if setfenv then
       },
       ctx = {},
     }
+    for k, v in pairs(extra_headers or {}) do
+      ngx.header[k] = v
+    end
     local env = setmetatable({ ngx = ngx }, { __index = _G })
     local f = assert(loadfile(header_path))
     setfenv(f, env)
@@ -197,6 +210,29 @@ if setfenv then
   if hctx.rp_rewrite then ok("header filter loads rewrite module once per request") else ko("header filter did not load rewrite module") end
   h = run_header("https://b.example.com.evil.com/x", nil)
   eq(h.location, "https://b.example.com.evil.com/x", "Location subdomain look-alike intact")
+  h = run_header(nil, nil, "text/html", nil, {
+    ["content-location"] = "https://b.example.com:8443/x?y=1",
+    ["refresh"] = "5; url=https://b.example.com/path",
+    ["link"] = "<https://b.example.com/a.css>; rel=preload",
+  })
+  eq(h["content-location"], "https://a.example/x?y=1", "Content-Location rewritten")
+  eq(h["refresh"], "5; url=https://a.example/path", "Refresh rewritten")
+  eq(h["link"], "<https://a.example/a.css>; rel=preload", "Link string rewritten")
+  h = run_header(nil, nil, "text/html", nil, {
+    ["link"] = { "<https://b.example.com/a.css>; rel=preload", "<//b.example.com/b.js>; rel=script" },
+  })
+  if type(h["link"]) == "table" then
+    eq(h["link"][1], "<https://a.example/a.css>; rel=preload", "Link table entry rewritten")
+    eq(h["link"][2], "<//a.example/b.js>; rel=script", "Link protocol-relative rewritten")
+  else
+    ko("Link table lost")
+  end
+  h = run_header(nil, nil, "application/xhtml+xml", nil)
+  eq(h.content_length, nil, "xhtml content-length cleared")
+  h = run_header(nil, nil, "application/ld+json", nil)
+  eq(h.content_length, nil, "json-ld content-length cleared")
+  h = run_header(nil, nil, "application/pdf", nil)
+  eq(h.content_length, 123, "pdf content-length kept")
   h = run_header(nil, "sess=1; Domain=b.example.com:8443; Path=/")
   local cookie = h.set_cookie
   if type(cookie) == "table" then cookie = cookie[1] end

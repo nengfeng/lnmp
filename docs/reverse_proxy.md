@@ -733,3 +733,8 @@ curl -H 'Host: a.example' http://127.0.0.1/ | grep -i 'b.example'
 - 备份按 label 保留最近 10 份（`RP_BACKUP_KEEP` 可覆盖）。
 - Cookie Domain 同时处理前导点和末尾根点。
 - `test` 使用 `--resolve` 让 HTTPS 探测带正确 SNI。
+- rewrite 模式显式 `proxy_redirect off`，避免与 Lua 双改 Location；no-rewrite 保留 nginx 默认行为。
+- header filter 同时改写 `Refresh`、`Content-Location`、`Link`；body 重写支持省略上游端口（如上游 `:8080`，正文为 `//b.example.com/x`）。
+- body 覆盖类型增加 `application/xhtml+xml`、`application/ld+json`。
+- OpenResty 版本字符串按 `openresty/` 解析，现代 OpenResty 使用 `http2 on;`。
+- reload 存活检查改为读取配置中的 master PID 文件，不再使用 `pgrep -f`。

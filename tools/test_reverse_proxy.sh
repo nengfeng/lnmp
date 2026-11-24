@@ -114,6 +114,7 @@ echo "${conf}" | grep -q 'header_filter_by_lua_file' && ok "rewrite header filte
 echo "${conf}" | grep -q 'body_filter_by_lua_file' && ok "rewrite body filter present" || ko "rewrite body filter missing"
 echo "${conf}" | grep -q 'proxy_set_header Accept-Encoding "";' && ok "identity encoding requested" || ko "identity encoding missing"
 echo "${conf}" | grep -q 'proxy_ssl_verify on;' && ok "upstream TLS verification on" || ko "upstream TLS verification missing"
+echo "${conf}" | grep -q 'proxy_redirect off;' && ok "proxy_redirect disabled with rewrite" || ko "proxy_redirect missing in rewrite mode"
 if ca=$(rp_ca_bundle_path); then
   echo "${conf}" | grep -q "proxy_ssl_trusted_certificate ${ca};" \
     && ok "CA bundle configured (${ca})" || ko "CA bundle missing from config"
@@ -131,6 +132,7 @@ echo "${conf_none}" | grep -q 'ssl_certificate' && ko "cert none still has TLS" 
 echo "${conf_none}" | grep -q 'well-known/acme-challenge' && ko "cert none has ACME challenge" || ok "cert none omits ACME challenge"
 echo "${conf_none}" | grep -q 'header_filter_by_lua_file' && ko "no-rewrite still has Lua" || ok "no-rewrite omits Lua"
 echo "${conf_none}" | grep -q 'proxy_pass https://b.example.com;' && ok "proxy_pass rendered" || ko "proxy_pass missing"
+echo "${conf_none}" | grep -q 'proxy_redirect off;' && ko "proxy_redirect off in no-rewrite mode" || ok "no-rewrite leaves nginx proxy_redirect default"
 
 echo "== subcommand domain validation =="
 if rp_command_show '../../etc/cron.d/x' >/dev/null 2>&1; then
@@ -224,6 +226,31 @@ rp_valid_timeout abc && ko "timeout abc accepted" || ok "timeout abc rejected"
   && ok "probe Host public uses A" || ko "probe Host public wrong"
 [ "$(rp_host_header_value upstream custom.example b.example a.example)" = "b.example" ] \
   && ok "probe Host upstream uses B" || ko "probe Host upstream wrong"
+
+echo "== version and reload probing =="
+_saved_nginx_bin="${nginx_bin}"
+fake_ver="${TMP_DIR}/nginx-openresty-version"
+cat >"${fake_ver}" <<'EOS'
+#!/bin/sh
+if [ "$1" = "-v" ]; then echo "nginx version: openresty/1.27.4.1"; exit 0; fi
+exit 0
+EOS
+chmod +x "${fake_ver}"
+nginx_bin="${fake_ver}"
+if rp_nginx_supports_http2_on; then ok "openresty version parsed"; else ko "openresty version not parsed"; fi
+cat >"${fake_ver}" <<'EOS'
+#!/bin/sh
+if [ "$1" = "-v" ]; then echo "nginx version: openresty/1.21.4.1"; exit 0; fi
+exit 0
+EOS
+if rp_nginx_supports_http2_on; then ko "old openresty accepted as http2 on"; else ok "old openresty rejected"; fi
+nginx_bin="${_saved_nginx_bin}"
+if awk '/^rp_nginx_reload\(\) \{/,/^\}/' include/reverse_proxy.sh | grep -q 'pgrep'; then
+  ko "pgrep still used by reload"
+else
+  ok "no pgrep fallback in reload"
+fi
+unset _saved_nginx_bin
 
 echo "== backup rotation =="
 BK_TMP="${TMP_DIR}/bk"
